@@ -43,8 +43,12 @@ _SL_ATR_MULT: Decimal = Decimal("1.5")
 _TP1_ATR_MULT: Decimal = Decimal("2.0")
 _TP2_ATR_MULT: Decimal = Decimal("3.0")
 
-# Fallback ATR when no ATR can be computed (0.2% of entry price).
+# Fallback stop-loss distance when ATR is unavailable (0.2% of entry price).
 _ATR_FALLBACK_PCT: Decimal = Decimal("0.002")
+
+# Minimum stop-loss floor when the computed stop-loss turns non-positive
+# (e.g. entry near zero): expressed as a fraction of entry price.
+_FALLBACK_SL_PCT: Decimal = Decimal("0.001")
 
 # Number of triggers needed for full confidence (confidence = triggers / N).
 _MAX_TRIGGERS_FOR_CONFIDENCE: float = 4.0
@@ -230,7 +234,7 @@ class SignalEngineService(BaseService):
 
         # Guard: stop_loss must be strictly positive.
         if stop_loss <= Decimal("0"):
-            stop_loss = entry_price * Decimal("0.001")
+            stop_loss = entry_price * _FALLBACK_SL_PCT
 
         # ── Signal strength and confidence ───────────────────────────────────
         raw_strength = min(1.0, len(triggers) / _MAX_TRIGGERS_FOR_CONFIDENCE)

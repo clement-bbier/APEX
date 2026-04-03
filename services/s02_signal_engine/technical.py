@@ -269,8 +269,9 @@ class TechnicalAnalyzer:
             arr = np.array([b["close"] for b in bars[start:end]])
             widths.append(4.0 * float(np.std(arr, ddof=1)))
 
-        # widths[0] is the most recent; squeeze if it is the minimum.
-        return widths[0] <= min(widths[1:])
+        # A squeeze is confirmed when the current period's width is at or below
+        # the minimum of all 6 periods (i.e. it is the 6-period minimum itself).
+        return widths[0] <= min(widths)
 
     def ema(self, period: int, timeframe: str = "5m") -> Optional[Decimal]:
         """Exponential moving average of bar close prices.

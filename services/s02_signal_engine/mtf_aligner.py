@@ -110,12 +110,12 @@ class MTFAligner:
         """
 
         def _direction(tf: str) -> Direction | None:
-            if tf in self._stances:
-                try:
-                    return Direction(self._stances[tf][0])
-                except ValueError:
-                    return None
-            return None
+            if tf not in self._stances:
+                return None
+            try:
+                return Direction(self._stances[tf][0])
+            except ValueError:
+                return None
 
         return MTFContext(
             tf_1d=_direction("1d"),
