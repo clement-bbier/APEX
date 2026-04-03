@@ -1,14 +1,13 @@
-//! APEX Risk Engine — PyO3 0.28 / numpy 0.22 / ndarray 0.15 extension.
+//! APEX Risk Engine — PyO3 0.28 / numpy 0.28 / ndarray 0.16 extension.
 //!
 //! Exposes portfolio-level risk calculations:
 //! - `compute_exposure`: Sum of absolute notional values.
 //! - `compute_correlation_matrix`: Pearson pairwise correlation.
 //! - `max_drawdown`: Maximum peak-to-trough drawdown of an equity curve.
 
-use ndarray::{Array1, Array2, Axis};
-use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use ndarray::Array2;
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use pyo3::prelude::*;
-use rayon::prelude::*;
 
 // ── Python-exported functions ─────────────────────────────────────────────────
 
@@ -152,7 +151,7 @@ mod tests {
 
     #[test]
     fn exposure_sum() {
-        let notionals = vec![10_000.0, -5_000.0, 8_000.0];
+        let notionals: Vec<f64> = vec![10_000.0, -5_000.0, 8_000.0];
         let exp: f64 = notionals.iter().map(|x| x.abs()).sum();
         assert_eq!(exp, 23_000.0);
     }
