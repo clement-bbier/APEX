@@ -7,13 +7,12 @@ Signals are immutable and carry full context for traceability.
 from __future__ import annotations
 
 from decimal import Decimal
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class Direction(str, Enum):
+class Direction(StrEnum):
     """Trade direction."""
 
     LONG = "long"
@@ -21,7 +20,7 @@ class Direction(str, Enum):
     FLAT = "flat"
 
 
-class SignalType(str, Enum):
+class SignalType(StrEnum):
     """Source of the signal for attribution."""
 
     OFI = "ofi"
@@ -48,11 +47,11 @@ class MTFContext(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    tf_1d: Optional[Direction] = None
-    tf_4h: Optional[Direction] = None
-    tf_1h: Optional[Direction] = None
-    tf_15m: Optional[Direction] = None
-    tf_5m: Optional[Direction] = None
+    tf_1d: Direction | None = None
+    tf_4h: Direction | None = None
+    tf_1h: Direction | None = None
+    tf_15m: Direction | None = None
+    tf_5m: Direction | None = None
     alignment_score: float = Field(
         default=0.0,
         ge=0.0,
@@ -73,36 +72,36 @@ class TechnicalFeatures(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     # RSI
-    rsi_1m: Optional[float] = None
-    rsi_5m: Optional[float] = None
-    rsi_15m: Optional[float] = None
+    rsi_1m: float | None = None
+    rsi_5m: float | None = None
+    rsi_15m: float | None = None
 
     # Bollinger Bands
-    bb_upper: Optional[Decimal] = None
-    bb_middle: Optional[Decimal] = None
-    bb_lower: Optional[Decimal] = None
+    bb_upper: Decimal | None = None
+    bb_middle: Decimal | None = None
+    bb_lower: Decimal | None = None
     bb_squeeze: bool = False
 
     # EMAs
-    ema_8: Optional[Decimal] = None
-    ema_21: Optional[Decimal] = None
-    ema_55: Optional[Decimal] = None
+    ema_8: Decimal | None = None
+    ema_21: Decimal | None = None
+    ema_55: Decimal | None = None
 
     # VWAP
-    vwap: Optional[Decimal] = None
+    vwap: Decimal | None = None
 
     # ATR
-    atr_14: Optional[Decimal] = None
+    atr_14: Decimal | None = None
 
     # Volume Profile
-    poc: Optional[Decimal] = None   # Point of Control
-    vah: Optional[Decimal] = None   # Value Area High
-    val: Optional[Decimal] = None   # Value Area Low
+    poc: Decimal | None = None  # Point of Control
+    vah: Decimal | None = None  # Value Area High
+    val: Decimal | None = None  # Value Area Low
 
     # Microstructure
-    ofi: Optional[float] = None     # Order Flow Imbalance
-    cvd: Optional[float] = None     # Cumulative Volume Delta
-    kyle_lambda: Optional[float] = None  # Price impact coefficient
+    ofi: float | None = None  # Order Flow Imbalance
+    cvd: float | None = None  # Cumulative Volume Delta
+    kyle_lambda: float | None = None  # Price impact coefficient
 
 
 class Signal(BaseModel):
@@ -160,8 +159,8 @@ class Signal(BaseModel):
     )
 
     # Context
-    features: Optional[TechnicalFeatures] = None
-    mtf_context: Optional[MTFContext] = None
+    features: TechnicalFeatures | None = None
+    mtf_context: MTFContext | None = None
 
     @field_validator("symbol")
     @classmethod
@@ -170,7 +169,7 @@ class Signal(BaseModel):
         return v.upper()
 
     @model_validator(mode="after")
-    def validate_price_levels(self) -> "Signal":
+    def validate_price_levels(self) -> Signal:
         """Validate stop loss and take profit are sensible relative to entry."""
         if self.direction == Direction.LONG:
             if self.stop_loss >= self.entry:
@@ -193,7 +192,7 @@ class Signal(BaseModel):
         return self
 
     @property
-    def risk_reward(self) -> Optional[float]:
+    def risk_reward(self) -> float | None:
         """Compute risk/reward ratio using scalp target."""
         risk = abs(self.entry - self.stop_loss)
         reward = abs(self.take_profit[0] - self.entry)

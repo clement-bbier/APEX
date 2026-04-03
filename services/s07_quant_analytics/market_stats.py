@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Optional
 
 
 class MarketStats:
@@ -37,9 +36,7 @@ class MarketStats:
             cov = np.mean((arr[k:] - mean) * (arr[:-k] - mean))
             autocorrs.append(cov / variance)
 
-        q_stat = n * (n + 2) * sum(
-            (rho ** 2) / (n - k) for k, rho in enumerate(autocorrs, start=1)
-        )
+        q_stat = n * (n + 2) * sum((rho**2) / (n - k) for k, rho in enumerate(autocorrs, start=1))
         # Approximate 5% critical value for chi-squared with `lags` degrees of freedom
         critical_value = lags * 1.5
         return {"q_stat": float(q_stat), "significant": bool(q_stat > critical_value)}
@@ -99,12 +96,10 @@ class MarketStats:
         arr = np.array(returns, dtype=float)
         sigma2 = np.var(arr) if len(arr) > 1 else omega
         for r in arr:
-            sigma2 = omega + alpha * (r ** 2) + beta * sigma2
+            sigma2 = omega + alpha * (r**2) + beta * sigma2
         return float(np.sqrt(max(sigma2, 0.0)))
 
-    def realized_vs_implied_ratio(
-        self, realized_vol: float, implied_vol: float
-    ) -> Optional[float]:
+    def realized_vs_implied_ratio(self, realized_vol: float, implied_vol: float) -> float | None:
         """Compute the ratio of realized to implied volatility.
 
         Args:

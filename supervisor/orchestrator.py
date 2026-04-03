@@ -139,6 +139,7 @@ class Orchestrator:
         """
         try:
             import zmq
+
             ctx = zmq.Context.instance()
             sock = ctx.socket(zmq.PUB)
             sock.bind(f"tcp://*:{self._settings.zmq_pub_port}")

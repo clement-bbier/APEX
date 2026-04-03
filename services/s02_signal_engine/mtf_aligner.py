@@ -7,7 +7,7 @@ and a session-based bonus multiplier.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from core.models.signal import Direction, MTFContext
 
@@ -52,11 +52,7 @@ class MTFAligner:
         Returns:
             Alignment score in [0, 1], or ``0.0`` if no stances are set.
         """
-        populated = [
-            (tf, stance)
-            for tf, stance in self._stances.items()
-            if tf in _TIMEFRAMES
-        ]
+        populated = [(tf, stance) for tf, stance in self._stances.items() if tf in _TIMEFRAMES]
         if not populated:
             return 0.0
         aligned = sum(1 for _, (d, _) in populated if d == target_direction)
@@ -79,7 +75,7 @@ class MTFAligner:
         Returns:
             Multiplier float in the range [0.70, 1.20].
         """
-        dt = datetime.fromtimestamp(timestamp_ms / 1_000.0, tz=timezone.utc)
+        dt = datetime.fromtimestamp(timestamp_ms / 1_000.0, tz=UTC)
         total_minutes = dt.hour * 60 + dt.minute
 
         # US open (14:30–15:30 UTC)

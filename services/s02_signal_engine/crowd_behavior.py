@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from collections import deque
 from decimal import Decimal
-from typing import Optional
 
 import numpy as np
 
@@ -71,9 +70,7 @@ class CrowdBehaviorAnalyzer:
                 opt_type = str(contract.get("type", "call")).lower()
                 sign = -1.0 if opt_type == "put" else 1.0
                 contribution = sign * gamma * oi * 100.0
-                self._gex_by_strike[strike] = (
-                    self._gex_by_strike.get(strike, 0.0) + contribution
-                )
+                self._gex_by_strike[strike] = self._gex_by_strike.get(strike, 0.0) + contribution
                 net_gex += contribution
             except (KeyError, ValueError, TypeError):
                 continue
@@ -142,7 +139,7 @@ class CrowdBehaviorAnalyzer:
         self._latest_funding = funding_rate
         self._funding_history.append(funding_rate)
 
-    def funding_extreme(self) -> Optional[str]:
+    def funding_extreme(self) -> str | None:
         """Classify the current funding rate as a crowd extreme.
 
         Returns:
@@ -166,7 +163,7 @@ class CrowdBehaviorAnalyzer:
         """
         self._oi_history.append(oi)
 
-    def oi_trend(self) -> Optional[str]:
+    def oi_trend(self) -> str | None:
         """Classify the recent open-interest trend from the last 5 readings.
 
         Returns:
@@ -211,8 +208,11 @@ class CrowdBehaviorAnalyzer:
         # five granular levels per side without overwhelming the consumer.
         multipliers = [0.5, 1.0, 1.5, 2.0, 2.5]
         longs = sorted(
-            [round(current_price - m * price_std, 8) for m in multipliers
-             if current_price - m * price_std > 0],
+            [
+                round(current_price - m * price_std, 8)
+                for m in multipliers
+                if current_price - m * price_std > 0
+            ],
             reverse=True,  # nearest first
         )
         shorts = sorted(

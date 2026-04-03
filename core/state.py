@@ -7,11 +7,10 @@ All operations are async using redis[asyncio].
 from __future__ import annotations
 
 import json
-from typing import Any, AsyncIterator, Optional
+from typing import Any
 
 import redis.asyncio as aioredis
 from redis.asyncio import Redis
-from redis.exceptions import RedisError
 
 from core.config import get_settings
 from core.logger import get_logger
@@ -34,7 +33,7 @@ class StateStore:
         """
         self._service_id = service_id
         self._settings = get_settings()
-        self._redis: Optional[Redis] = None
+        self._redis: Redis | None = None
 
     async def connect(self) -> None:
         """Create the Redis connection pool.
@@ -72,14 +71,13 @@ class StateStore:
         """
         if self._redis is None:
             raise RuntimeError(
-                f"[{self._service_id}] StateStore not connected. "
-                "Call connect() first."
+                f"[{self._service_id}] StateStore not connected. Call connect() first."
             )
         return self._redis
 
     # ── Key/Value ─────────────────────────────────────────────────────────────
 
-    async def get(self, key: str) -> Optional[Any]:
+    async def get(self, key: str) -> Any | None:
         """Get a JSON-deserialized value by key.
 
         Args:
@@ -98,7 +96,7 @@ class StateStore:
         self,
         key: str,
         value: Any,
-        ttl: Optional[int] = None,
+        ttl: int | None = None,
     ) -> None:
         """Set a key with JSON-serialized value.
 
@@ -134,7 +132,7 @@ class StateStore:
 
     # ── Hash ──────────────────────────────────────────────────────────────────
 
-    async def hget(self, name: str, field: str) -> Optional[Any]:
+    async def hget(self, name: str, field: str) -> Any | None:
         """Get a field from a Redis hash.
 
         Args:
@@ -224,7 +222,7 @@ class StateStore:
         stream: str,
         last_id: str = "0",
         count: int = 100,
-        block_ms: Optional[int] = None,
+        block_ms: int | None = None,
     ) -> list[tuple[str, dict[str, Any]]]:
         """Read entries from a Redis Stream.
 
@@ -238,9 +236,7 @@ class StateStore:
             List of (entry_id, data_dict) tuples.
         """
         r = self._ensure_connected()
-        results = await r.xread(
-            {stream: last_id}, count=count, block=block_ms
-        )
+        results = await r.xread({stream: last_id}, count=count, block=block_ms)
         entries: list[tuple[str, dict[str, Any]]] = []
         if results:
             for _stream_name, records in results:

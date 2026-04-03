@@ -36,8 +36,8 @@ def generate_btcusdt_fixture(n_candles: int = 43_200) -> None:
     timestamps = pd.date_range("2024-01-01", periods=n_candles, freq="1min", tz="UTC")
 
     # GBM parameters
-    mu = 0.00002      # drift per minute
-    sigma = 0.001     # volatility per minute
+    mu = 0.00002  # drift per minute
+    sigma = 0.001  # volatility per minute
 
     # Generate log-normal returns
     dt = 1.0

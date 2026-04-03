@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from decimal import Decimal
-from typing import Optional
 
 from core.logger import get_logger
 from core.state import StateStore
@@ -91,7 +90,9 @@ class PnLTracker:
         curve = await state.lrange("equity_curve", 0, -1)
         if len(curve) < 2:
             return 0.0
-        equity_values = [float(e.get("equity", 0)) if isinstance(e, dict) else float(e) for e in curve]
+        equity_values = [
+            float(e.get("equity", 0)) if isinstance(e, dict) else float(e) for e in curve
+        ]
         peak = equity_values[0]
         max_dd = 0.0
         for val in equity_values:

@@ -10,7 +10,6 @@ import hashlib
 import hmac
 import time
 import urllib.parse
-from typing import Optional
 
 import aiohttp
 
@@ -44,15 +43,13 @@ class BinanceBroker:
         self._secret_key = secret_key
         self._base_url = base_url.rstrip("/")
         self._testnet = testnet
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._session: aiohttp.ClientSession | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def connect(self) -> None:
         """Create the underlying :class:`aiohttp.ClientSession`."""
-        self._session = aiohttp.ClientSession(
-            headers={"X-MBX-APIKEY": self._api_key}
-        )
+        self._session = aiohttp.ClientSession(headers={"X-MBX-APIKEY": self._api_key})
 
     async def disconnect(self) -> None:
         """Close the HTTP session and release resources."""
@@ -88,8 +85,8 @@ class BinanceBroker:
         side: str,
         order_type: str,
         quantity: float,
-        price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        price: float | None = None,
+        stop_price: float | None = None,
     ) -> dict:
         """Submit a signed order to Binance.
 
@@ -121,9 +118,7 @@ class BinanceBroker:
             params.pop("timeInForce", None)
 
         params["signature"] = self._sign(params)
-        async with session.post(
-            f"{self._base_url}/api/v3/order", params=params
-        ) as resp:
+        async with session.post(f"{self._base_url}/api/v3/order", params=params) as resp:
             resp.raise_for_status()
             return await resp.json()
 
@@ -141,14 +136,12 @@ class BinanceBroker:
             "timestamp": int(time.time() * 1000),
         }
         params["signature"] = self._sign(params)
-        async with session.delete(
-            f"{self._base_url}/api/v3/order", params=params
-        ) as resp:
+        async with session.delete(f"{self._base_url}/api/v3/order", params=params) as resp:
             resp.raise_for_status()
 
     # ── Account / position queries ────────────────────────────────────────────
 
-    async def get_position(self, symbol: str) -> Optional[dict]:
+    async def get_position(self, symbol: str) -> dict | None:
         """Retrieve the current holding for a spot symbol.
 
         Fetches the account snapshot and returns the balance entry for the
@@ -189,9 +182,7 @@ class BinanceBroker:
         session = self._ensure_session()
         params = {"timestamp": int(time.time() * 1000)}
         params["signature"] = self._sign(params)
-        async with session.get(
-            f"{self._base_url}/api/v3/account", params=params
-        ) as resp:
+        async with session.get(f"{self._base_url}/api/v3/account", params=params) as resp:
             resp.raise_for_status()
             return await resp.json()
 

@@ -15,12 +15,10 @@ from __future__ import annotations
 import math
 from collections import defaultdict
 from decimal import Decimal
-from typing import Optional
 
 import numpy as np
 
 from core.models.order import TradeRecord
-
 
 # Annualisation factor for 1-minute bars (252 trading days × 390 min/day)
 _ANNUAL_FACTOR_1M: float = math.sqrt(252 * 390)
@@ -54,7 +52,7 @@ def sharpe_ratio(
     if len(returns) < 2:
         return 0.0
     arr = np.asarray(returns)
-    rf_per_period = risk_free_rate / (annual_factor ** 2)
+    rf_per_period = risk_free_rate / (annual_factor**2)
     excess = arr - rf_per_period
     std = float(np.std(excess, ddof=1))
     if std == 0:
@@ -82,7 +80,7 @@ def sortino_ratio(
     if len(returns) < 2:
         return 0.0
     arr = np.asarray(returns)
-    rf_per_period = risk_free_rate / (annual_factor ** 2)
+    rf_per_period = risk_free_rate / (annual_factor**2)
     excess = arr - rf_per_period
     downside = excess[excess < 0]
     if len(downside) == 0:
@@ -186,9 +184,7 @@ def avg_win_loss(trades: list[TradeRecord]) -> tuple[float, float]:
     return avg_w, avg_l
 
 
-def equity_curve_from_trades(
-    initial_capital: float, trades: list[TradeRecord]
-) -> list[float]:
+def equity_curve_from_trades(initial_capital: float, trades: list[TradeRecord]) -> list[float]:
     """Build an equity curve from sorted trade records.
 
     Args:
@@ -288,12 +284,10 @@ def full_report(
 
     curve = equity_curve_from_trades(initial_capital, trades)
     period_returns = [
-        (curve[i] - curve[i - 1]) / curve[i - 1]
-        for i in range(1, len(curve))
-        if curve[i - 1] > 0
+        (curve[i] - curve[i - 1]) / curve[i - 1] for i in range(1, len(curve)) if curve[i - 1] > 0
     ]
     final_equity = curve[-1]
-    annual_return = (final_equity / initial_capital - 1)  # simplified single-period
+    annual_return = final_equity / initial_capital - 1  # simplified single-period
 
     dd, dd_dur = max_drawdown(curve)
     avg_w, avg_l = avg_win_loss(trades)

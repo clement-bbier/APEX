@@ -10,12 +10,12 @@ from __future__ import annotations
 import asyncio
 import time
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from core.base_service import BaseService
 from core.config import TradingMode, get_settings
 from core.models.order import ApprovedOrder, ExecutedOrder
-from core.models.tick import NormalizedTick, Market
+from core.models.tick import Market, NormalizedTick
 from services.s06_execution.broker_alpaca import AlpacaBroker
 from services.s06_execution.broker_binance import BinanceBroker
 from services.s06_execution.order_manager import OrderManager
@@ -70,8 +70,8 @@ class ExecutionService(BaseService):
         self._paper = PaperTrader()
         self._order_manager = OrderManager(self.state)
 
-        self._alpaca: Optional[AlpacaBroker] = None
-        self._binance: Optional[BinanceBroker] = None
+        self._alpaca: AlpacaBroker | None = None
+        self._binance: BinanceBroker | None = None
 
         if settings.trading_mode == TradingMode.LIVE:
             self._alpaca = AlpacaBroker(
@@ -148,7 +148,7 @@ class ExecutionService(BaseService):
         broker_order_id = await self._order_manager.submit(approved)
 
         try:
-            executed: Optional[ExecutedOrder] = None
+            executed: ExecutedOrder | None = None
 
             if settings.trading_mode == TradingMode.PAPER:
                 # Build a minimal synthetic tick for liquidity checks.
@@ -171,9 +171,7 @@ class ExecutionService(BaseService):
                 await self._on_filled(executed)
 
         except Exception as exc:
-            await self._order_manager.cancel(
-                approved.order_id, reason=str(exc)
-            )
+            await self._order_manager.cancel(approved.order_id, reason=str(exc))
             self.logger.error(
                 "Execution failed, order cancelled",
                 order_id=approved.order_id,
@@ -248,9 +246,7 @@ class ExecutionService(BaseService):
         symbol = executed.symbol
         order_id = executed.order_id
 
-        await self._order_manager.confirm(
-            order_id, executed.fill_price, executed.fill_size
-        )
+        await self._order_manager.confirm(order_id, executed.fill_price, executed.fill_size)
 
         # Upsert position in Redis.
         position = {

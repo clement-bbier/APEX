@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import aiohttp
 
 
@@ -11,8 +9,17 @@ class SectorRotation:
     """Fetches sector ETF performance and classifies risk-on/off market environment."""
 
     SECTOR_ETFS: list[str] = [
-        "XLK", "XLE", "XLF", "XLV", "XLU",
-        "XLI", "XLB", "XLY", "XLP", "XLRE", "XLC",
+        "XLK",
+        "XLE",
+        "XLF",
+        "XLV",
+        "XLU",
+        "XLI",
+        "XLB",
+        "XLY",
+        "XLP",
+        "XLRE",
+        "XLC",
     ]
 
     _YAHOO_QUOTE_URL = (
@@ -32,9 +39,7 @@ class SectorRotation:
             for symbol in self.SECTOR_ETFS:
                 try:
                     url = self._YAHOO_QUOTE_URL.format(symbol=symbol)
-                    async with session.get(
-                        url, timeout=aiohttp.ClientTimeout(total=10)
-                    ) as resp:
+                    async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                         data = await resp.json()
 
                     closes = (
@@ -47,7 +52,7 @@ class SectorRotation:
                     if len(closes) >= 2 and closes[-2] and closes[-2] != 0:
                         pct = (closes[-1] - closes[-2]) / closes[-2]
                         performance[symbol] = float(pct)
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
 
         return performance
@@ -82,9 +87,7 @@ class SectorRotation:
             return "risk_off"
         return "neutral"
 
-    def sector_strength_matrix(
-        self, performance: dict[str, float]
-    ) -> list[dict]:
+    def sector_strength_matrix(self, performance: dict[str, float]) -> list[dict]:
         """Build a ranked sector strength matrix.
 
         Args:

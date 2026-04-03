@@ -115,9 +115,7 @@ class RiskManagerService(BaseService):
             return
 
         # ── 3. Exposure monitor ────────────────────────────────────────────────
-        ok, reason = await self._exposure.check_exposure(
-            candidate, self.state, capital, settings
-        )
+        ok, reason = await self._exposure.check_exposure(candidate, self.state, capital, settings)
         if not ok:
             await self._block(candidate, now_ms, reason=reason, blocker="exposure_monitor")
             return
@@ -196,9 +194,7 @@ class RiskManagerService(BaseService):
                 if daily_pnl_raw is not None:
                     daily_pnl_pct = float(daily_pnl_raw)
                     if self._breaker.check_daily_drawdown(daily_pnl_pct):
-                        self._breaker.trip(
-                            f"daily drawdown {daily_pnl_pct:.2f}% exceeded limit"
-                        )
+                        self._breaker.trip(f"daily drawdown {daily_pnl_pct:.2f}% exceeded limit")
                         await self.state.set(
                             "circuit_breaker:state",
                             "open",

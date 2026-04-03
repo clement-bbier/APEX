@@ -5,7 +5,9 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
-from hypothesis import given, settings as hyp_settings, strategies as st
+from hypothesis import given
+from hypothesis import settings as hyp_settings
+from hypothesis import strategies as st
 
 from core.config import Settings
 from core.models.order import OrderCandidate
@@ -56,9 +58,7 @@ def settings() -> Settings:
 
 
 class TestPositionRules:
-    def test_valid_order_passes(
-        self, rules: PositionRules, settings: Settings
-    ) -> None:
+    def test_valid_order_passes(self, rules: PositionRules, settings: Settings) -> None:
         candidate = _make_candidate(
             size=Decimal("0.001"),
             entry=Decimal("50000"),
@@ -91,9 +91,7 @@ class TestPositionRules:
         assert ok is False
         assert "position_value" in reason
 
-    def test_valid_stop_loss_passes(
-        self, rules: PositionRules, settings: Settings
-    ) -> None:
+    def test_valid_stop_loss_passes(self, rules: PositionRules, settings: Settings) -> None:
         # A tiny stop_loss > 0 should not be blocked by the stop_loss check
         candidate = _make_candidate(
             size=Decimal("0.001"),
@@ -104,9 +102,7 @@ class TestPositionRules:
         # Position value = 0.001 * 50000 = 50, well within 10% limit
         assert ok is True
 
-    def test_short_order_passes(
-        self, rules: PositionRules, settings: Settings
-    ) -> None:
+    def test_short_order_passes(self, rules: PositionRules, settings: Settings) -> None:
         candidate = _make_candidate(
             direction=Direction.SHORT,
             size=Decimal("0.001"),
@@ -117,15 +113,11 @@ class TestPositionRules:
 
 
 @given(
-    capital=st.decimals(
-        min_value=Decimal("1000"), max_value=Decimal("1000000"), places=2
-    ),
+    capital=st.decimals(min_value=Decimal("1000"), max_value=Decimal("1000000"), places=2),
     risk_pct=st.floats(0.1, 0.5),
 )
 @hyp_settings(max_examples=200)
-def test_approved_order_never_exceeds_max_risk(
-    capital: Decimal, risk_pct: float
-) -> None:
+def test_approved_order_never_exceeds_max_risk(capital: Decimal, risk_pct: float) -> None:
     """Property: no approved order ever exceeds max_position_risk_pct capital risk."""
     settings = Settings(
         max_position_risk_pct=risk_pct,

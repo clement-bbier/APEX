@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-import pytest
-
 from core.models.tick import Market, NormalizedTick, Session
 from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
 

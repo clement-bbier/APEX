@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 
 class SurpriseIndex:
     """Computes economic data surprise scores and regime adjustments."""

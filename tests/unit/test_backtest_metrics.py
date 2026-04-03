@@ -7,14 +7,10 @@ from decimal import Decimal
 import pytest
 
 from backtesting.metrics import (
-    avg_win_loss,
-    calmar_ratio,
-    equity_curve_from_trades,
     full_report,
     max_drawdown,
     profit_factor,
     sharpe_ratio,
-    sortino_ratio,
     win_rate,
 )
 from core.models.order import TradeRecord
@@ -89,7 +85,7 @@ class TestMaxDrawdown:
         assert dd == pytest.approx(20 / 110, rel=1e-4)
 
     def test_short_curve(self) -> None:
-        dd, dur = max_drawdown([100.0])
+        dd, _dur = max_drawdown([100.0])
         assert dd == 0.0
 
 

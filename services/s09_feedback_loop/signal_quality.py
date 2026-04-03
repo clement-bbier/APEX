@@ -68,12 +68,14 @@ class SignalQuality:
             arr = np.array(pnls, dtype=float)
             std = float(np.std(arr, ddof=1)) if len(arr) > 1 else 0.0
             sharpe = float(np.mean(arr) / std) if std > 0.0 else 0.0
-            scored.append({
-                "signal_type": sig,
-                "regime": regime,
-                "session": session,
-                "sharpe": sharpe,
-            })
+            scored.append(
+                {
+                    "signal_type": sig,
+                    "regime": regime,
+                    "session": session,
+                    "sharpe": sharpe,
+                }
+            )
 
         scored.sort(key=lambda x: x["sharpe"], reverse=True)
         return scored[:3]

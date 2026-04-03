@@ -33,7 +33,7 @@ async def run(fixture_path: str) -> int:
     min_sharpe = float(os.environ.get("BACKTEST_MIN_SHARPE", "0.8"))
     max_dd = float(os.environ.get("BACKTEST_MAX_DD", "0.08"))
 
-    print(f"\n── Backtest Regression Gate ──")
+    print("\n── Backtest Regression Gate ──")
     print(f"  fixture  : {fixture_path}")
     print(f"  min_sharpe: {min_sharpe}")
     print(f"  max_dd    : {max_dd}\n")

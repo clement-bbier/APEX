@@ -13,7 +13,6 @@ polling interval (default 60 seconds).
 from __future__ import annotations
 
 import asyncio
-from typing import Optional
 
 import aiohttp
 
@@ -22,10 +21,7 @@ from core.logger import get_logger
 logger = get_logger("s01_data_ingestion.macro_feed")
 
 _FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
-_YAHOO_DXY_URL = (
-    "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB"
-    "?interval=1d&range=2d"
-)
+_YAHOO_DXY_URL = "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d"
 _POLL_INTERVAL_SECONDS: int = 60
 _HTTP_TIMEOUT_SECONDS: int = 15
 
@@ -52,9 +48,9 @@ class MacroFeed:
         self._poll_task: asyncio.Task | None = None
 
         # Cached latest values (None until first successful fetch).
-        self._vix: Optional[float] = None
-        self._dxy: Optional[float] = None
-        self._yield_spread: Optional[float] = None
+        self._vix: float | None = None
+        self._dxy: float | None = None
+        self._yield_spread: float | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -83,7 +79,7 @@ class MacroFeed:
 
     # ── Public data accessors ─────────────────────────────────────────────────
 
-    async def get_vix(self) -> Optional[float]:
+    async def get_vix(self) -> float | None:
         """Fetch (or return cached) latest VIX value from FRED.
 
         Endpoint: ``VIXCLS`` series, most recent observation.
@@ -96,7 +92,7 @@ class MacroFeed:
             self._vix = value
         return self._vix
 
-    async def get_dxy(self) -> Optional[float]:
+    async def get_dxy(self) -> float | None:
         """Fetch (or return cached) latest US Dollar Index from Yahoo Finance.
 
         Returns:
@@ -125,7 +121,7 @@ class MacroFeed:
                 logger.warning("DXY fetch failed", error=str(exc))
                 return self._dxy
 
-    async def get_yield_spread(self) -> Optional[float]:
+    async def get_yield_spread(self) -> float | None:
         """Fetch (or return cached) 10Y-2Y US Treasury yield spread from FRED.
 
         Fetches ``DGS10`` and ``DGS2`` series and returns their difference.
@@ -170,7 +166,7 @@ class MacroFeed:
                 logger.error("Macro polling loop error", error=str(exc))
             await asyncio.sleep(_POLL_INTERVAL_SECONDS)
 
-    async def _fetch_fred_latest(self, series_id: str) -> Optional[float]:
+    async def _fetch_fred_latest(self, series_id: str) -> float | None:
         """Fetch the most recent observation for a FRED series.
 
         Args:
@@ -208,7 +204,5 @@ class MacroFeed:
                     logger.debug("FRED value fetched", series=series_id, value=value)
                     return value
             except Exception as exc:
-                logger.warning(
-                    "FRED fetch failed", series=series_id, error=str(exc)
-                )
+                logger.warning("FRED fetch failed", series=series_id, error=str(exc))
                 return None

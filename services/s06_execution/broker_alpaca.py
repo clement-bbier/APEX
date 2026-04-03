@@ -7,7 +7,6 @@ Wraps :class:`alpaca.trading.client.TradingClient` for equity order management.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
@@ -45,7 +44,7 @@ class AlpacaBroker:
         self._api_key = api_key
         self._secret_key = secret_key
         self._paper = paper
-        self._client: Optional[TradingClient] = None
+        self._client: TradingClient | None = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -77,8 +76,8 @@ class AlpacaBroker:
         qty: float,
         side: str,
         order_type: str = "limit",
-        limit_price: Optional[float] = None,
-        stop_price: Optional[float] = None,
+        limit_price: float | None = None,
+        stop_price: float | None = None,
     ) -> dict:
         """Submit an order to Alpaca.
 
@@ -140,7 +139,7 @@ class AlpacaBroker:
 
     # ── Account / position queries ────────────────────────────────────────────
 
-    async def get_position(self, symbol: str) -> Optional[dict]:
+    async def get_position(self, symbol: str) -> dict | None:
         """Retrieve the current open position for a symbol.
 
         Args:

@@ -14,16 +14,13 @@ Design principles:
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Optional
 
 from core.config import get_settings
 from core.logger import get_logger
 from core.models.order import (
     ApprovedOrder,
-    ExecutedOrder,
     OrderCandidate,
     OrderType,
     TradeRecord,
@@ -296,7 +293,7 @@ class BacktestEngine:
         state.capital += net
         del state.positions[pos.symbol]
 
-    def _generate_signal(self, tick: NormalizedTick, symbol: str) -> Optional[Signal]:
+    def _generate_signal(self, tick: NormalizedTick, symbol: str) -> Signal | None:
         """Generate a Signal from current analyzer state, or None."""
         import uuid
 
@@ -310,7 +307,7 @@ class BacktestEngine:
         if atr_val is None or atr_val <= 0:
             return None
 
-        direction: Optional[Direction] = None
+        direction: Direction | None = None
         triggers: list[str] = []
 
         if abs(ofi) > 0.3:
@@ -340,6 +337,7 @@ class BacktestEngine:
 
         try:
             from core.models.signal import SignalType
+
             return Signal(
                 signal_id=str(uuid.uuid4()),
                 symbol=symbol,
@@ -358,7 +356,7 @@ class BacktestEngine:
 
     def _build_candidate(
         self, signal: Signal, capital: Decimal, regime: Regime
-    ) -> Optional[OrderCandidate]:
+    ) -> OrderCandidate | None:
         """Build an OrderCandidate from a signal and current capital."""
         import uuid
 

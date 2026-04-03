@@ -2,23 +2,23 @@
 
 from __future__ import annotations
 
-from typing import Optional
-
 import aiohttp
 
 
 class GeopoliticalAnalyzer:
     """Analyzes energy prices and their geopolitical market impact."""
 
-    _YAHOO_QUOTE_URL = "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=2d"
+    _YAHOO_QUOTE_URL = (
+        "https://query1.finance.yahoo.com/v8/finance/chart/{symbol}?interval=1d&range=2d"
+    )
 
-    async def get_energy_prices(self) -> dict[str, Optional[float]]:
+    async def get_energy_prices(self) -> dict[str, float | None]:
         """Fetch WTI and Brent crude oil prices from Yahoo Finance.
 
         Returns:
             Dict with keys "wti" (CL=F) and "brent" (BZ=F) as Optional floats.
         """
-        result: dict[str, Optional[float]] = {"wti": None, "brent": None}
+        result: dict[str, float | None] = {"wti": None, "brent": None}
         symbols = {"wti": "CL=F", "brent": "BZ=F"}
 
         async with aiohttp.ClientSession() as session:
@@ -36,14 +36,12 @@ class GeopoliticalAnalyzer:
                     )
                     if closes:
                         result[key] = float(closes[-1])
-                except Exception:  # noqa: BLE001
+                except Exception:
                     pass
 
         return result
 
-    def energy_impact_score(
-        self, wti_change_pct: float, brent_change_pct: float
-    ) -> float:
+    def energy_impact_score(self, wti_change_pct: float, brent_change_pct: float) -> float:
         """Compute a normalised energy impact score from price changes.
 
         Impact score = average change × 2, capped to [0, 1].

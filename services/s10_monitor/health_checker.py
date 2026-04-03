@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict, deque
-from typing import Optional
 
 from core.logger import get_logger
 
@@ -29,9 +28,7 @@ class HealthChecker:
     def __init__(self) -> None:
         """Initialize health checker."""
         self._last_seen: dict[str, float] = {}
-        self._arrival_times: dict[str, deque[float]] = defaultdict(
-            lambda: deque(maxlen=100)
-        )
+        self._arrival_times: dict[str, deque[float]] = defaultdict(lambda: deque(maxlen=100))
 
     def record_heartbeat(self, service_id: str, timestamp_ms: int) -> None:
         """Record a heartbeat from a service.
@@ -81,10 +78,7 @@ class HealthChecker:
             if len(arrivals) < 2:
                 stats[sid] = {"p50": None, "p95": None, "p99": None, "alive": self.is_alive(sid)}
                 continue
-            deltas_ms = [
-                (arrivals[i + 1] - arrivals[i]) * 1000
-                for i in range(len(arrivals) - 1)
-            ]
+            deltas_ms = [(arrivals[i + 1] - arrivals[i]) * 1000 for i in range(len(arrivals) - 1)]
             stats[sid] = {
                 "p50": float(np.percentile(deltas_ms, 50)),
                 "p95": float(np.percentile(deltas_ms, 95)),

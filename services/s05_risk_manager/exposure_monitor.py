@@ -103,7 +103,9 @@ class ExposureMonitor:
             ``(False, reason)`` on failure.
         """
         new_value = candidate.size * candidate.entry
-        new_exposure_pct = float(new_value / capital * Decimal("100")) if capital > Decimal("0") else 0.0
+        new_exposure_pct = (
+            float(new_value / capital * Decimal("100")) if capital > Decimal("0") else 0.0
+        )
 
         current_exposure_pct = await self.get_total_exposure(state, capital)
         combined = current_exposure_pct + new_exposure_pct
@@ -119,8 +121,7 @@ class ExposureMonitor:
         if position_count >= settings.max_simultaneous_positions:
             return (
                 False,
-                f"open positions {position_count} at max "
-                f"{settings.max_simultaneous_positions}",
+                f"open positions {position_count} at max {settings.max_simultaneous_positions}",
             )
 
         return True, ""

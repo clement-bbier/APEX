@@ -115,9 +115,7 @@ class BaseService(ABC):
         try:
             self.bus.close()
         except Exception as exc:
-            self.logger.warning(
-                "Error closing bus", service=self.service_id, error=str(exc)
-            )
+            self.logger.warning("Error closing bus", service=self.service_id, error=str(exc))
 
         try:
             await self.state.disconnect()
@@ -142,9 +140,7 @@ class BaseService(ABC):
             "status": "healthy" if self._running else "stopped",
         }
         try:
-            await self.bus.publish(
-                f"{HEALTH_TOPIC_PREFIX}{self.service_id}", status
-            )
+            await self.bus.publish(f"{HEALTH_TOPIC_PREFIX}{self.service_id}", status)
         except Exception as exc:
             self.logger.warning(
                 "Heartbeat publish failed",

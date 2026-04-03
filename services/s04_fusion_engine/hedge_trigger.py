@@ -8,11 +8,9 @@ reference position.
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import Optional
 
 from core.models.regime import Regime
 from core.models.signal import Direction, Signal, TechnicalFeatures
-
 
 # Fraction of the reference size used for the hedge position.
 _HEDGE_FRACTION = Decimal("0.3")
@@ -39,7 +37,7 @@ class HedgeTrigger:
         features: TechnicalFeatures,
         regime: Regime,
         reference_size: Decimal,
-    ) -> tuple[bool, Optional[Direction], Optional[Decimal]]:
+    ) -> tuple[bool, Direction | None, Decimal | None]:
         """Decide whether a hedge order should be placed alongside the signal.
 
         Args:
@@ -85,10 +83,6 @@ class HedgeTrigger:
         if not reasons:
             return False, None, None
 
-        hedge_direction = (
-            Direction.SHORT
-            if signal.direction == Direction.LONG
-            else Direction.LONG
-        )
+        hedge_direction = Direction.SHORT if signal.direction == Direction.LONG else Direction.LONG
         hedge_size = reference_size * _HEDGE_FRACTION
         return True, hedge_direction, hedge_size

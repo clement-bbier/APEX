@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Optional
 
 
 class AdvancedMicrostructure:
@@ -32,9 +31,7 @@ class AdvancedMicrostructure:
             return 0.0
         return float(np.mean(ratios))
 
-    def pin_estimate(
-        self, buy_trades: list[float], sell_trades: list[float]
-    ) -> float:
+    def pin_estimate(self, buy_trades: list[float], sell_trades: list[float]) -> float:
         """Compute a simplified Probability of Informed Trading (PIN) estimate.
 
         PIN = α×μ / (α×μ + 2×ε)
@@ -102,9 +99,5 @@ class AdvancedMicrostructure:
 
         t = event_times[-1]
         prior_times = event_times[:-1]
-        excitation = sum(
-            alpha * float(np.exp(-beta * (t - t_i)))
-            for t_i in prior_times
-            if t_i < t
-        )
+        excitation = sum(alpha * float(np.exp(-beta * (t - t_i))) for t_i in prior_times if t_i < t)
         return mu + excitation

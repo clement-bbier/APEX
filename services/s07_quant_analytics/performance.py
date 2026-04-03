@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import numpy as np
-from typing import Optional
 
 
 class PerformanceAnalyzer:
     """Computes standard and advanced portfolio performance metrics."""
 
-    def sharpe_ratio(
-        self, returns: list[float], risk_free_rate: float = 0.05
-    ) -> float:
+    def sharpe_ratio(self, returns: list[float], risk_free_rate: float = 0.05) -> float:
         """Compute the annualised Sharpe ratio.
 
         Sharpe = (Rp - Rf) / σp × sqrt(252)
@@ -33,9 +30,7 @@ class PerformanceAnalyzer:
             return 0.0
         return float(np.mean(excess) / std * np.sqrt(252))
 
-    def sortino_ratio(
-        self, returns: list[float], risk_free_rate: float = 0.05
-    ) -> float:
+    def sortino_ratio(self, returns: list[float], risk_free_rate: float = 0.05) -> float:
         """Compute the annualised Sortino ratio using downside deviation.
 
         Only negative excess returns contribute to the denominator.

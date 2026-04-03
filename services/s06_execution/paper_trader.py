@@ -64,9 +64,7 @@ class PaperTrader:
 
         # ── Slippage ───────────────────────────────────────────────────────────
         spread_bps = (
-            current_tick.spread_bps
-            if current_tick.spread_bps is not None
-            else _DEFAULT_SPREAD_BPS
+            current_tick.spread_bps if current_tick.spread_bps is not None else _DEFAULT_SPREAD_BPS
         )
         slippage_bps = Decimal(str(float(spread_bps) / 2.0 + kyle_lambda * float(fill_size)))
 

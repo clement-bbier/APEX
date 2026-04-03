@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
-from typing import Optional
 
 import aiohttp
 
@@ -23,7 +22,9 @@ class CBWatcher:
             List of dicts with keys "title", "link", and "published".
         """
         async with aiohttp.ClientSession() as session:
-            async with session.get(self._FED_RSS_URL, timeout=aiohttp.ClientTimeout(total=15)) as resp:
+            async with session.get(
+                self._FED_RSS_URL, timeout=aiohttp.ClientTimeout(total=15)
+            ) as resp:
                 text = await resp.text()
 
         root = ET.fromstring(text)
@@ -37,26 +38,30 @@ class CBWatcher:
                 title_el = item.find("title")
                 link_el = item.find("link")
                 pub_el = item.find("pubDate")
-                items.append({
-                    "title": title_el.text if title_el is not None else "",
-                    "link": link_el.text if link_el is not None else "",
-                    "published": pub_el.text if pub_el is not None else "",
-                })
+                items.append(
+                    {
+                        "title": title_el.text if title_el is not None else "",
+                        "link": link_el.text if link_el is not None else "",
+                        "published": pub_el.text if pub_el is not None else "",
+                    }
+                )
         else:
             # Atom format
             for entry in root.findall("atom:entry", ns):
                 title_el = entry.find("atom:title", ns)
                 link_el = entry.find("atom:link", ns)
                 pub_el = entry.find("atom:published", ns)
-                items.append({
-                    "title": title_el.text if title_el is not None else "",
-                    "link": link_el.get("href", "") if link_el is not None else "",
-                    "published": pub_el.text if pub_el is not None else "",
-                })
+                items.append(
+                    {
+                        "title": title_el.text if title_el is not None else "",
+                        "link": link_el.get("href", "") if link_el is not None else "",
+                        "published": pub_el.text if pub_el is not None else "",
+                    }
+                )
 
         return items
 
-    async def detect_surprise(self, statement: str) -> Optional[str]:
+    async def detect_surprise(self, statement: str) -> str | None:
         """Detect policy surprises from Fed statement text using keyword analysis.
 
         Args:
@@ -83,7 +88,7 @@ class CBWatcher:
             return "dovish_surprise"
         return None
 
-    async def get_latest_statement(self) -> Optional[str]:
+    async def get_latest_statement(self) -> str | None:
         """Return the latest Fed statement text.
 
         Returns:

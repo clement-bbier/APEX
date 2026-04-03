@@ -7,7 +7,7 @@ Auto-reconnects on failure with exponential back-off.
 from __future__ import annotations
 
 import asyncio
-from typing import Callable
+from collections.abc import Callable
 
 from alpaca.data.live import StockDataStream
 

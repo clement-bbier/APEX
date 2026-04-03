@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from decimal import Decimal
 from typing import Any
 
 from core.base_service import BaseService
@@ -42,7 +41,7 @@ class MonitorService(BaseService):
             data: Deserialized message payload.
         """
         if topic.startswith("service.health."):
-            service_id = topic[len("service.health."):]
+            service_id = topic[len("service.health.") :]
             ts = data.get("timestamp_ms", 0)
             self._health.record_heartbeat(service_id, ts)
 
