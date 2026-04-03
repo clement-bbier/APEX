@@ -9,11 +9,9 @@ Saves to ``data/historical/*.parquet``.  Resamples from 1m to any timeframe.
 
 from __future__ import annotations
 
-import os
-from datetime import datetime, timezone
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
-from typing import Optional
 
 import pandas as pd
 import pyarrow as pa
@@ -32,9 +30,7 @@ def _ensure_data_dir() -> None:
     _DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-def resample_ticks_to_ohlcv(
-    ticks: list[NormalizedTick], timeframe: str = "1min"
-) -> pd.DataFrame:
+def resample_ticks_to_ohlcv(ticks: list[NormalizedTick], timeframe: str = "1min") -> pd.DataFrame:
     """Resample a tick list to OHLCV bars at the given frequency.
 
     Args:
@@ -228,12 +224,12 @@ class AlpacaHistoricalLoader:
         from alpaca.data.requests import StockBarsRequest
         from alpaca.data.timeframe import TimeFrame
 
-        client = StockHistoricalDataClient(
-            api_key=self._api_key, secret_key=self._secret_key
-        )
+        client = StockHistoricalDataClient(api_key=self._api_key, secret_key=self._secret_key)
         tf_map = {
             "1Min": TimeFrame.Minute,
-            "5Min": TimeFrame(5, TimeFrame.Minute.unit) if hasattr(TimeFrame, "Minute") else TimeFrame.Minute,
+            "5Min": TimeFrame(5, TimeFrame.Minute.unit)
+            if hasattr(TimeFrame, "Minute")
+            else TimeFrame.Minute,
         }
         tf = tf_map.get(timeframe, TimeFrame.Minute)
 

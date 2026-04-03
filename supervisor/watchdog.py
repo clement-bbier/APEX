@@ -121,7 +121,9 @@ class Watchdog:
                 restart_count=len(recent),
                 window_s=RESTART_WINDOW_S,
             )
-            await state.set("circuit:suspended", {"reason": f"{service_id} restart loop", "at": now})
+            await state.set(
+                "circuit:suspended", {"reason": f"{service_id} restart loop", "at": now}
+            )
             self._suspended = True
             return
 

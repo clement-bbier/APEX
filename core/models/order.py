@@ -7,15 +7,14 @@ All order objects are immutable Pydantic v2 models.
 from __future__ import annotations
 
 from decimal import Decimal
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from core.models.signal import Direction, Signal
 
 
-class OrderStatus(str, Enum):
+class OrderStatus(StrEnum):
     """Lifecycle status of an order."""
 
     CANDIDATE = "candidate"
@@ -28,7 +27,7 @@ class OrderStatus(str, Enum):
     REJECTED = "rejected"
 
 
-class OrderType(str, Enum):
+class OrderType(StrEnum):
     """Execution order type."""
 
     MARKET = "market"
@@ -72,8 +71,8 @@ class OrderCandidate(BaseModel):
     )
 
     # Hedge
-    hedge_direction: Optional[Direction] = None
-    hedge_size: Optional[Decimal] = None
+    hedge_direction: Direction | None = None
+    hedge_size: Decimal | None = None
 
     # Scoring
     fusion_score: float = Field(
@@ -89,13 +88,11 @@ class OrderCandidate(BaseModel):
     )
 
     # Lineage
-    source_signal: Optional[Signal] = None
-    linked_order_id: Optional[str] = Field(
-        default=None, description="ID of hedge counterpart order"
-    )
+    source_signal: Signal | None = None
+    linked_order_id: str | None = Field(default=None, description="ID of hedge counterpart order")
 
     @model_validator(mode="after")
-    def validate_exit_sizes(self) -> "OrderCandidate":
+    def validate_exit_sizes(self) -> OrderCandidate:
         """Scalp + swing exit sizes must sum to total size (within rounding tolerance)."""
         tolerance = Decimal("0.0001")
         total_exits = self.size_scalp_exit + self.size_swing_exit
@@ -151,9 +148,7 @@ class ExecutedOrder(BaseModel):
     fill_price: Decimal = Field(..., gt=Decimal("0"), description="Actual fill price")
     fill_size: Decimal = Field(..., gt=Decimal("0"), description="Actual filled size")
     fill_timestamp_ms: int = Field(..., gt=0, description="Fill timestamp UTC ms")
-    slippage_bps: Decimal = Field(
-        default=Decimal("0"), description="Slippage in basis points"
-    )
+    slippage_bps: Decimal = Field(default=Decimal("0"), description="Slippage in basis points")
     commission: Decimal = Field(
         default=Decimal("0"), description="Commission charged in quote currency"
     )
@@ -212,7 +207,7 @@ class TradeRecord(BaseModel):
         return self.net_pnl > 0
 
     @property
-    def r_multiple(self) -> Optional[float]:
+    def r_multiple(self) -> float | None:
         """Return PnL as multiple of initial risk (R)."""
         risk = abs(self.entry_price - self.exit_price)
         if risk == 0 or self.size == 0:
@@ -231,6 +226,4 @@ class NullOrder(BaseModel):
     candidate_id: str
     blocked_at_ms: int
     reason: str = Field(..., description="Why this order was blocked")
-    blocker: str = Field(
-        ..., description="Which rule/guard triggered the block"
-    )
+    blocker: str = Field(..., description="Which rule/guard triggered the block")

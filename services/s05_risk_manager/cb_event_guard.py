@@ -7,7 +7,7 @@ blocked (pre-event) or allowed with a reduced size (post-event scalp).
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from core.config import get_settings
 from core.models.regime import CentralBankEvent
@@ -64,7 +64,7 @@ class CBEventGuard:
             except Exception:
                 pass
 
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
 
         for event in events:
             # Pre-event block window
@@ -75,10 +75,7 @@ class CBEventGuard:
                     return False, 0.0
 
             # Post-event scalp window
-            if (
-                event.post_event_scalp_start is not None
-                and event.post_event_scalp_end is not None
-            ):
+            if event.post_event_scalp_start is not None and event.post_event_scalp_end is not None:
                 scalp_start = _ensure_utc(event.post_event_scalp_start)
                 scalp_end = _ensure_utc(event.post_event_scalp_end)
                 if scalp_start <= now < scalp_end:
@@ -97,5 +94,5 @@ def _ensure_utc(dt: datetime) -> datetime:
         Timezone-aware datetime in UTC.
     """
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
+        return dt.replace(tzinfo=UTC)
     return dt

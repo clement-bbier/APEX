@@ -166,9 +166,7 @@ class SignalEngineService(BaseService):
                 short_triggers.append("RSI_overbought")
 
         # Bollinger Band bounce (5-minute bars)
-        bb_upper, bb_middle, bb_lower = tech.bollinger_bands(
-            period=20, std=2.0, timeframe="5m"
-        )
+        bb_upper, _bb_middle, bb_lower = tech.bollinger_bands(period=20, std=2.0, timeframe="5m")
         entry_price: Decimal = tick.price
         if bb_upper is not None and bb_lower is not None:
             bb_range = bb_upper - bb_lower
@@ -185,12 +183,7 @@ class SignalEngineService(BaseService):
         prev_8 = self._prev_ema_8.get(symbol)
         prev_21 = self._prev_ema_21.get(symbol)
 
-        if (
-            ema_8 is not None
-            and ema_21 is not None
-            and prev_8 is not None
-            and prev_21 is not None
-        ):
+        if ema_8 is not None and ema_21 is not None and prev_8 is not None and prev_21 is not None:
             if prev_8 < prev_21 and ema_8 > ema_21:
                 long_triggers.append("EMA_cross_bullish")
             elif prev_8 > prev_21 and ema_8 < ema_21:
@@ -215,8 +208,7 @@ class SignalEngineService(BaseService):
         # ── Price levels (ATR-based) ──────────────────────────────────────────
         atr = tech.atr(period=14, timeframe="5m")
         atr_val: Decimal = (
-            atr if atr is not None and atr > Decimal("0")
-            else entry_price * _ATR_FALLBACK_PCT
+            atr if atr is not None and atr > Decimal("0") else entry_price * _ATR_FALLBACK_PCT
         )
 
         if direction == Direction.LONG:
@@ -243,9 +235,7 @@ class SignalEngineService(BaseService):
 
         # ── MTF context ───────────────────────────────────────────────────────
         self._mtf.update("5m", direction.value, raw_strength)
-        mtf_ctx: MTFContext = self._mtf.build_context(
-            direction.value, tick.timestamp_ms
-        )
+        mtf_ctx: MTFContext = self._mtf.build_context(direction.value, tick.timestamp_ms)
 
         # ── TechnicalFeatures snapshot ────────────────────────────────────────
         vp = tech.volume_profile()

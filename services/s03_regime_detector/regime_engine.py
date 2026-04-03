@@ -8,8 +8,6 @@ into typed :class:`~core.models.regime.VolRegime`,
 
 from __future__ import annotations
 
-from typing import Optional
-
 from core.models.regime import RiskMode, TrendRegime, VolRegime
 
 
@@ -24,7 +22,7 @@ class RegimeEngine:
 
     # ── Volatility regime ─────────────────────────────────────────────────────
 
-    def compute_vol_regime(self, vix: Optional[float]) -> VolRegime:
+    def compute_vol_regime(self, vix: float | None) -> VolRegime:
         """Classify the current volatility regime from a VIX reading.
 
         Thresholds:
@@ -53,9 +51,9 @@ class RegimeEngine:
 
     def compute_macro_mult(
         self,
-        vix: Optional[float],
-        dxy: Optional[float],  # noqa: ARG002  (reserved for Phase 2 logic)
-        yield_spread: Optional[float],
+        vix: float | None,
+        dxy: float | None,
+        yield_spread: float | None,
     ) -> float:
         """Compute the macro sizing multiplier from macro indicators.
 

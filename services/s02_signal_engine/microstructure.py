@@ -54,12 +54,8 @@ class MicrostructureAnalyzer:
         self.volumes.append(float(tick.volume))
         self.bid_vols.append(float(tick.bid) if tick.bid is not None else 0.0)
         self.ask_vols.append(float(tick.ask) if tick.ask is not None else 0.0)
-        self.buy_vols.append(
-            float(tick.volume) if tick.side == TradeSide.BUY else 0.0
-        )
-        self.sell_vols.append(
-            float(tick.volume) if tick.side == TradeSide.SELL else 0.0
-        )
+        self.buy_vols.append(float(tick.volume) if tick.side == TradeSide.BUY else 0.0)
+        self.sell_vols.append(float(tick.volume) if tick.side == TradeSide.SELL else 0.0)
         self.timestamps.append(tick.timestamp_ms)
 
     def ofi(self) -> float:
@@ -98,9 +94,7 @@ class MicrostructureAnalyzer:
         if total_vol == 0.0:
             return 0.0
 
-        delta = float(
-            np.sum(np.array(self.buy_vols) - np.array(self.sell_vols))
-        )
+        delta = float(np.sum(np.array(self.buy_vols) - np.array(self.sell_vols)))
         return delta / total_vol
 
     def kyle_lambda(self) -> float:

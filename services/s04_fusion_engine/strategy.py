@@ -43,7 +43,10 @@ class StrategySelector:
         vol = regime.vol_regime
 
         if strategy == "momentum_scalp":
-            return trend in (TrendRegime.TRENDING_UP, TrendRegime.TRENDING_DOWN) and vol == VolRegime.NORMAL
+            return (
+                trend in (TrendRegime.TRENDING_UP, TrendRegime.TRENDING_DOWN)
+                and vol == VolRegime.NORMAL
+            )
 
         if strategy == "mean_reversion":
             return trend == TrendRegime.RANGING and vol in (

@@ -6,13 +6,12 @@ Defines Regime, MacroContext, CentralBankEvent, and SessionContext.
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class TrendRegime(str, Enum):
+class TrendRegime(StrEnum):
     """Macro trend regime."""
 
     TRENDING_UP = "trending_up"
@@ -21,23 +20,23 @@ class TrendRegime(str, Enum):
     BREAKOUT = "breakout"
 
 
-class VolRegime(str, Enum):
+class VolRegime(StrEnum):
     """Volatility regime based on VIX thresholds."""
 
-    LOW = "low"         # VIX < 15
-    NORMAL = "normal"   # VIX 15-25
-    HIGH = "high"       # VIX 25-35
-    CRISIS = "crisis"   # VIX > 35
+    LOW = "low"  # VIX < 15
+    NORMAL = "normal"  # VIX 15-25
+    HIGH = "high"  # VIX 25-35
+    CRISIS = "crisis"  # VIX > 35
 
 
-class RiskMode(str, Enum):
+class RiskMode(StrEnum):
     """System-wide risk mode derived from regime."""
 
     NORMAL = "normal"
     REDUCED = "reduced"
     MINIMAL = "minimal"
-    BLOCKED = "blocked"   # No new positions
-    CRISIS = "crisis"     # Emergency close positions
+    BLOCKED = "blocked"  # No new positions
+    CRISIS = "crisis"  # Emergency close positions
 
 
 class CentralBankEvent(BaseModel):
@@ -54,15 +53,15 @@ class CentralBankEvent(BaseModel):
     is_high_impact: bool = Field(default=True)
 
     # Window metadata (populated after parsing)
-    block_window_start: Optional[datetime] = Field(
+    block_window_start: datetime | None = Field(
         default=None,
         description="45 minutes before event: no new entries",
     )
-    post_event_scalp_start: Optional[datetime] = Field(
+    post_event_scalp_start: datetime | None = Field(
         default=None,
         description="When post-event scalp window opens",
     )
-    post_event_scalp_end: Optional[datetime] = Field(
+    post_event_scalp_end: datetime | None = Field(
         default=None,
         description="60 minutes after event: scalp allowed with reduced size",
     )
@@ -93,9 +92,9 @@ class MacroContext(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     timestamp_ms: int = Field(..., description="Snapshot time UTC ms")
-    vix: Optional[float] = Field(default=None, description="CBOE VIX level")
-    dxy: Optional[float] = Field(default=None, description="US Dollar Index")
-    yield_spread_10y2y: Optional[float] = Field(
+    vix: float | None = Field(default=None, description="CBOE VIX level")
+    dxy: float | None = Field(default=None, description="US Dollar Index")
+    yield_spread_10y2y: float | None = Field(
         default=None, description="10Y-2Y yield spread (negative = inversion)"
     )
     macro_mult: float = Field(
@@ -104,9 +103,7 @@ class MacroContext(BaseModel):
         le=1.0,
         description="Macro multiplier applied to position sizing [0.0→1.0]",
     )
-    event_active: bool = Field(
-        default=False, description="True if inside a CB event block window"
-    )
+    event_active: bool = Field(default=False, description="True if inside a CB event block window")
     post_event_scalp: bool = Field(
         default=False, description="True if inside post-event scalp window"
     )
@@ -131,9 +128,7 @@ class SessionContext(BaseModel):
     is_us_prime: bool = Field(
         default=False, description="True during 09:30-10:30 ET and 15:00-16:00 ET"
     )
-    is_us_open: bool = Field(
-        default=False, description="True during regular US market hours"
-    )
+    is_us_open: bool = Field(default=False, description="True during regular US market hours")
 
 
 class Regime(BaseModel):
@@ -156,15 +151,11 @@ class Regime(BaseModel):
 
     # Central bank
     cb_calendar: list[CentralBankEvent] = Field(default_factory=list)
-    next_cb_event: Optional[CentralBankEvent] = None
+    next_cb_event: CentralBankEvent | None = None
 
     # Composite score
-    macro_mult: float = Field(
-        default=1.0, ge=0.0, le=1.0, description="Composite macro multiplier"
-    )
-    session_mult: float = Field(
-        default=1.0, ge=0.5, le=1.5, description="Session multiplier"
-    )
+    macro_mult: float = Field(default=1.0, ge=0.0, le=1.0, description="Composite macro multiplier")
+    session_mult: float = Field(default=1.0, ge=0.5, le=1.5, description="Session multiplier")
 
     @property
     def combined_mult(self) -> float:

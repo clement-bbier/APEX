@@ -66,15 +66,9 @@ class FusionEngine:
             Final fusion score in ``[0.0, 2.0]``.
         """
         mtf_alignment = (
-            signal.mtf_context.alignment_score
-            if signal.mtf_context is not None
-            else 0.7
+            signal.mtf_context.alignment_score if signal.mtf_context is not None else 0.7
         )
-        session_mult = (
-            signal.mtf_context.session_bonus
-            if signal.mtf_context is not None
-            else 1.0
-        )
+        session_mult = signal.mtf_context.session_bonus if signal.mtf_context is not None else 1.0
         confluence_bonus = self.compute_confluence_bonus(signal.triggers)
         session_prime_bonus = 1.10 if regime.session.is_us_prime else 1.0
 

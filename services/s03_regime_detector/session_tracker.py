@@ -7,7 +7,7 @@ flags used downstream by the Fusion Engine.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from core.models.regime import SessionContext
 
@@ -33,7 +33,7 @@ class SessionTracker:
         Returns:
             A fully-populated :class:`SessionContext` instance.
         """
-        dt = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc)
+        dt = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=UTC)
 
         # Weekend check (Mon=0 … Sun=6)
         if dt.weekday() >= 5:

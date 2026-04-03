@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from core.base_service import BaseService
@@ -44,7 +44,7 @@ class FeedbackLoopService(BaseService):
             try:
                 await self._fast_analysis()
                 # Check if it's post-market time (21:00-22:00 UTC)
-                now = datetime.now(timezone.utc)
+                now = datetime.now(UTC)
                 if 21 <= now.hour < 22:
                     await self._slow_analysis()
             except Exception as exc:
@@ -82,8 +82,14 @@ class FeedbackLoopService(BaseService):
                 if len(sym_trades) < 5:
                     continue
                 sym_win_rate = sum(1 for t in sym_trades if t.is_winner) / len(sym_trades)
-                winners = [float(t.r_multiple or 0) for t in sym_trades if t.is_winner and t.r_multiple]
-                losers = [abs(float(t.r_multiple or 0)) for t in sym_trades if not t.is_winner and t.r_multiple]
+                winners = [
+                    float(t.r_multiple or 0) for t in sym_trades if t.is_winner and t.r_multiple
+                ]
+                [
+                    abs(float(t.r_multiple or 0))
+                    for t in sym_trades
+                    if not t.is_winner and t.r_multiple
+                ]
                 avg_rr = (sum(winners) / len(winners)) if winners else KELLY_DEFAULT_AVG_RR
                 await self.state.hset(
                     f"kelly:{symbol}",

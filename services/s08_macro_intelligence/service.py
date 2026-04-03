@@ -48,7 +48,7 @@ class MacroIntelligenceService(BaseService):
 
                 regime = self._sector_rotation.risk_on_off(performance)
                 await self.state.set("macro:risk_regime", regime)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.logger.warning("sector_loop error: %s", exc)
             await asyncio.sleep(900)
 
@@ -57,7 +57,7 @@ class MacroIntelligenceService(BaseService):
         while True:
             try:
                 await self._run_macro_analytics()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.logger.warning("macro_loop error: %s", exc)
             await asyncio.sleep(3600)
 

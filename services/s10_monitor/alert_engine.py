@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import smtplib
 from email.mime.text import MIMEText
-from typing import Optional
 
 import aiohttp
 
@@ -71,7 +70,9 @@ class AlertEngine:
         """
         if not self._settings.twilio_sid or not self._settings.twilio_token:
             return
-        url = f"https://api.twilio.com/2010-04-01/Accounts/{self._settings.twilio_sid}/Messages.json"
+        url = (
+            f"https://api.twilio.com/2010-04-01/Accounts/{self._settings.twilio_sid}/Messages.json"
+        )
         data = {
             "To": self._settings.alert_phone_number,
             "From": self._settings.twilio_from_number,
@@ -82,9 +83,7 @@ class AlertEngine:
                 async with session.post(
                     url,
                     data=data,
-                    auth=aiohttp.BasicAuth(
-                        self._settings.twilio_sid, self._settings.twilio_token
-                    ),
+                    auth=aiohttp.BasicAuth(self._settings.twilio_sid, self._settings.twilio_token),
                 ) as resp:
                     if resp.status not in (200, 201):
                         logger.warning("SMS send failed", status=resp.status)

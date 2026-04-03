@@ -47,9 +47,7 @@ class TestCircuitBreakerTransitions:
         assert transitioned is False
         assert cb.state == CircuitState.OPEN
 
-    def test_open_transitions_to_half_open_after_cooldown(
-        self, cb: CircuitBreaker
-    ) -> None:
+    def test_open_transitions_to_half_open_after_cooldown(self, cb: CircuitBreaker) -> None:
         cb.trip("test")
         # Monkey-patch _tripped_at to simulate 16 minutes ago
         cb._tripped_at = time.monotonic() - (16 * 60)

@@ -7,9 +7,8 @@ profile indicators.
 
 from __future__ import annotations
 
-from collections import defaultdict, deque
+from collections import deque
 from decimal import Decimal
-from typing import Optional
 
 import numpy as np
 
@@ -45,11 +44,9 @@ class TechnicalAnalyzer:
 
         # Completed bars per timeframe.  Each bar is a dict:
         # {open, high, low, close, volume, timestamp_ms}
-        self._bars: dict[str, deque[dict]] = {
-            tf: deque(maxlen=_MAX_BARS) for tf in _TIMEFRAME_MS
-        }
+        self._bars: dict[str, deque[dict]] = {tf: deque(maxlen=_MAX_BARS) for tf in _TIMEFRAME_MS}
         # In-progress (current) bar per timeframe.
-        self._current: dict[str, dict | None] = {tf: None for tf in _TIMEFRAME_MS}
+        self._current: dict[str, dict | None] = dict.fromkeys(_TIMEFRAME_MS)
 
         # Daily VWAP accumulators (reset at midnight UTC).
         self._vwap_day: int = -1
@@ -118,9 +115,7 @@ class TechnicalAnalyzer:
             result.append(current)
         return result
 
-    def _compute_rsi_from_closes(
-        self, closes: list[float], period: int
-    ) -> Optional[float]:
+    def _compute_rsi_from_closes(self, closes: list[float], period: int) -> float | None:
         """Compute RSI via Wilder's smoothing from a list of close prices.
 
         Args:
@@ -152,7 +147,7 @@ class TechnicalAnalyzer:
 
     # ── Indicators ────────────────────────────────────────────────────────────
 
-    def rsi(self, period: int = 14, timeframe: str = "1m") -> Optional[float]:
+    def rsi(self, period: int = 14, timeframe: str = "1m") -> float | None:
         """RSI using Wilder's exponential smoothing method.
 
         Args:
@@ -166,7 +161,7 @@ class TechnicalAnalyzer:
         closes = [b["close"] for b in bars]
         return self._compute_rsi_from_closes(closes, period)
 
-    def rsi_divergence(self, timeframe: str = "5m") -> Optional[str]:
+    def rsi_divergence(self, timeframe: str = "5m") -> str | None:
         """Detect bullish or bearish RSI divergence over recent bars.
 
         Compares the direction of price trend with the direction of RSI
@@ -201,9 +196,7 @@ class TechnicalAnalyzer:
         # Average close for each half as the price-trend proxy.
         older_closes = all_closes[:mid]
         newer_closes = all_closes[mid:]
-        price_up = (sum(newer_closes) / len(newer_closes)) > (
-            sum(older_closes) / len(older_closes)
-        )
+        price_up = (sum(newer_closes) / len(newer_closes)) > (sum(older_closes) / len(older_closes))
         rsi_up = rsi_newer > rsi_older
 
         if not price_up and rsi_up:
@@ -217,7 +210,7 @@ class TechnicalAnalyzer:
         period: int = 20,
         std: float = 2.0,
         timeframe: str = "5m",
-    ) -> tuple[Optional[Decimal], Optional[Decimal], Optional[Decimal]]:
+    ) -> tuple[Decimal | None, Decimal | None, Decimal | None]:
         """Compute Bollinger Bands (upper, middle, lower).
 
         Args:
@@ -273,7 +266,7 @@ class TechnicalAnalyzer:
         # the minimum of all 6 periods (i.e. it is the 6-period minimum itself).
         return widths[0] <= min(widths)
 
-    def ema(self, period: int, timeframe: str = "5m") -> Optional[Decimal]:
+    def ema(self, period: int, timeframe: str = "5m") -> Decimal | None:
         """Exponential moving average of bar close prices.
 
         Seeded from a simple average of the first *period* values, then
@@ -298,7 +291,7 @@ class TechnicalAnalyzer:
             ema_val = price * k + ema_val * (1.0 - k)
         return Decimal(str(round(ema_val, 8)))
 
-    def vwap(self) -> Optional[Decimal]:
+    def vwap(self) -> Decimal | None:
         """Daily Volume-Weighted Average Price.
 
         Accumulates price × volume and total volume from the first tick of
@@ -313,7 +306,7 @@ class TechnicalAnalyzer:
         vwap_val = self._vwap_cum_pv / self._vwap_cum_v
         return Decimal(str(round(vwap_val, 8)))
 
-    def atr(self, period: int = 14, timeframe: str = "5m") -> Optional[Decimal]:
+    def atr(self, period: int = 14, timeframe: str = "5m") -> Decimal | None:
         """Average True Range using Wilder's exponential smoothing.
 
         True Range = max(H − L, |H − prev_C|, |L − prev_C|).
@@ -330,7 +323,7 @@ class TechnicalAnalyzer:
         if len(bars) < period + 1:
             return None
 
-        recent = bars[-(period + 1):]
+        recent = bars[-(period + 1) :]
         trs: list[float] = []
         for i in range(1, len(recent)):
             h = recent[i]["high"]
@@ -346,7 +339,7 @@ class TechnicalAnalyzer:
             atr_val = (atr_val * (period - 1) + tr) / period
         return Decimal(str(round(atr_val, 8)))
 
-    def volume_profile(self, bins: int = 50) -> dict[str, Optional[Decimal]]:
+    def volume_profile(self, bins: int = 50) -> dict[str, Decimal | None]:
         """Compute volume-profile metrics: POC, VAH, VAL.
 
         Volume is distributed across *bins* equally-spaced price levels.
@@ -367,9 +360,7 @@ class TechnicalAnalyzer:
         if not all_bars:
             return {"poc": None, "vah": None, "val": None}
 
-        prices = np.array(
-            [(b["high"] + b["low"]) / 2.0 for b in all_bars], dtype=float
-        )
+        prices = np.array([(b["high"] + b["low"]) / 2.0 for b in all_bars], dtype=float)
         volumes = np.array([b["volume"] for b in all_bars], dtype=float)
 
         price_min, price_max = float(prices.min()), float(prices.max())
@@ -381,7 +372,7 @@ class TechnicalAnalyzer:
         bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2.0
         bin_volumes = np.zeros(bins, dtype=float)
 
-        for price, vol in zip(prices, volumes):
+        for price, vol in zip(prices, volumes, strict=False):
             idx = min(int(np.searchsorted(bin_edges[1:], price)), bins - 1)
             bin_volumes[idx] += vol
 

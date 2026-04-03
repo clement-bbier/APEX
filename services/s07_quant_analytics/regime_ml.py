@@ -37,9 +37,7 @@ class RegimeML:
         # TODO Phase 2: PELT breakpoint detection
         return []
 
-    def cointegration_test(
-        self, series_a: list[float], series_b: list[float]
-    ) -> dict:
+    def cointegration_test(self, series_a: list[float], series_b: list[float]) -> dict:
         """Run the Engle-Granger cointegration test on two series.
 
         TODO Phase 2: Implement Engle-Granger two-step cointegration test

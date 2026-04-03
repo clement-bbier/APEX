@@ -30,7 +30,7 @@ from typing import Any
 import numpy as np
 
 try:
-    from apex_mc import run_mc_batch, compute_var, compute_cvar
+    from apex_mc import compute_cvar, compute_var, run_mc_batch
 
     RUST_AVAILABLE = True
 except ImportError:
@@ -80,9 +80,7 @@ class MonteCarloEngine:
         self.n_simulations = n_simulations
         self._n_workers: int = os.cpu_count() or 4
 
-    def simulate_pnl_distribution(
-        self, historical_returns: np.ndarray
-    ) -> dict[str, float]:
+    def simulate_pnl_distribution(self, historical_returns: np.ndarray) -> dict[str, float]:
         """Bootstrap-simulate P&L distribution and compute risk metrics.
 
         Args:
@@ -166,9 +164,7 @@ class MonteCarloEngine:
 
         return best_f / 4.0  # quarter-Kelly
 
-    def stress_test_positions(
-        self, positions: dict[str, float], capital: float
-    ) -> list[dict]:
+    def stress_test_positions(self, positions: dict[str, float], capital: float) -> list[dict]:
         """Apply stress scenarios to current positions and estimate losses.
 
         Args:
@@ -205,10 +201,7 @@ class MonteCarloEngine:
             2-D array of shape (n_simulations, n_steps).
         """
         chunk = max(1, self.n_simulations // self._n_workers)
-        args_list = [
-            (returns, chunk, seed)
-            for seed in range(self._n_workers)
-        ]
+        args_list = [(returns, chunk, seed) for seed in range(self._n_workers)]
 
         with ProcessPoolExecutor(max_workers=self._n_workers) as executor:
             futures = [executor.submit(_run_chunk, args) for args in args_list]

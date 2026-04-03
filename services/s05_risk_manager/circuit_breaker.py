@@ -8,12 +8,12 @@ auto-resets after a 15-minute cool-down.
 from __future__ import annotations
 
 import time
-from enum import Enum
+from enum import StrEnum
 
 from core.config import Settings
 
 
-class CircuitState(str, Enum):
+class CircuitState(StrEnum):
     """Circuit breaker state machine states."""
 
     CLOSED = "closed"

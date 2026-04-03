@@ -23,9 +23,7 @@ class DriftDetector:
         recent = trades[-window:] if len(trades) >= window else trades
         if not recent:
             return 0.0
-        wins = sum(
-            1 for t in recent if float(getattr(t, "net_pnl", 0.0) or 0.0) > 0.0
-        )
+        wins = sum(1 for t in recent if float(getattr(t, "net_pnl", 0.0) or 0.0) > 0.0)
         return wins / len(recent)
 
     def is_drifting(
@@ -65,7 +63,7 @@ class DriftDetector:
         arr = np.array(pnl_series, dtype=float)
         sigma2 = float(np.var(arr)) if len(arr) > 1 else omega
         for r in arr:
-            sigma2 = omega + alpha * (r ** 2) + beta * sigma2
+            sigma2 = omega + alpha * (r**2) + beta * sigma2
         return float(np.sqrt(max(sigma2, 0.0)))
 
     def outcome_correlation(

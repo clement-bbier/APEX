@@ -11,13 +11,13 @@ import asyncio
 import time
 import uuid
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 
 from core.base_service import BaseService
 from core.config import get_settings
 from core.models.order import OrderCandidate
 from core.models.regime import Regime
-from core.models.signal import Direction, Signal, TechnicalFeatures
+from core.models.signal import Signal, TechnicalFeatures
 from services.s04_fusion_engine.fusion import FusionEngine
 from services.s04_fusion_engine.hedge_trigger import HedgeTrigger
 from services.s04_fusion_engine.kelly_sizer import KellySizer
@@ -177,9 +177,7 @@ class FusionEngineService(BaseService):
         features: TechnicalFeatures = (
             signal.features if signal.features is not None else TechnicalFeatures()
         )
-        hedge_bool, hedge_dir, hedge_sz = self._hedge.should_hedge(
-            signal, features, regime, size
-        )
+        hedge_bool, hedge_dir, hedge_sz = self._hedge.should_hedge(signal, features, regime, size)
 
         # ── Build OrderCandidate ───────────────────────────────────────────────
         candidate = OrderCandidate(
@@ -215,7 +213,7 @@ class FusionEngineService(BaseService):
             hedge=hedge_bool,
         )
 
-    async def _load_regime(self) -> Optional[Regime]:
+    async def _load_regime(self) -> Regime | None:
         """Read the current regime from Redis.
 
         Returns:

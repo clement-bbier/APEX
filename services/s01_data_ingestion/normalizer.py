@@ -8,9 +8,8 @@ All normalizers produce :class:`~core.models.tick.NormalizedTick` instances.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Optional
 
 from core.logger import get_logger
 from core.models.tick import Market, NormalizedTick, RawTick, Session, TradeSide
@@ -59,7 +58,7 @@ class SessionTagger:
         """
         # Normalise to UTC if timezone info is present.
         if ts.tzinfo is not None:
-            ts = ts.astimezone(timezone.utc)
+            ts = ts.astimezone(UTC)
 
         # Weekend check: Python weekday() is 0=Mon … 6=Sun.
         if ts.weekday() >= 5:
@@ -142,14 +141,10 @@ class BinanceNormalizer:
         is_maker_buy: bool = bool(raw_data.get("m", False))
         side = TradeSide.SELL if is_maker_buy else TradeSide.BUY
 
-        bid: Optional[Decimal] = (
-            Decimal(str(raw_data["b"])) if raw_data.get("b") else None
-        )
-        ask: Optional[Decimal] = (
-            Decimal(str(raw_data["a"])) if raw_data.get("a") else None
-        )
+        bid: Decimal | None = Decimal(str(raw_data["b"])) if raw_data.get("b") else None
+        ask: Decimal | None = Decimal(str(raw_data["a"])) if raw_data.get("a") else None
 
-        ts_utc = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=timezone.utc)
+        ts_utc = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=UTC)
         session = self._tagger.tag(ts_utc)
 
         raw_tick = RawTick(
@@ -255,7 +250,9 @@ class AlpacaNormalizer:
         # Truncate sub-second component to at most 6 digits (microseconds).
         if "." in normalised:
             dot_idx = normalised.index(".")
-            tz_idx = normalised.index("+", dot_idx) if "+" in normalised[dot_idx:] else len(normalised)
+            tz_idx = (
+                normalised.index("+", dot_idx) if "+" in normalised[dot_idx:] else len(normalised)
+            )
             sub_second = normalised[dot_idx + 1 : tz_idx]
             truncated_sub = sub_second[:6].ljust(6, "0")
             normalised = normalised[: dot_idx + 1] + truncated_sub + normalised[tz_idx:]

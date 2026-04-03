@@ -19,7 +19,7 @@ class TradeAnalyzer:
             mtf_score, expected_slippage_bps, actual_outcome, r_multiple.
         """
         entry = getattr(trade, "entry_price", 0.0) or 0.0
-        exit_price = getattr(trade, "exit_price", 0.0) or 0.0
+        getattr(trade, "exit_price", 0.0) or 0.0
         stop = getattr(trade, "stop_loss", 0.0) or 0.0
         risk = abs(entry - stop) if entry and stop else 1.0
         pnl = getattr(trade, "net_pnl", 0.0) or 0.0

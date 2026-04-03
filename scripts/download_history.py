@@ -17,7 +17,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 
@@ -87,10 +87,10 @@ async def main(years: int, output_dir: str, alpaca_key: str, alpaca_secret: str)
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
 
-    end_dt = datetime.now(timezone.utc)
+    end_dt = datetime.now(UTC)
     start_dt = end_dt - timedelta(days=365 * years)
 
-    print(f"\n─── APEX Historical Data Downloader ───")
+    print("\n─── APEX Historical Data Downloader ───")
     print(f"  period  : {start_dt.date()} → {end_dt.date()}")
     print(f"  output  : {out.resolve()}\n")
 
@@ -104,10 +104,26 @@ async def main(years: int, output_dir: str, alpaca_key: str, alpaca_secret: str)
     # Alpaca equities
     if alpaca_key and alpaca_secret:
         sp500_top20 = [
-            "AAPL", "MSFT", "AMZN", "NVDA", "GOOGL",
-            "META", "TSLA", "AVGO", "GOOG", "BRK.B",
-            "JPM", "LLY", "XOM", "UNH", "V",
-            "MA", "HD", "PG", "COST", "ABBV",
+            "AAPL",
+            "MSFT",
+            "AMZN",
+            "NVDA",
+            "GOOGL",
+            "META",
+            "TSLA",
+            "AVGO",
+            "GOOG",
+            "BRK.B",
+            "JPM",
+            "LLY",
+            "XOM",
+            "UNH",
+            "V",
+            "MA",
+            "HD",
+            "PG",
+            "COST",
+            "ABBV",
         ]
         for ticker in sp500_top20:
             try:
@@ -126,9 +142,7 @@ def cli() -> None:
 
     parser = argparse.ArgumentParser(description="Download APEX historical data")
     parser.add_argument("--years", type=int, default=2, help="Years of history (default 2)")
-    parser.add_argument(
-        "--output-dir", default="data/historical", help="Output directory"
-    )
+    parser.add_argument("--output-dir", default="data/historical", help="Output directory")
     args = parser.parse_args()
 
     alpaca_key = os.environ.get("ALPACA_API_KEY", "")

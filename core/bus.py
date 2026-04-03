@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Any, AsyncIterator, Callable, Optional
+from collections.abc import Callable
+from typing import Any
 
 import zmq
 import zmq.asyncio
@@ -36,10 +37,10 @@ class MessageBus:
         self._settings = get_settings()
         self._context: zmq.asyncio.Context = zmq.asyncio.Context.instance()
 
-        self._pub_socket: Optional[zmq.asyncio.Socket] = None
-        self._sub_socket: Optional[zmq.asyncio.Socket] = None
-        self._push_socket: Optional[zmq.asyncio.Socket] = None
-        self._pull_socket: Optional[zmq.asyncio.Socket] = None
+        self._pub_socket: zmq.asyncio.Socket | None = None
+        self._sub_socket: zmq.asyncio.Socket | None = None
+        self._push_socket: zmq.asyncio.Socket | None = None
+        self._pull_socket: zmq.asyncio.Socket | None = None
 
     # ── PUB/SUB ───────────────────────────────────────────────────────────────
 
@@ -61,9 +62,7 @@ class MessageBus:
         if self._sub_socket is not None:
             return
         self._sub_socket = self._context.socket(zmq.SUB)
-        addr = (
-            f"tcp://{self._settings.zmq_host}:{self._settings.zmq_sub_port}"
-        )
+        addr = f"tcp://{self._settings.zmq_host}:{self._settings.zmq_sub_port}"
         self._sub_socket.connect(addr)
         for topic in topics:
             self._sub_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
@@ -90,9 +89,7 @@ class MessageBus:
         if self._pull_socket is not None:
             return
         self._pull_socket = self._context.socket(zmq.PULL)
-        addr = (
-            f"tcp://{self._settings.zmq_host}:{self._settings.zmq_pull_port}"
-        )
+        addr = f"tcp://{self._settings.zmq_host}:{self._settings.zmq_pull_port}"
         self._pull_socket.connect(addr)
         logger.info("ZMQ PULL socket connected", service=self._service_id, addr=addr)
 
@@ -107,13 +104,10 @@ class MessageBus:
         """
         if self._pub_socket is None:
             raise RuntimeError(
-                f"[{self._service_id}] PUB socket not initialized. "
-                "Call init_publisher() first."
+                f"[{self._service_id}] PUB socket not initialized. Call init_publisher() first."
             )
         payload = json.dumps(data, default=str)
-        await self._pub_socket.send_multipart(
-            [topic.encode(), payload.encode()]
-        )
+        await self._pub_socket.send_multipart([topic.encode(), payload.encode()])
 
     async def push(self, data: dict[str, Any]) -> None:
         """Push a message on the PUSH socket.
@@ -123,8 +117,7 @@ class MessageBus:
         """
         if self._push_socket is None:
             raise RuntimeError(
-                f"[{self._service_id}] PUSH socket not initialized. "
-                "Call init_pusher() first."
+                f"[{self._service_id}] PUSH socket not initialized. Call init_pusher() first."
             )
         payload = json.dumps(data, default=str)
         await self._push_socket.send_string(payload)
@@ -142,8 +135,7 @@ class MessageBus:
         """
         if self._sub_socket is None:
             raise RuntimeError(
-                f"[{self._service_id}] SUB socket not initialized. "
-                "Call init_subscriber() first."
+                f"[{self._service_id}] SUB socket not initialized. Call init_subscriber() first."
             )
         parts = await self._sub_socket.recv_multipart()
         topic = parts[0].decode()
@@ -161,8 +153,7 @@ class MessageBus:
         """
         if self._pull_socket is None:
             raise RuntimeError(
-                f"[{self._service_id}] PULL socket not initialized. "
-                "Call init_puller() first."
+                f"[{self._service_id}] PULL socket not initialized. Call init_puller() first."
             )
         raw = await self._pull_socket.recv_string()
         return json.loads(raw)

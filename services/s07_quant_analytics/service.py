@@ -44,7 +44,7 @@ class QuantAnalyticsService(BaseService):
         while True:
             try:
                 await self._run_fast_analytics()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.logger.warning("fast_loop error: %s", exc)
             await asyncio.sleep(300)
 
@@ -53,7 +53,7 @@ class QuantAnalyticsService(BaseService):
         while True:
             try:
                 await self._run_slow_analytics()
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 self.logger.warning("slow_loop error: %s", exc)
             await asyncio.sleep(3600)
 

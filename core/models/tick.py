@@ -8,20 +8,19 @@ All timestamps are UTC milliseconds.
 from __future__ import annotations
 
 from decimal import Decimal
-from enum import Enum
-from typing import Literal, Optional
+from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-class Market(str, Enum):
+class Market(StrEnum):
     """Supported trading markets."""
 
     CRYPTO = "crypto"
     EQUITY = "equity"
 
 
-class TradeSide(str, Enum):
+class TradeSide(StrEnum):
     """Trade side: buy or sell aggressor."""
 
     BUY = "buy"
@@ -29,15 +28,15 @@ class TradeSide(str, Enum):
     UNKNOWN = "unknown"
 
 
-class Session(str, Enum):
+class Session(StrEnum):
     """Trading session context."""
 
-    US_PRIME = "us_prime"       # 09:30-10:30 ET and 15:00-16:00 ET
-    US_NORMAL = "us_normal"     # Regular US market hours outside prime windows
-    AFTER_HOURS = "after_hours" # Pre/post US market
-    LONDON = "london"           # 08:00-10:00 UTC
-    ASIAN = "asian"             # 00:00-02:00 UTC
-    WEEKEND = "weekend"         # Saturday/Sunday crypto
+    US_PRIME = "us_prime"  # 09:30-10:30 ET and 15:00-16:00 ET
+    US_NORMAL = "us_normal"  # Regular US market hours outside prime windows
+    AFTER_HOURS = "after_hours"  # Pre/post US market
+    LONDON = "london"  # 08:00-10:00 UTC
+    ASIAN = "asian"  # 00:00-02:00 UTC
+    WEEKEND = "weekend"  # Saturday/Sunday crypto
     UNKNOWN = "unknown"
 
 
@@ -55,9 +54,9 @@ class RawTick(BaseModel):
     price: Decimal = Field(..., gt=Decimal("0"), description="Trade price")
     volume: Decimal = Field(..., ge=Decimal("0"), description="Trade volume")
     side: TradeSide = Field(default=TradeSide.UNKNOWN, description="Aggressor side")
-    bid: Optional[Decimal] = Field(default=None, description="Best bid price")
-    ask: Optional[Decimal] = Field(default=None, description="Best ask price")
-    raw_data: Optional[dict] = Field(default=None, description="Original broker payload")
+    bid: Decimal | None = Field(default=None, description="Best bid price")
+    ask: Decimal | None = Field(default=None, description="Best ask price")
+    raw_data: dict | None = Field(default=None, description="Original broker payload")
 
     @field_validator("symbol")
     @classmethod
@@ -95,9 +94,9 @@ class NormalizedTick(BaseModel):
     side: TradeSide = Field(default=TradeSide.UNKNOWN)
 
     # Order book
-    bid: Optional[Decimal] = Field(default=None)
-    ask: Optional[Decimal] = Field(default=None)
-    spread_bps: Optional[Decimal] = Field(
+    bid: Decimal | None = Field(default=None)
+    ask: Decimal | None = Field(default=None)
+    spread_bps: Decimal | None = Field(
         default=None,
         description="Bid-ask spread in basis points: (ask-bid)/mid × 10000",
     )
@@ -106,9 +105,7 @@ class NormalizedTick(BaseModel):
     session: Session = Field(default=Session.UNKNOWN)
 
     # Source reference
-    source_tick: Optional[RawTick] = Field(
-        default=None, description="Parent RawTick for traceability"
-    )
+    source_tick: RawTick | None = Field(default=None, description="Parent RawTick for traceability")
 
     @field_validator("symbol")
     @classmethod
@@ -117,7 +114,7 @@ class NormalizedTick(BaseModel):
         return v.upper()
 
     @model_validator(mode="after")
-    def compute_spread_bps(self) -> "NormalizedTick":
+    def compute_spread_bps(self) -> NormalizedTick:
         """Compute spread in basis points if bid/ask present and spread not set."""
         # Pydantic frozen models cannot be mutated; spread must be pre-computed
         # This validator serves as a consistency check.
@@ -128,14 +125,12 @@ class NormalizedTick(BaseModel):
                 object.__setattr__(
                     self,
                     "spread_bps",
-                    ((self.ask - self.bid) / mid * Decimal("10000")).quantize(
-                        Decimal("0.01")
-                    ),
+                    ((self.ask - self.bid) / mid * Decimal("10000")).quantize(Decimal("0.01")),
                 )
         return self
 
     @property
-    def mid_price(self) -> Optional[Decimal]:
+    def mid_price(self) -> Decimal | None:
         """Compute mid price from bid/ask."""
         if self.bid is not None and self.ask is not None:
             return (self.bid + self.ask) / Decimal("2")

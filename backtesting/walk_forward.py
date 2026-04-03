@@ -13,12 +13,11 @@ Reference:
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
 from typing import Any
 
 from core.models.tick import NormalizedTick
-from backtesting.metrics import full_report, sharpe_ratio
 
 _DEFAULT_TRAIN_RATIO = 0.8
 _DEFAULT_N_SPLITS = 5
@@ -111,15 +110,15 @@ class WalkForwardValidator:
             embargo_end = min(test_end + self._embargo_bars, n)
 
             # Training set: all bars NOT in [test_start, embargo_end)
-            train_ticks = (
-                [t for t in ticks[:test_start]]
-                + [t for t in ticks[embargo_end:]]
-            )
+            train_ticks = list(ticks[:test_start]) + list(ticks[embargo_end:])
             # Purge: remove training bars whose label horizon reaches the test set
             # (simplified: remove bars within 1 window_size before test_start)
             purge_horizon = max(0, test_start - window_size // 4)
-            train_ticks = [t for t in train_ticks if ticks.index(t) < purge_horizon or
-                           ticks.index(t) >= embargo_end]
+            train_ticks = [
+                t
+                for t in train_ticks
+                if ticks.index(t) < purge_horizon or ticks.index(t) >= embargo_end
+            ]
 
             test_ticks_window = ticks[test_start:test_end]
             if not test_ticks_window:

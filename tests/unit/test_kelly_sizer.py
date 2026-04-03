@@ -76,12 +76,20 @@ class TestKellySizer:
         """High Kyle lambda (illiquid) should reduce position size."""
         capital = Decimal("100000")
         liquid = self.sizer.position_size(
-            capital=capital, kelly_f=0.05, regime_mult=1.0,
-            session_mult=1.0, kyle_lambda=0.0, is_crypto=False,
+            capital=capital,
+            kelly_f=0.05,
+            regime_mult=1.0,
+            session_mult=1.0,
+            kyle_lambda=0.0,
+            is_crypto=False,
         )
         illiquid = self.sizer.position_size(
-            capital=capital, kelly_f=0.05, regime_mult=1.0,
-            session_mult=1.0, kyle_lambda=0.009, is_crypto=False,
+            capital=capital,
+            kelly_f=0.05,
+            regime_mult=1.0,
+            session_mult=1.0,
+            kyle_lambda=0.009,
+            is_crypto=False,
         )
         assert illiquid < liquid
 
@@ -89,7 +97,11 @@ class TestKellySizer:
         """Regime multiplier of 0 (crisis) should result in zero size."""
         capital = Decimal("100000")
         size = self.sizer.position_size(
-            capital=capital, kelly_f=0.05, regime_mult=0.0,
-            session_mult=1.0, kyle_lambda=0.0, is_crypto=False,
+            capital=capital,
+            kelly_f=0.05,
+            regime_mult=0.0,
+            session_mult=1.0,
+            kyle_lambda=0.0,
+            is_crypto=False,
         )
         assert size == Decimal("0")

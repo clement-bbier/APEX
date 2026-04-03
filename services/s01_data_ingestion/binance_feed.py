@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import Callable
+from collections.abc import Callable
 
 import websockets
 import websockets.exceptions
@@ -112,11 +112,7 @@ class BinanceFeed:
             Full WSS URL with all symbol stream subscriptions.
         """
         streams = "/".join(f"{s.lower()}@trade" for s in self._symbols)
-        base = (
-            _TESTNET_WS_BASE
-            if self._settings.binance_testnet
-            else _PRODUCTION_WS_BASE
-        )
+        base = _TESTNET_WS_BASE if self._settings.binance_testnet else _PRODUCTION_WS_BASE
         return f"{base}/stream?streams={streams}"
 
     async def _consume(self, ws) -> None:

@@ -7,8 +7,7 @@ schedules from an API; for now the list is hardcoded.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Optional
+from datetime import UTC, datetime, timedelta
 
 from core.models.regime import CentralBankEvent
 
@@ -105,9 +104,7 @@ class CBCalendar:
         """Build the event list from the hardcoded schedule."""
         self._events: list[CentralBankEvent] = []
         for institution, event_type, dt_str in self._RAW_SCHEDULE:
-            dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M").replace(
-                tzinfo=timezone.utc
-            )
+            dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
             self._events.append(self.build_event(institution, event_type, dt))
 
     # ── Public API ────────────────────────────────────────────────────────────
@@ -120,19 +117,17 @@ class CBCalendar:
         """
         self._events.clear()
         for institution, event_type, dt_str in self._RAW_SCHEDULE:
-            dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M").replace(
-                tzinfo=timezone.utc
-            )
+            dt = datetime.strptime(dt_str, "%Y-%m-%d %H:%M").replace(tzinfo=UTC)
             self._events.append(self.build_event(institution, event_type, dt))
 
-    def next_event(self) -> Optional[CentralBankEvent]:
+    def next_event(self) -> CentralBankEvent | None:
         """Return the next upcoming central-bank event from now.
 
         Returns:
             The earliest future :class:`CentralBankEvent`, or ``None`` if
             all known events are in the past.
         """
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         future = [e for e in self._events if e.scheduled_at > now]
         if not future:
             return None
@@ -166,11 +161,9 @@ class CBCalendar:
         Returns:
             List of :class:`CentralBankEvent` objects scheduled within the window.
         """
-        now = datetime.now(tz=timezone.utc)
+        now = datetime.now(tz=UTC)
         cutoff = now + timedelta(hours=hours)
-        return [
-            e for e in self._events if now <= e.scheduled_at <= cutoff
-        ]
+        return [e for e in self._events if now <= e.scheduled_at <= cutoff]
 
     def build_event(
         self,

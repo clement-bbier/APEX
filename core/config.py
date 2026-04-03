@@ -7,14 +7,13 @@ All settings are validated at startup.
 from __future__ import annotations
 
 from decimal import Decimal
-from enum import Enum
-from typing import Optional
+from enum import StrEnum
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class TradingMode(str, Enum):
+class TradingMode(StrEnum):
     """System trading mode."""
 
     PAPER = "paper"
@@ -36,9 +35,7 @@ class Settings(BaseSettings):
     )
 
     # ── Trading Mode ──────────────────────────────────────────────────────────
-    trading_mode: TradingMode = Field(
-        default=TradingMode.PAPER, description="paper or live"
-    )
+    trading_mode: TradingMode = Field(default=TradingMode.PAPER, description="paper or live")
 
     # ── Alpaca ────────────────────────────────────────────────────────────────
     alpaca_api_key: str = Field(default="", description="Alpaca API key")
@@ -69,9 +66,7 @@ class Settings(BaseSettings):
     fred_api_key: str = Field(default="", description="FRED API key for macro data")
 
     # ── Redis ─────────────────────────────────────────────────────────────────
-    redis_url: str = Field(
-        default="redis://localhost:6379/0", description="Redis connection URL"
-    )
+    redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
     redis_max_connections: int = Field(default=50)
     redis_ttl_seconds: int = Field(
         default=3600, description="Default TTL for cached values in Redis"
@@ -158,9 +153,7 @@ class Settings(BaseSettings):
     cb_loss_pct_in_window: float = Field(
         default=2.0, description="Loss % in cb_loss_window_minutes to open circuit"
     )
-    cb_vix_spike_pct: float = Field(
-        default=20.0, description="VIX 1h spike % to open circuit"
-    )
+    cb_vix_spike_pct: float = Field(default=20.0, description="VIX 1h spike % to open circuit")
     cb_data_timeout_seconds: int = Field(
         default=60, description="Data feed silence duration to open circuit"
     )
@@ -196,15 +189,13 @@ class Settings(BaseSettings):
     )
 
     # ── Alerts ────────────────────────────────────────────────────────────────
-    alert_email: Optional[str] = Field(
-        default=None, description="Email address for alerts"
-    )
+    alert_email: str | None = Field(default=None, description="Email address for alerts")
     alert_smtp_host: str = Field(default="smtp.gmail.com")
     alert_smtp_port: int = Field(default=587)
     alert_smtp_user: str = Field(default="")
     alert_smtp_password: str = Field(default="")
-    twilio_sid: Optional[str] = Field(default=None, description="Twilio account SID")
-    twilio_token: Optional[str] = Field(default=None, description="Twilio auth token")
+    twilio_sid: str | None = Field(default=None, description="Twilio account SID")
+    twilio_token: str | None = Field(default=None, description="Twilio auth token")
     twilio_from_number: str = Field(default="", description="Twilio sender phone number")
     alert_phone_number: str = Field(default="", description="SMS recipient phone number")
 
@@ -225,7 +216,7 @@ class Settings(BaseSettings):
 
 
 # Module-level singleton
-_settings: Optional[Settings] = None
+_settings: Settings | None = None
 
 
 def get_settings() -> Settings:

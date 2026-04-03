@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import time
-from typing import Any, Optional
+from typing import Any
 
 from core.base_service import BaseService
 from core.models.regime import (
@@ -90,11 +90,9 @@ class RegimeDetectorService(BaseService):
         dxy_raw = await self.state.get("macro:dxy")
         spread_raw = await self.state.get("macro:yield_spread")
 
-        vix: Optional[float] = float(vix_raw) if vix_raw is not None else None
-        dxy: Optional[float] = float(dxy_raw) if dxy_raw is not None else None
-        yield_spread: Optional[float] = (
-            float(spread_raw) if spread_raw is not None else None
-        )
+        vix: float | None = float(vix_raw) if vix_raw is not None else None
+        dxy: float | None = float(dxy_raw) if dxy_raw is not None else None
+        yield_spread: float | None = float(spread_raw) if spread_raw is not None else None
 
         # ── Session context ────────────────────────────────────────────────────
         session_ctx: SessionContext = self._session.get_session(now_ms)
@@ -120,9 +118,7 @@ class RegimeDetectorService(BaseService):
         # ── Regime values ─────────────────────────────────────────────────────
         vol_regime: VolRegime = self._engine.compute_vol_regime(vix)
         circuit_open = await self._is_circuit_open()
-        risk_mode: RiskMode = self._engine.compute_risk_mode(
-            vol_regime, event_active, circuit_open
-        )
+        risk_mode: RiskMode = self._engine.compute_risk_mode(vol_regime, event_active, circuit_open)
 
         # Trend requires price history; default to RANGING when unavailable.
         trend_regime: TrendRegime = TrendRegime.RANGING
