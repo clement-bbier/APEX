@@ -1,0 +1,15 @@
+[package]
+name = "apex_mc"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.28", features = ["abi3-py312"] }
+numpy = "0.28"
+ndarray = "0.17"
+rayon = "1.10"
+rand = { version = "0.8", features = ["small_rng"] }
+rand_distr = "0.4"

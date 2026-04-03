@@ -1,0 +1,118 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install ruff mypy "bandit[toml]" -r requirements.txt
+      - run: ruff check . && ruff format --check .
+      - run: mypy . --ignore-missing-imports
+      - run: bandit -r . -x tests/ -c pyproject.toml
+
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+      - working-directory: rust
+        run: cargo test --workspace
+      - name: Build and install Rust wheels
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install "maturin>=1.9.4"
+          (cd rust/apex_mc   && maturin build --release)
+          (cd rust/apex_risk && maturin build --release)
+          ls -la ./rust/target/wheels/
+          python -m pip install ./rust/target/wheels/*.whl
+          python -c "from apex_mc import run_mc_batch, compute_var, compute_cvar; print('apex_mc OK')"
+          python -c "from apex_risk import compute_exposure; print('apex_risk OK')"
+
+  unit-tests:
+    needs: [quality, rust]
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install -r requirements.txt
+          python -m pip install "maturin>=1.9.4"
+          (cd rust/apex_mc   && maturin build --release)
+          (cd rust/apex_risk && maturin build --release)
+          ls -la ./rust/target/wheels/
+          python -m pip install ./rust/target/wheels/*.whl
+      - name: Run unit tests
+        run: pytest tests/unit/ -v --cov=. --cov-report=xml
+        env:
+          REDIS_URL: "redis://localhost:6379/0"
+      - uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage.xml
+
+  integration-tests:
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: docker compose -f docker/docker-compose.test.yml up -d
+      - run: pip install -r requirements.txt
+      - run: pytest tests/integration/ -v --timeout=60
+      - if: always()
+        run: docker compose -f docker/docker-compose.test.yml down -v
+
+  backtest-gate:
+    needs: [unit-tests]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Generate fixture if missing
+        run: |
+          if [ ! -f "tests/fixtures/30d_btcusdt_1m.parquet" ]; then
+            python scripts/generate_test_fixtures.py
+          fi
+      - name: Run backtest regression gate
+        run: python scripts/backtest_regression.py --fixture tests/fixtures/30d_btcusdt_1m.parquet
+        env:
+          BACKTEST_MIN_SHARPE: "0.8"
+          BACKTEST_MAX_DD: "0.08"
