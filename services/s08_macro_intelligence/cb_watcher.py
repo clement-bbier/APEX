@@ -27,7 +27,7 @@ class CBWatcher:
             ) as resp:
                 text = await resp.text()
 
-        root = ET.fromstring(text)
+        root = ET.fromstring(text)  # noqa: S314  # Fed RSS feed is trusted source
         ns = {"atom": "http://www.w3.org/2005/Atom"}
         items: list[dict] = []
 

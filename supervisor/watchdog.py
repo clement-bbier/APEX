@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import defaultdict, deque
+from typing import ClassVar
 
 from core.logger import get_logger
 from core.state import StateStore
@@ -31,7 +32,7 @@ class Watchdog:
     restarts in RESTART_WINDOW_S, suspends execution.
     """
 
-    SERVICE_ORDER = [
+    SERVICE_ORDER: ClassVar[list[str]] = [
         "s01_data_ingestion",
         "s02_signal_engine",
         "s03_regime_detector",
@@ -80,7 +81,7 @@ class Watchdog:
         """
         while True:
             if self._suspended:
-                logger.critical("Watchdog suspended — manual intervention required")
+                logger.critical("Watchdog suspended - manual intervention required")
                 await asyncio.sleep(60)
                 continue
 
@@ -116,7 +117,7 @@ class Watchdog:
         recent = [t for t in self._restart_times[service_id] if now - t < RESTART_WINDOW_S]
         if len(recent) >= MAX_RESTARTS_IN_WINDOW:
             logger.critical(
-                "Too many restarts — suspending execution",
+                "Too many restarts - suspending execution",
                 service=service_id,
                 restart_count=len(recent),
                 window_s=RESTART_WINDOW_S,

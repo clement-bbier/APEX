@@ -22,12 +22,12 @@ class SessionTagger:
 
     Session windows (all times UTC):
 
-    * **Weekend**   – Saturday or Sunday (weekday >= 5)
-    * **US Prime**  – 14:30–15:30 (open prime) *or* 20:00–21:00 (close prime)
-    * **US Normal** – 14:30–21:00 outside the prime windows
-    * **London**    – 08:00–10:00
-    * **Asian**     – 00:00–02:00
-    * **After Hours / Unknown** – everything else
+    * **Weekend**   - Saturday or Sunday (weekday >= 5)
+    * **US Prime**  - 14:30-15:30 (open prime) *or* 20:00-21:00 (close prime)
+    * **US Normal** - 14:30-21:00 outside the prime windows
+    * **London**    - 08:00-10:00
+    * **Asian**     - 00:00-02:00
+    * **After Hours / Unknown** - everything else
     """
 
     # Boundaries expressed as (hour, minute) tuples (UTC, inclusive start).
@@ -99,17 +99,17 @@ class BinanceNormalizer:
 
     Expected raw-data keys (Binance trade stream ``data`` object):
 
-    * ``s`` – symbol (str)
-    * ``t`` – trade ID (not used directly)
-    * ``T`` – trade timestamp UTC ms (int) — use ``T`` not ``t``
-    * ``p`` – price (str)
-    * ``q`` – quantity / volume (str)
-    * ``m`` – is buyer the market maker (bool); ``True`` → aggressor is SELL
+    * ``s`` - symbol (str)
+    * ``t`` - trade ID (not used directly)
+    * ``T`` - trade timestamp UTC ms (int) - use ``T`` not ``t``
+    * ``p`` - price (str)
+    * ``q`` - quantity / volume (str)
+    * ``m`` - is buyer the market maker (bool); ``True`` → aggressor is SELL
 
     Optional book-ticker keys (merged from a separate subscription if present):
 
-    * ``b`` – best bid price (str)
-    * ``a`` – best ask price (str)
+    * ``b`` - best bid price (str)
+    * ``a`` - best ask price (str)
     """
 
     _tagger = SessionTagger()
@@ -178,11 +178,11 @@ class AlpacaNormalizer:
 
     Expected raw-data keys (Alpaca ``T="t"`` trade message):
 
-    * ``S`` – symbol (str)
-    * ``t`` – ISO 8601 timestamp string (e.g. ``"2024-01-15T14:30:00.123456789Z"``)
-    * ``p`` – price (float)
-    * ``s`` – size / volume (float)
-    * ``c`` – conditions list (list[str]); not reliably buy/sell, default UNKNOWN
+    * ``S`` - symbol (str)
+    * ``t`` - ISO 8601 timestamp string (e.g. ``"2024-01-15T14:30:00.123456789Z"``)
+    * ``p`` - price (float)
+    * ``s`` - size / volume (float)
+    * ``c`` - conditions list (list[str]); not reliably buy/sell, default UNKNOWN
     """
 
     _tagger = SessionTagger()

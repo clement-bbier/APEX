@@ -32,7 +32,7 @@ class AlpacaFeed:
         on_tick: Async or sync callable that receives a single trade-event dict.
         api_key: Alpaca API key.
         secret_key: Alpaca secret key.
-        url: Unused — kept for interface compatibility with BinanceFeed.
+        url: Unused - kept for interface compatibility with BinanceFeed.
     """
 
     def __init__(
@@ -74,11 +74,11 @@ class AlpacaFeed:
                 backoff = _RECONNECT_BASE_SECONDS
 
             except asyncio.CancelledError:
-                logger.info("AlpacaFeed cancelled — stopping")
+                logger.info("AlpacaFeed cancelled - stopping")
                 break
             except Exception as exc:
                 logger.warning(
-                    "Alpaca stream error — reconnecting",
+                    "Alpaca stream error - reconnecting",
                     error=str(exc),
                     backoff_seconds=backoff,
                 )

@@ -1,0 +1,4 @@
+# file: /home/runner/work/CashMachine/CashMachine/core/state.py
+# hypothesis_version: 6.151.10
+
+[100, 10000, '0', 'Redis connected', 'Redis disconnected', 'core.state']

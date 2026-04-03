@@ -7,13 +7,15 @@ basic liquidity checks.  All fills are flagged ``is_paper=True``.
 from __future__ import annotations
 
 import asyncio
-import random
+import secrets
 import time
 from decimal import Decimal
 from typing import Any
 
 from core.models.order import ApprovedOrder, ExecutedOrder
 from core.models.tick import NormalizedTick
+
+_rng = secrets.SystemRandom()
 
 # Basis points used when the tick carries no spread information.
 _DEFAULT_SPREAD_BPS = Decimal("5")
@@ -69,7 +71,7 @@ class PaperTrader:
         slippage_bps = Decimal(str(float(spread_bps) / 2.0 + kyle_lambda * float(fill_size)))
 
         # ── Simulated network latency ──────────────────────────────────────────
-        await asyncio.sleep(random.uniform(0.005, 0.050))
+        await asyncio.sleep(_rng.uniform(0.005, 0.050))
 
         # ── Fill price ─────────────────────────────────────────────────────────
         from core.models.signal import Direction  # local import avoids circularity
@@ -112,7 +114,7 @@ class PaperTrader:
         Returns:
             Dict summarising the simulated exit fill.
         """
-        await asyncio.sleep(random.uniform(0.005, 0.050))
+        await asyncio.sleep(_rng.uniform(0.005, 0.050))
 
         slippage_factor = Decimal("0.0005")  # 5 bps default on exits
         # Exits are closes, so we fill slightly worse than quoted.

@@ -34,7 +34,7 @@ class BinanceFeed:
 
     Args:
         symbols: List of Binance symbols to subscribe to, e.g. ``["BTCUSDT"]``.
-        on_tick: Async (or sync) callable receiving a single ``dict`` – the
+        on_tick: Async (or sync) callable receiving a single ``dict`` - the
             ``data`` payload from the combined-stream message.
     """
 
@@ -72,17 +72,17 @@ class BinanceFeed:
                     logger.info("Binance WebSocket connected", symbols=self._symbols)
                     await self._consume(ws)
             except asyncio.CancelledError:
-                logger.info("BinanceFeed cancelled – stopping")
+                logger.info("BinanceFeed cancelled - stopping")
                 break
             except websockets.exceptions.WebSocketException as exc:
                 logger.warning(
-                    "Binance WebSocket error – reconnecting",
+                    "Binance WebSocket error - reconnecting",
                     error=str(exc),
                     backoff_seconds=backoff,
                 )
             except Exception as exc:
                 logger.error(
-                    "Unexpected BinanceFeed error – reconnecting",
+                    "Unexpected BinanceFeed error - reconnecting",
                     error=str(exc),
                     backoff_seconds=backoff,
                 )
@@ -115,7 +115,7 @@ class BinanceFeed:
         base = _TESTNET_WS_BASE if self._settings.binance_testnet else _PRODUCTION_WS_BASE
         return f"{base}/stream?streams={streams}"
 
-    async def _consume(self, ws) -> None:
+    async def _consume(self, ws: websockets.WebSocketClientProtocol) -> None:
         """Read messages from *ws* until the connection closes or we stop.
 
         Parses the combined-stream envelope and invokes *on_tick* with the

@@ -84,7 +84,7 @@ class SignalEngineService(BaseService):
         # Shared multi-timeframe aligner (all symbols share one instance).
         self._mtf = MTFAligner()
 
-        # Previous EMA values per symbol — needed for cross detection.
+        # Previous EMA values per symbol - needed for cross detection.
         self._prev_ema_8: dict[str, Decimal | None] = {}
         self._prev_ema_21: dict[str, Decimal | None] = {}
 
@@ -198,9 +198,9 @@ class SignalEngineService(BaseService):
         n_short = len(short_triggers)
 
         if n_long == 0 and n_short == 0:
-            return  # No triggers — no signal.
+            return  # No triggers - no signal.
         if n_long == n_short:
-            return  # Tied — ambiguous direction.
+            return  # Tied - ambiguous direction.
 
         direction = Direction.LONG if n_long > n_short else Direction.SHORT
         triggers = long_triggers if direction == Direction.LONG else short_triggers

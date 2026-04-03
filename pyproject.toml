@@ -8,7 +8,10 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E","W","F","I","N","UP","ANN","S","B","A","C4","PT","RUF"]
-ignore = ["ANN101","ANN102","S101"]
+ignore = ["S101"]
+# Allow intentional mathematical/scientific Unicode in docstrings and comments.
+# These are used throughout quant formulas (σ=volatility, α=alpha, μ=mean, ×=multiply, etc.)
+allowed-confusables = ["\u00d7","\u2212","\u03b1","\u03b2","\u03b3","\u03bc","\u03c1","\u03c3","\u221a","\u2192","\u2190"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN","S"]

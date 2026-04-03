@@ -1,0 +1,4 @@
+# file: /home/runner/work/CashMachine/CashMachine/services/s05_risk_manager/circuit_breaker.py
+# hypothesis_version: 6.151.10
+
+[0.0, 2.0, 60.0, 100.0, 'closed', 'half_open', 'open']

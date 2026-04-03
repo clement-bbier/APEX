@@ -77,7 +77,7 @@ class StateStore:
 
     # ── Key/Value ─────────────────────────────────────────────────────────────
 
-    async def get(self, key: str) -> Any | None:
+    async def get(self, key: str) -> Any | None:  # noqa: ANN401
         """Get a JSON-deserialized value by key.
 
         Args:
@@ -95,7 +95,7 @@ class StateStore:
     async def set(
         self,
         key: str,
-        value: Any,
+        value: Any,  # noqa: ANN401
         ttl: int | None = None,
     ) -> None:
         """Set a key with JSON-serialized value.
@@ -132,7 +132,7 @@ class StateStore:
 
     # ── Hash ──────────────────────────────────────────────────────────────────
 
-    async def hget(self, name: str, field: str) -> Any | None:
+    async def hget(self, name: str, field: str) -> Any | None:  # noqa: ANN401
         """Get a field from a Redis hash.
 
         Args:
@@ -148,7 +148,7 @@ class StateStore:
             return None
         return json.loads(raw)
 
-    async def hset(self, name: str, field: str, value: Any) -> None:
+    async def hset(self, name: str, field: str, value: Any) -> None:  # noqa: ANN401
         """Set a field in a Redis hash.
 
         Args:
@@ -184,7 +184,7 @@ class StateStore:
 
     # ── Pub/Sub ───────────────────────────────────────────────────────────────
 
-    async def publish(self, channel: str, message: Any) -> None:
+    async def publish(self, channel: str, message: Any) -> None:  # noqa: ANN401
         """Publish a message to a Redis Pub/Sub channel.
 
         Args:
@@ -247,7 +247,7 @@ class StateStore:
 
     # ── Lists ─────────────────────────────────────────────────────────────────
 
-    async def lpush(self, key: str, *values: Any) -> None:
+    async def lpush(self, key: str, *values: Any) -> None:  # noqa: ANN401
         """Push values to the left of a Redis list.
 
         Args:

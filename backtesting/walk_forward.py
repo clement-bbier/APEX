@@ -138,7 +138,7 @@ class WalkForwardValidator:
     async def validate(
         self,
         ticks: list[NormalizedTick],
-        engine_factory: Any,
+        engine_factory: Any,  # noqa: ANN401
         initial_capital: Decimal = Decimal("100000"),
     ) -> WalkForwardResult:
         """Run the engine on each OOS test window and aggregate results.

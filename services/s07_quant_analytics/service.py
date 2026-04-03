@@ -24,7 +24,7 @@ class QuantAnalyticsService(BaseService):
         self._microstructure = AdvancedMicrostructure()
         self._performance = PerformanceAnalyzer()
 
-    async def on_message(self, topic: str, data: Any) -> None:
+    async def on_message(self, topic: str, data: Any) -> None:  # noqa: ANN401
         """No-op message handler (service reads from Redis directly).
 
         Args:

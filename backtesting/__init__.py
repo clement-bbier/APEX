@@ -1,1 +1,1 @@
-"""APEX Trading System — Backtesting Package."""
+"""APEX Trading System - Backtesting Package."""

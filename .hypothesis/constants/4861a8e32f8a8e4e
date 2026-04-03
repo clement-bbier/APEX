@@ -1,0 +1,4 @@
+# file: /home/runner/work/CashMachine/CashMachine/backtesting/metrics.py
+# hypothesis_version: 6.151.10
+
+[0.0, 0.05, 100000.0, 252, 390, 'avg_loss', 'avg_pnl', 'avg_win', 'by_regime', 'by_session', 'by_signal', 'calmar', 'equity_curve', 'error', 'final_equity', 'inf', 'max_drawdown', 'no trades', 'profit_factor', 'sharpe', 'sortino', 'total_pnl', 'trade_count', 'unknown', 'win_rate']

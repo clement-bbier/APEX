@@ -33,7 +33,7 @@ class MTFAligner:
 
         Args:
             timeframe: Timeframe label, e.g. ``'5m'``, ``'1h'``, ``'1d'``.
-            direction: Direction string — ``'long'``, ``'short'``, or
+            direction: Direction string - ``'long'``, ``'short'``, or
                 ``'flat'``.
             strength: Normalised strength in [0, 1].
         """
@@ -63,10 +63,10 @@ class MTFAligner:
 
         Session windows (UTC):
 
-        * US open  14:30–15:30 → 1.20
-        * US close 20:00–21:00 → 1.20
-        * London   08:00–10:00 → 1.10
-        * Asian    00:00–02:00 → 0.70
+        * US open  14:30-15:30 → 1.20
+        * US close 20:00-21:00 → 1.20
+        * London   08:00-10:00 → 1.10
+        * Asian    00:00-02:00 → 0.70
         * All other sessions   → 1.00
 
         Args:
@@ -78,16 +78,16 @@ class MTFAligner:
         dt = datetime.fromtimestamp(timestamp_ms / 1_000.0, tz=UTC)
         total_minutes = dt.hour * 60 + dt.minute
 
-        # US open (14:30–15:30 UTC)
+        # US open (14:30-15:30 UTC)
         if 14 * 60 + 30 <= total_minutes < 15 * 60 + 30:
             return 1.20
-        # US close (20:00–21:00 UTC)
+        # US close (20:00-21:00 UTC)
         if 20 * 60 <= total_minutes < 21 * 60:
             return 1.20
-        # London open (08:00–10:00 UTC)
+        # London open (08:00-10:00 UTC)
         if 8 * 60 <= total_minutes < 10 * 60:
             return 1.10
-        # Asian session (00:00–02:00 UTC)
+        # Asian session (00:00-02:00 UTC)
         if total_minutes < 2 * 60:
             return 0.70
         return 1.00

@@ -89,7 +89,7 @@ class TechnicalAnalyzer:
                 current["close"] = price
                 current["volume"] += volume
 
-        # Daily VWAP accumulators — reset at midnight UTC.
+        # Daily VWAP accumulators - reset at midnight UTC.
         day_start = (ts // 86_400_000) * 86_400_000
         if self._vwap_day != day_start:
             self._vwap_day = day_start
@@ -237,7 +237,7 @@ class TechnicalAnalyzer:
         return upper, middle, lower
 
     def bb_squeeze(self, timeframe: str = "5m") -> bool:
-        """Detect a Bollinger Band squeeze — BB width at its 6-period minimum.
+        """Detect a Bollinger Band squeeze - BB width at its 6-period minimum.
 
         A squeeze occurs when the current Bollinger Band width is at or below
         the minimum width seen over the prior 5 bar-windows.  This signals

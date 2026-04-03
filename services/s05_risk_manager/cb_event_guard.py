@@ -9,11 +9,14 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 
+import structlog
+
 from core.config import get_settings
 from core.models.regime import CentralBankEvent
 from core.state import StateStore
 
 _CB_KEY = "cb:calendar"
+logger = structlog.get_logger(__name__)
 
 
 class CBEventGuard:
@@ -25,10 +28,10 @@ class CBEventGuard:
 
     Return values from :meth:`check`:
 
-    - ``(False, 0.0)`` – inside a pre-event block window; trading blocked.
-    - ``(True, cb_event_post_size_mult)`` – inside a post-event scalp window;
+    - ``(False, 0.0)`` - inside a pre-event block window; trading blocked.
+    - ``(True, cb_event_post_size_mult)`` - inside a post-event scalp window;
       trading allowed at reduced size.
-    - ``(True, 1.0)`` – no active window; normal operation.
+    - ``(True, 1.0)`` - no active window; normal operation.
     """
 
     async def check(self, state: StateStore) -> tuple[bool, float]:
@@ -50,7 +53,8 @@ class CBEventGuard:
                     if isinstance(item, str):
                         item = json.loads(item)
                     events.append(CentralBankEvent.model_validate(item))
-                except Exception:
+                except Exception as exc:
+                    logger.debug("cb_event_parse_failed", error=str(exc))
                     continue
         elif isinstance(raw, str):
             try:
@@ -59,10 +63,11 @@ class CBEventGuard:
                     for item in parsed:
                         try:
                             events.append(CentralBankEvent.model_validate(item))
-                        except Exception:
+                        except Exception as exc:
+                            logger.debug("cb_event_parse_failed", error=str(exc))
                             continue
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("cb_calendar_parse_failed", error=str(exc))
 
         now = datetime.now(tz=UTC)
 

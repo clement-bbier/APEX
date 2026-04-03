@@ -55,7 +55,7 @@ def download_alpaca(
 ) -> None:
     """Download Alpaca equity bars and save as Parquet.
 
-    Uses the ``alpaca-py`` SDK — NOT the deprecated ``alpaca-trade-api``.
+    Uses the ``alpaca-py`` SDK - NOT the deprecated ``alpaca-trade-api``.
 
     Args:
         symbol:     Equity ticker, e.g. ``"AAPL"``.
@@ -131,7 +131,7 @@ async def main(years: int, output_dir: str, alpaca_key: str, alpaca_secret: str)
             except Exception as exc:
                 print(f"  ✗ Alpaca {ticker} failed: {exc}", file=sys.stderr)
     else:
-        print("  ⚠ Alpaca keys not set — skipping equity download")
+        print("  ⚠ Alpaca keys not set - skipping equity download")
 
     print("\n─── Done ───")
 

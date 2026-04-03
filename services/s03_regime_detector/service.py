@@ -55,7 +55,7 @@ class RegimeDetectorService(BaseService):
     # ── BaseService interface ─────────────────────────────────────────────────
 
     async def on_message(self, topic: str, data: dict[str, Any]) -> None:
-        """No-op – the regime detector does not subscribe to any topics.
+        """No-op - the regime detector does not subscribe to any topics.
 
         Args:
             topic: Incoming ZMQ topic (unused).

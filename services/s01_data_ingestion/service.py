@@ -40,7 +40,7 @@ class DataIngestionService(BaseService):
     * Publish on ZMQ topic ``tick.{market}.{symbol}``.
     * Cache the latest tick in Redis under key ``tick:{symbol}``.
 
-    This service is a *source* – it does not subscribe to any ZMQ topics.
+    This service is a *source* - it does not subscribe to any ZMQ topics.
     """
 
     service_id: str = "s01_data_ingestion"

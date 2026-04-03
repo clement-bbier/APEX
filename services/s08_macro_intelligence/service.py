@@ -24,7 +24,7 @@ class MacroIntelligenceService(BaseService):
         self._geo = GeopoliticalAnalyzer()
         self._sector_rotation = SectorRotation()
 
-    async def on_message(self, topic: str, data: Any) -> None:
+    async def on_message(self, topic: str, data: Any) -> None:  # noqa: ANN401
         """No-op message handler (service uses its own polling loops).
 
         Args:

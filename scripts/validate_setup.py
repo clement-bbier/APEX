@@ -23,7 +23,7 @@ def ok(msg: str) -> None:
 
 
 def fail(msg: str, detail: str = "") -> None:
-    suffix = f" — {detail}" if detail else ""
+    suffix = f" - {detail}" if detail else ""
     print(f"  {RED}✗ FAIL{RESET}  {msg}{suffix}")
 
 
@@ -95,7 +95,7 @@ def check_alpaca() -> bool:
     api_key = os.environ.get("ALPACA_API_KEY", "")
     secret_key = os.environ.get("ALPACA_SECRET_KEY", "")
     if not api_key or not secret_key:
-        warn("Alpaca keys not set — skipping")
+        warn("Alpaca keys not set - skipping")
         return True
     try:
         from alpaca.trading.client import TradingClient
@@ -114,7 +114,7 @@ async def check_binance() -> bool:
     api_key = os.environ.get("BINANCE_API_KEY", "")
     secret_key = os.environ.get("BINANCE_SECRET_KEY", "")
     if not api_key or not secret_key:
-        warn("Binance keys not set — skipping")
+        warn("Binance keys not set - skipping")
         return True
     try:
         import aiohttp
@@ -137,7 +137,7 @@ def check_fred() -> bool:
     """Test FRED API connectivity."""
     api_key = os.environ.get("FRED_API_KEY", "")
     if not api_key:
-        warn("FRED_API_KEY not set — skipping")
+        warn("FRED_API_KEY not set - skipping")
         return True
     try:
         from fredapi import Fred
@@ -160,7 +160,7 @@ def check_fred() -> bool:
 async def main() -> int:
     """Run all checks and return exit code."""
     print("\n════════════════════════════════════════════")
-    print("      APEX Trading System — Preflight")
+    print("      APEX Trading System - Preflight")
     print("════════════════════════════════════════════\n")
 
     results = [

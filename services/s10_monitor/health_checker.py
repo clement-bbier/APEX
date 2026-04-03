@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict, deque
+from typing import ClassVar
 
 from core.logger import get_logger
 
@@ -13,7 +14,7 @@ logger = get_logger("s10_monitor.health_checker")
 class HealthChecker:
     """Per-service heartbeat tracking with latency statistics."""
 
-    SERVICE_IDS = [
+    SERVICE_IDS: ClassVar[list[str]] = [
         "s01_data_ingestion",
         "s02_signal_engine",
         "s03_regime_detector",

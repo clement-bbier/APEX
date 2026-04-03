@@ -158,9 +158,9 @@ class BinanceBroker:
         # Derive the base asset by stripping the longest matching quote suffix.
         # Checked longest-first to avoid partial matches (e.g. "ETHBTC" → "ETH",
         # not an erroneous empty string from stripping "BTC" then "ETH").
-        _QUOTE_SUFFIXES = ("USDT", "BUSD", "USDC", "BTC", "ETH", "BNB")
+        _quote_suffixes = ("USDT", "BUSD", "USDC", "BTC", "ETH", "BNB")
         base_asset = symbol
-        for suffix in _QUOTE_SUFFIXES:
+        for suffix in _quote_suffixes:
             if symbol.endswith(suffix):
                 base_asset = symbol[: -len(suffix)]
                 break

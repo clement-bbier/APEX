@@ -1,1 +1,1 @@
-"""APEX Trading System — Integration Tests Package."""
+"""APEX Trading System - Integration Tests Package."""
