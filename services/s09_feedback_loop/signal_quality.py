@@ -1,6 +1,7 @@
 """Signal quality analysis for APEX Trading System."""
 
 from __future__ import annotations
+from typing import Any
 
 import numpy as np
 
@@ -10,7 +11,7 @@ from core.models.order import TradeRecord
 class SignalQuality:
     """Evaluates signal quality grouped by type, regime, and session."""
 
-    def compute_by_type(self, trades: list[TradeRecord]) -> dict[str, dict]:
+    def compute_by_type(self, trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
         """Compute win rate and average PnL grouped by signal type.
 
         Args:
@@ -21,7 +22,7 @@ class SignalQuality:
         """
         return self._group_stats(trades, "signal_type")
 
-    def compute_by_regime(self, trades: list[TradeRecord]) -> dict[str, dict]:
+    def compute_by_regime(self, trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
         """Compute win rate and average PnL grouped by regime at entry.
 
         Args:
@@ -32,7 +33,7 @@ class SignalQuality:
         """
         return self._group_stats(trades, "regime_at_entry")
 
-    def compute_by_session(self, trades: list[TradeRecord]) -> dict[str, dict]:
+    def compute_by_session(self, trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
         """Compute win rate and average PnL grouped by session at entry.
 
         Args:
@@ -43,7 +44,7 @@ class SignalQuality:
         """
         return self._group_stats(trades, "session_at_entry")
 
-    def best_configurations(self, trades: list[TradeRecord]) -> list[dict]:
+    def best_configurations(self, trades: list[TradeRecord]) -> list[dict[str, Any]]:
         """Return the top 3 signal_type + regime + session combinations by Sharpe.
 
         Args:
@@ -53,7 +54,7 @@ class SignalQuality:
             List of up to 3 dicts with keys "signal_type", "regime",
             "session", and "sharpe".
         """
-        groups: dict[tuple, list[float]] = {}
+        groups: dict[tuple[str, ...], list[float]] = {}
         for trade in trades:
             key = (
                 getattr(trade, "signal_type", "unknown"),
@@ -80,7 +81,7 @@ class SignalQuality:
         scored.sort(key=lambda x: x["sharpe"], reverse=True)
         return scored[:3]
 
-    def _group_stats(self, trades: list[TradeRecord], attr: str) -> dict[str, dict]:
+    def _group_stats(self, trades: list[TradeRecord], attr: str) -> dict[str, dict[str, Any]]:
         """Generic grouping helper that computes win_rate and avg_pnl.
 
         Args:
@@ -95,7 +96,7 @@ class SignalQuality:
             key = str(getattr(trade, attr, "unknown"))
             groups.setdefault(key, []).append(trade)
 
-        result: dict[str, dict] = {}
+        result: dict[str, dict[str, Any]] = {}
         for key, group in groups.items():
             pnls = [float(getattr(t, "net_pnl", 0.0) or 0.0) for t in group]
             wins = [t for t in group if float(getattr(t, "net_pnl", 0.0) or 0.0) > 0.0]

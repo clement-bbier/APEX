@@ -11,6 +11,7 @@ References:
 """
 
 from __future__ import annotations
+from typing import Any
 
 import math
 from collections import defaultdict
@@ -203,7 +204,7 @@ def equity_curve_from_trades(initial_capital: float, trades: list[TradeRecord]) 
     return curve
 
 
-def by_session_breakdown(trades: list[TradeRecord]) -> dict[str, dict]:
+def by_session_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
     """Group trades by session and compute stats per group.
 
     Args:
@@ -218,7 +219,7 @@ def by_session_breakdown(trades: list[TradeRecord]) -> dict[str, dict]:
     return _group_stats(groups)
 
 
-def by_regime_breakdown(trades: list[TradeRecord]) -> dict[str, dict]:
+def by_regime_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
     """Group trades by regime label and compute stats per group.
 
     Args:
@@ -233,7 +234,7 @@ def by_regime_breakdown(trades: list[TradeRecord]) -> dict[str, dict]:
     return _group_stats(groups)
 
 
-def by_signal_breakdown(trades: list[TradeRecord]) -> dict[str, dict]:
+def by_signal_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
     """Group trades by signal trigger type and compute stats per group.
 
     Args:
@@ -248,9 +249,9 @@ def by_signal_breakdown(trades: list[TradeRecord]) -> dict[str, dict]:
     return _group_stats(groups)
 
 
-def _group_stats(groups: dict[str, list[TradeRecord]]) -> dict[str, dict]:
+def _group_stats(groups: dict[str, list[TradeRecord]]) -> dict[str, dict[str, Any]]:
     """Compute aggregate stats for each group of trades."""
-    result: dict[str, dict] = {}
+    result: dict[str, dict[str, Any]] = {}
     for label, group_trades in groups.items():
         pnls = [_to_float(t.net_pnl) for t in group_trades]
         result[label] = {
@@ -266,7 +267,7 @@ def full_report(
     trades: list[TradeRecord],
     initial_capital: float = 100_000.0,
     risk_free_rate: float = 0.05,
-) -> dict:
+) -> dict[str, Any]:
     """Generate a complete performance report from trade records.
 
     Args:

@@ -6,6 +6,7 @@ position size adjusted for regime, session, market-impact, and asset class.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from decimal import Decimal
 
@@ -37,7 +38,7 @@ class KellySizer:
         Returns:
             ``(win_rate, avg_rr)`` tuple.  Defaults: ``(0.5, 1.5)``.
         """
-        raw: dict | None = await state.get(f"kelly:{symbol}")
+        raw: dict[str, Any] | None = await state.get(f"kelly:{symbol}")
         if not isinstance(raw, dict):
             return 0.5, 1.5
         win_rate = float(raw.get("win_rate", 0.5))

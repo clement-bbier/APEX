@@ -1,6 +1,7 @@
 """Economic surprise index for APEX Trading System."""
 
 from __future__ import annotations
+from typing import Any
 
 
 class SurpriseIndex:
@@ -44,11 +45,11 @@ class SurpriseIndex:
             return 0.75
         return 1.0
 
-    async def get_latest_economic_data(self) -> dict:
+    async def get_latest_economic_data(self) -> dict[str, Any]:
         """Retrieve the latest economic release data.
 
         Returns:
-            Empty dict (stub). TODO Phase 2: integrate FRED releases API.
+            Empty dict[str, Any] (stub). TODO Phase 2: integrate FRED releases API.
         """
         # TODO Phase 2: Integrate FRED releases API for live economic data
         return {}

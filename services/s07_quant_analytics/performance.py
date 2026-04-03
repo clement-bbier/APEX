@@ -1,6 +1,7 @@
 """Portfolio performance analytics for APEX Trading System."""
 
 from __future__ import annotations
+from typing import Any
 
 import numpy as np
 
@@ -130,7 +131,7 @@ class PerformanceAnalyzer:
             return 0.0
         return float(np.mean(active) / std * np.sqrt(252))
 
-    def factor_attribution(self, trade_records: list[dict]) -> dict:
+    def factor_attribution(self, trade_records: list[dict[str, Any]]) -> dict[str, Any]:
         """Attribute performance across regimes, sessions, and signal types.
 
         Groups trades by regime, session, and signal_type, then computes
@@ -141,13 +142,13 @@ class PerformanceAnalyzer:
                 "session", "signal_type", "pnl", and "won".
 
         Returns:
-            Nested dict keyed by group dimension then group value, each
+            Nested dict[str, Any] keyed by group dimension then group value, each
             containing "win_rate" and "avg_pnl".
         """
-        result: dict = {"regime": {}, "session": {}, "signal_type": {}}
+        result: dict[str, Any] = {"regime": {}, "session": {}, "signal_type": {}}
 
-        def _group(key: str) -> dict:
-            groups: dict[str, list[dict]] = {}
+        def _group(key: str) -> dict[str, Any]:
+            groups: dict[str, list[dict[str, Any]]] = {}
             for trade in trade_records:
                 grp = str(trade.get(key, "unknown"))
                 groups.setdefault(grp, []).append(trade)

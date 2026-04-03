@@ -1,6 +1,7 @@
 """Trade attribution analyzer for APEX Trading System."""
 
 from __future__ import annotations
+from typing import Any
 
 from core.models.order import TradeRecord
 
@@ -8,8 +9,8 @@ from core.models.order import TradeRecord
 class TradeAnalyzer:
     """Analyzes individual and batch trade records for attribution."""
 
-    def analyze(self, trade: TradeRecord) -> dict:
-        """Return a full attribution dict for a single trade.
+    def analyze(self, trade: TradeRecord) -> dict[str, Any]:
+        """Return a full attribution dict[str, Any] for a single trade.
 
         Args:
             trade: TradeRecord instance to analyze.
@@ -35,7 +36,7 @@ class TradeAnalyzer:
             "r_multiple": r_multiple,
         }
 
-    def batch_analyze(self, trades: list[TradeRecord]) -> list[dict]:
+    def batch_analyze(self, trades: list[TradeRecord]) -> list[dict[str, Any]]:
         """Analyze a list of trade records.
 
         Args:

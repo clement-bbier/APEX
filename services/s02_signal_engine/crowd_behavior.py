@@ -6,6 +6,7 @@ positioning extremes.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from collections import deque
 from decimal import Decimal
@@ -39,7 +40,7 @@ class CrowdBehaviorAnalyzer:
 
     # ── GEX ───────────────────────────────────────────────────────────────────
 
-    def update_gex(self, options_data: list[dict]) -> float:
+    def update_gex(self, options_data: list[dict[str, Any]]) -> float:
         """Compute and cache GEX from a fresh options chain snapshot.
 
         Each entry in *options_data* must contain at least the keys

@@ -67,8 +67,8 @@ class Watchdog:
             health = await state.get(f"service_health:{service_id}")
             if health is None:
                 return False
-            ts = health.get("timestamp_ms", 0) / 1000
-            return (time.time() - ts) < HEALTH_TIMEOUT_S
+            ts = float(health.get("timestamp_ms", 0)) / 1000
+            return bool((time.time() - ts) < HEALTH_TIMEOUT_S)
         except Exception as exc:
             logger.warning("Ping error", service=service_id, error=str(exc))
             return False

@@ -19,7 +19,7 @@ class QuantAnalyticsService(BaseService):
 
     def __init__(self) -> None:
         """Initialise analytics sub-modules."""
-        super().__init__()
+        super().__init__("s07_quant_analytics")
         self._market_stats = MarketStats()
         self._microstructure = AdvancedMicrostructure()
         self._performance = PerformanceAnalyzer()
@@ -62,7 +62,7 @@ class QuantAnalyticsService(BaseService):
         raw = await self.state.get("ticks:recent")
         if not raw:
             return
-        ticks: list[dict] = json.loads(raw)
+        ticks: list[dict[str, Any]] = json.loads(raw)
         prices = [float(t["price"]) for t in ticks if "price" in t]
         returns = [float(t["return"]) for t in ticks if "return" in t]
         volumes = [float(t["volume"]) for t in ticks if "volume" in t]
@@ -83,7 +83,7 @@ class QuantAnalyticsService(BaseService):
         raw = await self.state.get("trades:records")
         if not raw:
             return
-        trades: list[dict] = json.loads(raw)
+        trades: list[dict[str, Any]] = json.loads(raw)
         returns = [float(t["return"]) for t in trades if "return" in t]
         if not returns:
             return

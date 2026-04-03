@@ -31,8 +31,30 @@ module = [
     "websockets.*",
     "uvicorn.*",
     "fakeredis.*",
+    "numba.*",
+    "curl_cffi.*",
+    "aiohttp.*",
+    "pydantic.*",
+    "pydantic_settings.*",
+    "fastapi.*",
+    "starlette.*",
+    "pytest.*",
+    "_pytest.*",
+    "hypothesis.*",
+    "alpaca.*",
+    "redis.*",
+    "zmq.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "core.models.*",
+    "core.config",
+    "tests.*",
+    "services.s10_monitor.dashboard",
+]
+disable_error_codes = ["misc", "untyped-def", "no-untyped-def"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import aiohttp
 import structlog
@@ -92,7 +92,7 @@ class SectorRotation:
             return "risk_off"
         return "neutral"
 
-    def sector_strength_matrix(self, performance: dict[str, float]) -> list[dict]:
+    def sector_strength_matrix(self, performance: dict[str, float]) -> list[dict[str, Any]]:
         """Build a ranked sector strength matrix.
 
         Args:

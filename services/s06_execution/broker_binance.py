@@ -5,6 +5,7 @@ Request signing uses HMAC-SHA256 as required by the Binance API.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import hashlib
 import hmac
@@ -59,7 +60,7 @@ class BinanceBroker:
 
     # ── Signing ───────────────────────────────────────────────────────────────
 
-    def _sign(self, params: dict) -> str:
+    def _sign(self, params: dict[str, Any]) -> str:
         """Produce an HMAC-SHA256 signature for the given query parameters.
 
         The signature covers the URL-encoded query string (sorted by key).
@@ -87,7 +88,7 @@ class BinanceBroker:
         quantity: float,
         price: float | None = None,
         stop_price: float | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Submit a signed order to Binance.
 
         Args:
@@ -99,7 +100,7 @@ class BinanceBroker:
             stop_price: Stop price (required for stop orders).
 
         Returns:
-            Binance order response dict.
+            Binance order response dict[str, Any].
         """
         session = self._ensure_session()
         params: dict = {
@@ -141,7 +142,7 @@ class BinanceBroker:
 
     # ── Account / position queries ────────────────────────────────────────────
 
-    async def get_position(self, symbol: str) -> dict | None:
+    async def get_position(self, symbol: str) -> dict[str, Any] | None:
         """Retrieve the current holding for a spot symbol.
 
         Fetches the account snapshot and returns the balance entry for the
@@ -152,7 +153,7 @@ class BinanceBroker:
             symbol: Trading pair symbol.
 
         Returns:
-            Balance dict or ``None`` if effectively no open position.
+            Balance dict[str, Any] or ``None`` if effectively no open position.
         """
         account = await self.get_account()
         # Derive the base asset by stripping the longest matching quote suffix.
@@ -164,7 +165,7 @@ class BinanceBroker:
             if symbol.endswith(suffix):
                 base_asset = symbol[: -len(suffix)]
                 break
-        balances: list[dict] = account.get("balances", [])
+        balances: list[dict[str, Any]] = account.get("balances", [])
         for balance in balances:
             if balance.get("asset") == base_asset:
                 free = float(balance.get("free", 0))
@@ -173,11 +174,11 @@ class BinanceBroker:
                     return balance
         return None
 
-    async def get_account(self) -> dict:
+    async def get_account(self) -> dict[str, Any]:
         """Retrieve the Binance spot account information.
 
         Returns:
-            Account information dict from Binance.
+            Account information dict[str, Any] from Binance.
         """
         session = self._ensure_session()
         params = {"timestamp": int(time.time() * 1000)}

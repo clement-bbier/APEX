@@ -1,6 +1,7 @@
 """Federal Reserve statement watcher for APEX Trading System."""
 
 from __future__ import annotations
+from typing import Any
 
 import xml.etree.ElementTree as ET
 
@@ -15,7 +16,7 @@ class CBWatcher:
     def __init__(self) -> None:
         """Initialise the CBWatcher."""
 
-    async def fetch_fed_rss(self) -> list[dict]:
+    async def fetch_fed_rss(self) -> list[dict[str, Any]]:
         """Fetch and parse the Federal Reserve press release RSS feed.
 
         Returns:
@@ -29,7 +30,7 @@ class CBWatcher:
 
         root = ET.fromstring(text)  # noqa: S314  # Fed RSS feed is trusted source
         ns = {"atom": "http://www.w3.org/2005/Atom"}
-        items: list[dict] = []
+        items: list[dict[str, Any]] = []
 
         # Try RSS 2.0 format first
         channel = root.find("channel")

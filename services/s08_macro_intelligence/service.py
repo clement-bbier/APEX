@@ -19,7 +19,7 @@ class MacroIntelligenceService(BaseService):
 
     def __init__(self) -> None:
         """Initialise macro sub-modules."""
-        super().__init__()
+        super().__init__("s08_macro_intelligence")
         self._cb_watcher = CBWatcher()
         self._geo = GeopoliticalAnalyzer()
         self._sector_rotation = SectorRotation()
@@ -73,7 +73,7 @@ class MacroIntelligenceService(BaseService):
             if statement:
                 surprise = await self._cb_watcher.detect_surprise(statement)
                 if surprise:
-                    await self.publish(
+                    await self.bus.publish(
                         f"macro.catalyst.{surprise}",
                         {"source": "fed", "title": latest.get("title", "")},
                     )
@@ -83,7 +83,7 @@ class MacroIntelligenceService(BaseService):
         if wti is not None and brent is not None:
             impact = self._geo.energy_impact_score(wti, brent)
             if impact > 0.02:
-                await self.publish(
+                await self.bus.publish(
                     "macro.catalyst.energy",
                     {"wti": wti, "brent": brent, "impact": impact},
                 )

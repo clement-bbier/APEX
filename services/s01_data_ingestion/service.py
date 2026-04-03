@@ -122,7 +122,7 @@ class DataIngestionService(BaseService):
 
     # ── Tick callbacks ────────────────────────────────────────────────────────
 
-    async def _on_binance_tick(self, raw_data: dict) -> None:
+    async def _on_binance_tick(self, raw_data: dict[str, Any]) -> None:
         """Normalise a Binance trade event and publish/cache the result.
 
         Args:
@@ -151,11 +151,11 @@ class DataIngestionService(BaseService):
                 raw=raw_data,
             )
 
-    async def _on_alpaca_tick(self, raw_data: dict) -> None:
+    async def _on_alpaca_tick(self, raw_data: dict[str, Any]) -> None:
         """Normalise an Alpaca trade event and publish/cache the result.
 
         Args:
-            raw_data: A single Alpaca trade event dict (``T="t"``).
+            raw_data: A single Alpaca trade event dict[str, Any] (``T="t"``).
         """
         try:
             tick = self._alpaca_normalizer.normalize(raw_data)

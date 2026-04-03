@@ -6,6 +6,7 @@ or simultaneous-position limits.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from decimal import Decimal
 
@@ -28,7 +29,7 @@ class ExposureMonitor:
 
     def __init__(self) -> None:
         """Initialize the exposure monitor."""
-        self._position_cache: dict[str, dict] = {}
+        self._position_cache: dict[str, dict[str, Any]] = {}
 
     # ── Exposure queries ──────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict, deque
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from core.logger import get_logger
 
@@ -65,7 +65,7 @@ class HealthChecker:
         """
         return [sid for sid in self.SERVICE_IDS if not self.is_alive(sid)]
 
-    def latency_stats(self) -> dict[str, dict]:
+    def latency_stats(self) -> dict[str, dict[str, Any]]:
         """Compute p50/p95/p99 inter-arrival latency per service.
 
         Returns:
@@ -73,7 +73,7 @@ class HealthChecker:
         """
         import numpy as np
 
-        stats: dict[str, dict] = {}
+        stats: dict[str, dict[str, Any]] = {}
         for sid in self.SERVICE_IDS:
             arrivals = list(self._arrival_times[sid])
             if len(arrivals) < 2:

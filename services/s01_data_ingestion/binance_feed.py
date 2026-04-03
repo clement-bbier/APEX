@@ -5,6 +5,7 @@ a caller-supplied callback, and auto-reconnects on failure with exponential back
 """
 
 from __future__ import annotations
+from typing import Any
 
 import asyncio
 import json
@@ -34,16 +35,16 @@ class BinanceFeed:
 
     Args:
         symbols: List of Binance symbols to subscribe to, e.g. ``["BTCUSDT"]``.
-        on_tick: Async (or sync) callable receiving a single ``dict`` - the
+        on_tick: Async (or sync) callable receiving a single ``dict[str, Any]`` - the
             ``data`` payload from the combined-stream message.
     """
 
-    def __init__(self, symbols: list[str], on_tick: Callable) -> None:
+    def __init__(self, symbols: list[str], on_tick: Callable[..., Any]) -> None:
         """Initialise the feed.
 
         Args:
             symbols: Uppercase Binance trading-pair symbols.
-            on_tick: Callback invoked with each raw trade ``data`` dict.
+            on_tick: Callback invoked with each raw trade ``data`` dict[str, Any].
         """
         self._symbols = [s.upper() for s in symbols]
         self._on_tick = on_tick
@@ -119,7 +120,7 @@ class BinanceFeed:
         """Read messages from *ws* until the connection closes or we stop.
 
         Parses the combined-stream envelope and invokes *on_tick* with the
-        inner ``data`` dict.
+        inner ``data`` dict[str, Any].
 
         Args:
             ws: An active :mod:`websockets` connection.
@@ -128,8 +129,8 @@ class BinanceFeed:
             if not self._running:
                 break
             try:
-                envelope: dict = json.loads(raw_message)
-                data: dict | None = envelope.get("data")
+                envelope: dict[str, Any] = json.loads(raw_message)
+                data: dict[str, Any] | None = envelope.get("data")
                 if data is None:
                     continue
                 await self._dispatch(data)
@@ -138,7 +139,7 @@ class BinanceFeed:
             except Exception as exc:
                 logger.error("Error processing Binance tick", error=str(exc))
 
-    async def _dispatch(self, data: dict) -> None:
+    async def _dispatch(self, data: dict[str, Any]) -> None:
         """Call *on_tick* with *data*, supporting both async and sync callables.
 
         Args:

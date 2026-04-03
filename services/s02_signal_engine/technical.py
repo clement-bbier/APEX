@@ -6,6 +6,7 @@ profile indicators.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from collections import deque
 from decimal import Decimal
@@ -42,11 +43,11 @@ class TechnicalAnalyzer:
         """
         self.symbol = symbol
 
-        # Completed bars per timeframe.  Each bar is a dict:
+        # Completed bars per timeframe.  Each bar is a dict[str, Any]:
         # {open, high, low, close, volume, timestamp_ms}
-        self._bars: dict[str, deque[dict]] = {tf: deque(maxlen=_MAX_BARS) for tf in _TIMEFRAME_MS}
+        self._bars: dict[str, deque[dict[str, Any]]] = {tf: deque(maxlen=_MAX_BARS) for tf in _TIMEFRAME_MS}
         # In-progress (current) bar per timeframe.
-        self._current: dict[str, dict | None] = dict.fromkeys(_TIMEFRAME_MS)
+        self._current: dict[str, dict[str, Any] | None] = dict[str, Any].fromkeys(_TIMEFRAME_MS)
 
         # Daily VWAP accumulators (reset at midnight UTC).
         self._vwap_day: int = -1
@@ -100,7 +101,7 @@ class TechnicalAnalyzer:
 
     # ── Helper ────────────────────────────────────────────────────────────────
 
-    def _all_bars(self, timeframe: str) -> list[dict]:
+    def _all_bars(self, timeframe: str) -> list[dict[str, Any]]:
         """Return completed bars plus the current in-progress bar.
 
         Args:

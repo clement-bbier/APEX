@@ -50,7 +50,7 @@ class BaseService(ABC):
         self.bus = MessageBus(service_id)
         self.state = StateStore(service_id)
         self._running = False
-        self._heartbeat_task: asyncio.Task | None = None
+        self._heartbeat_task: asyncio.Task[None] | None = None
 
     # ── Abstract interface ────────────────────────────────────────────────────
 

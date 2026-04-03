@@ -11,6 +11,7 @@ polling interval (default 60 seconds).
 """
 
 from __future__ import annotations
+from typing import Any
 
 import asyncio
 
@@ -45,7 +46,7 @@ class MacroFeed:
         """
         self._fred_api_key = fred_api_key
         self._running = False
-        self._poll_task: asyncio.Task | None = None
+        self._poll_task: asyncio.Task[None] | None = None
 
         # Cached latest values (None until first successful fetch).
         self._vix: float | None = None
@@ -106,7 +107,7 @@ class MacroFeed:
                     headers={"User-Agent": "apex-trading/1.0"},
                 ) as resp:
                     resp.raise_for_status()
-                    payload: dict = await resp.json(content_type=None)
+                    payload: dict[str, Any] = await resp.json(content_type=None)
                     result = (
                         payload.get("chart", {})
                         .get("result", [{}])[0]
@@ -190,8 +191,8 @@ class MacroFeed:
                     timeout=aiohttp.ClientTimeout(total=_HTTP_TIMEOUT_SECONDS),
                 ) as resp:
                     resp.raise_for_status()
-                    payload: dict = await resp.json(content_type=None)
-                    observations: list[dict] = payload.get("observations", [])
+                    payload: dict[str, Any] = await resp.json(content_type=None)
+                    observations: list[dict[str, Any]] = payload.get("observations", [])
                     if not observations:
                         logger.warning("FRED returned no observations", series=series_id)
                         return None

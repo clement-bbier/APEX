@@ -57,7 +57,7 @@ class WalkForwardResult:
 
     window_sharpes: list[float]
     oos_trades: list[Any]  # list[TradeRecord]
-    aggregate_report: dict
+    aggregate_report: dict[str, Any]
     mean_sharpe: float = 0.0
     std_sharpe: float = 0.0
 
@@ -154,7 +154,7 @@ class WalkForwardValidator:
         from backtesting.metrics import full_report as _full_report
 
         windows = self.build_windows_fast(ticks)
-        all_trades: list = []
+        all_trades: list[Any] = []
         window_sharpes: list[float] = []
 
         for win in windows:
