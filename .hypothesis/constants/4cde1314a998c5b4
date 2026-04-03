@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/zope/interface/ro.py
-# hypothesis_version: 6.151.10
-
-['+', '+ ', '- ', '1', '=', 'Legacy RO (len={})', 'ORIG_', 'Unable to find self', 'ZOPE_INTERFACE_', 'bases', 'delete', 'direct', 'equal', 'insert', 'no', 'replace', 'restructuredtext', 'ro', '{}{}']

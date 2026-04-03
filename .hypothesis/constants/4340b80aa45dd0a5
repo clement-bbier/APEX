@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/twisted/python/failure.py
-# hypothesis_version: 6.151.10
-
-['    %s\n', ' ( Globals )\n', ' (chained Failure)\n', ' (pickled) ', ' [ Locals ]\n', '%s: %s: %s\n', '%s:%d: %s(...)\n', '<{} {}: {}>', 'Failure: ', 'Traceback', 'YIELD_VALUE', '_T_Callable', '__builtins__', '__failure__', '__traceback__', 'brief', 'broken str', 'default', 'frames', 'pickled', 'self', 'stack', 'tb', 'verbose']

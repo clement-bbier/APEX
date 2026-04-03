@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/twisted/logger/_json.py
-# hypothesis_version: 6.151.10
-
-[b'\n', b'\x1e', 4096, '__class_uuid__', '__name__', 'charmap', 'name', 'type', 'unpersistable', 'utf-8']

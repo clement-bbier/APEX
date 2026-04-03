@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/zope/interface/declarations.py
-# hypothesis_version: 6.151.10
-
-[', ', '.', ':', '?', '__args', '__class__', '__implemented__', '__module__', '__name__', '__providedBy__', '__provides__', '_cls', '_empty', '_implements', 'directlyProvides', 'directlyProvides({})', 'interfaces', 'restructuredtext', 'sys.modules[%r]', 'zope.interface', '{}({})', '{}, ']

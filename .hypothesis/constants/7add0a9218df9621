@@ -1,4 +1,0 @@
-# file: /home/runner/work/CashMachine/CashMachine/core/models/tick.py
-# hypothesis_version: 6.151.10
-
-['0', '0.01', '10000', '2', 'Aggressor side', 'Best ask price', 'Best bid price', 'Market type', 'Trade price', 'Trade volume', 'UTC milliseconds', 'after', 'after_hours', 'asian', 'before', 'buy', 'crypto', 'equity', 'london', 'price', 'sell', 'spread_bps', 'symbol', 'unknown', 'us_normal', 'us_prime', 'volume', 'weekend']

@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/zope/interface/interfaces.py
-# hypothesis_version: 6.151.10
-
-['ComponentLookupError', 'IAdapterRegistration', 'IAdapterRegistry', 'IAttribute', 'IComponentLookup', 'IComponentRegistry', 'IComponents', 'IDeclaration', 'IElement', 'IHandlerRegistration', 'IInterface', 'IMethod', 'IObjectEvent', 'IRegistered', 'IRegistration', 'IRegistrationEvent', 'ISpecification', 'IUnregistered', 'IUtilityRegistration', 'Invalid', 'ObjectEvent', 'Registered', 'The object name', 'Unregistered', '__doc__', '__name__', 'interface', 'restructuredtext', '{} event:\n{!r}']

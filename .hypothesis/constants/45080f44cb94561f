@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/twisted/logger/_legacy.py
-# hypothesis_version: 6.151.10
-
-['%(log_legacy)s', '-', 'ILegacyLogObserver', 'failure', 'format', 'isError', 'logLevel', 'log_failure', 'log_format', 'log_legacy', 'log_level', 'log_namespace', 'log_system', 'log_text', 'log_time', 'message', 'system', 'time', 'why', '{log_text}']

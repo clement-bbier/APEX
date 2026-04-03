@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/twisted/python/compat.py
-# hypothesis_version: 6.151.10
-
-[b'%d', 'FileType', 'InstanceType', 'NativeStringIO', 'PyPy', 'Sequence', 'StringType', 'Twisted', '_get_async_param', 'ascii', 'async', "b'%d'", 'bytesEnviron', 'cmp', 'comparable', 'cookielib', 'd.items()', 'd.values()', 'encoding', 'escape', 'exec', 'execfile', 'frozenset', 'intToBytes', 'intern', 'items', 'iterbytes', 'iteritems', 'itervalues', 'izip', 'lazyByteSlice', 'list(d.items())', 'long', 'nativeString', 'networkString', 'os.environb', 'range', 'raw_input', 'rb', 'reduce', 'reraise', 'set', 'unichr', 'unicode', 'urllib_parse', 'urlquote', 'urlunquote', 'xrange']

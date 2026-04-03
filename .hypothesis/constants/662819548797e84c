@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/twisted/python/reflect.py
-# hypothesis_version: 6.151.10
-
-[b'__init__.py', '()', '.', '.__func__', '.__self__', '.__self__.__class__', 'Empty module name', 'InvalidName', 'ModuleNotFound', 'ObjectNotFound', 'QueueMethod', '[', ']', '__dict__', '__init__.py', '__name__', 'accumulateClassDict', 'accumulateClassList', 'accumulateMethods', 'addMethodNamesToDict', 'filenameToModuleName', 'findInstances', 'fullFuncName', 'fullyQualifiedName', 'getClass', 'getset_descriptor', 'isLike', 'isOfType', 'isSame', 'member_descriptor', 'method_descriptor', 'modgrep', 'namedAny', 'namedClass', 'namedModule', 'namedObject', 'objgrep', 'prefixedMethodNames', 'prefixedMethods', 'qual', 'requireModule', 'safe_repr', 'safe_str', 'sys.modules', 'unknown type', 'utf-8', 'wrapper_descriptor', '{', '{}.{}', '}']

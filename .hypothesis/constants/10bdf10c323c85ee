@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/twisted/python/log.py
-# hypothesis_version: 6.151.10
-
-['+', '-', '<stdio (log)>', 'Log opened.', 'Unhandled Error', 'defaultObserver', 'encoding', 'failure', 'format', 'isError', 'log_format', 'logfile', 'message', 'msg', 'system', 'text', 'theLogPublisher', 'time', 'twisted', 'wb', 'why']
