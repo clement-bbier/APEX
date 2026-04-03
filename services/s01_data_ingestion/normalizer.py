@@ -127,7 +127,12 @@ class BinanceNormalizer:
         symbol: str = str(raw_data.get("s", "")).upper()
 
         # Binance uses capital ``T`` for the actual trade execution timestamp (ms).
-        timestamp_ms: int = int(raw_data.get("T", raw_data.get("t", 0)))
+        raw_ts = raw_data.get("T") or raw_data.get("t")
+        if not raw_ts:
+            raise ValueError(
+                f"Binance trade payload is missing timestamp fields 'T'/'t': {raw_data}"
+            )
+        timestamp_ms: int = int(raw_ts)
 
         price = Decimal(str(raw_data["p"]))
         volume = Decimal(str(raw_data["q"]))

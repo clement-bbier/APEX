@@ -96,18 +96,29 @@ class DataIngestionService(BaseService):
             equity_symbols=_DEFAULT_EQUITY_SYMBOLS,
         )
 
+        # Start the macro polling loop first; it runs in its own background task.
         await self._macro_feed.start()
 
+        # Stream feeds run concurrently.  The finally block guarantees all feeds
+        # are stopped regardless of how gather exits (cancel, exception, or normal).
         try:
             await asyncio.gather(
                 self._binance_feed.start(),
                 self._alpaca_feed.start(),
-                return_exceptions=False,
             )
+        except asyncio.CancelledError:
+            logger.info("DataIngestionService gather cancelled")
+            raise
+        except Exception as exc:
+            logger.error("DataIngestionService feed error", error=str(exc))
+            raise
         finally:
-            await self._macro_feed.stop()
-            await self._binance_feed.stop()
-            await self._alpaca_feed.stop()
+            await asyncio.gather(
+                self._macro_feed.stop(),
+                self._binance_feed.stop(),
+                self._alpaca_feed.stop(),
+                return_exceptions=True,
+            )
 
     # ── Tick callbacks ────────────────────────────────────────────────────────
 
