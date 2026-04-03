@@ -1,0 +1,231 @@
+"""Configuration management for APEX Trading System.
+
+Uses Pydantic Settings to load configuration from environment variables / .env file.
+All settings are validated at startup.
+"""
+
+from __future__ import annotations
+
+from decimal import Decimal
+from enum import StrEnum
+
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class TradingMode(StrEnum):
+    """System trading mode."""
+
+    PAPER = "paper"
+    LIVE = "live"
+
+
+class Settings(BaseSettings):
+    """APEX Trading System configuration loaded from environment variables.
+
+    All sensitive values (API keys, secrets) must be set via environment or .env file.
+    No default values are provided for security-critical settings.
+    """
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore",
+    )
+
+    # ── Trading Mode ──────────────────────────────────────────────────────────
+    trading_mode: TradingMode = Field(default=TradingMode.PAPER, description="paper or live")
+
+    # ── Alpaca ────────────────────────────────────────────────────────────────
+    alpaca_api_key: str = Field(default="", description="Alpaca API key")
+    alpaca_secret_key: str = Field(default="", description="Alpaca secret key")
+    alpaca_base_url: str = Field(
+        default="https://paper-api.alpaca.markets",
+        description="Alpaca REST base URL",
+    )
+    alpaca_data_url: str = Field(
+        default="wss://stream.data.alpaca.markets/v2/iex",
+        description="Alpaca WebSocket data stream URL",
+    )
+
+    # ── Binance ───────────────────────────────────────────────────────────────
+    binance_api_key: str = Field(default="", description="Binance API key")
+    binance_secret_key: str = Field(default="", description="Binance secret key")
+    binance_testnet: bool = Field(default=True, description="Use Binance testnet")
+    binance_rest_url: str = Field(
+        default="https://testnet.binance.vision",
+        description="Binance REST API base URL",
+    )
+    binance_ws_url: str = Field(
+        default="wss://testnet.binance.vision/ws",
+        description="Binance WebSocket base URL",
+    )
+
+    # ── FRED API ──────────────────────────────────────────────────────────────
+    fred_api_key: str = Field(default="", description="FRED API key for macro data")
+
+    # ── Redis ─────────────────────────────────────────────────────────────────
+    redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
+    redis_max_connections: int = Field(default=50)
+    redis_ttl_seconds: int = Field(
+        default=3600, description="Default TTL for cached values in Redis"
+    )
+
+    # ── ZeroMQ ────────────────────────────────────────────────────────────────
+    zmq_pub_port: int = Field(default=5555, description="ZMQ PUB socket port")
+    zmq_sub_port: int = Field(default=5555, description="ZMQ SUB socket port (same broker)")
+    zmq_push_port: int = Field(default=5556, description="ZMQ PUSH socket port")
+    zmq_pull_port: int = Field(default=5556, description="ZMQ PULL socket port")
+    zmq_host: str = Field(default="localhost", description="ZMQ broker host")
+
+    # ── Risk Parameters ───────────────────────────────────────────────────────
+    max_daily_drawdown_pct: float = Field(
+        default=3.0,
+        gt=0.0,
+        le=10.0,
+        description="Maximum daily drawdown % before circuit breaker opens",
+    )
+    max_position_risk_pct: float = Field(
+        default=0.5,
+        gt=0.0,
+        le=5.0,
+        description="Max capital at risk per trade as % of portfolio",
+    )
+    max_total_exposure_pct: float = Field(
+        default=40.0,
+        gt=0.0,
+        le=100.0,
+        description="Max total portfolio exposure as % of capital",
+    )
+    max_per_asset_class_pct: float = Field(
+        default=25.0,
+        gt=0.0,
+        le=100.0,
+        description="Max exposure per asset class as % of capital",
+    )
+    max_position_size_pct: float = Field(
+        default=10.0,
+        gt=0.0,
+        le=50.0,
+        description="Max single position size as % of capital",
+    )
+    max_simultaneous_positions: int = Field(
+        default=5,
+        gt=0,
+        le=20,
+        description="Maximum number of open positions at once",
+    )
+    min_risk_reward: float = Field(
+        default=1.5, gt=0.0, description="Minimum required risk/reward ratio"
+    )
+    crypto_size_multiplier: float = Field(
+        default=0.70,
+        gt=0.0,
+        le=1.0,
+        description="Size reduction factor for crypto positions",
+    )
+    max_inter_position_correlation: float = Field(
+        default=0.70,
+        gt=0.0,
+        le=1.0,
+        description="Maximum allowed correlation between open positions",
+    )
+
+    # ── Capital ───────────────────────────────────────────────────────────────
+    initial_capital: Decimal = Field(
+        default=Decimal("100000"),
+        description="Starting capital in quote currency (USD)",
+    )
+
+    # ── Session Windows (UTC offsets) ─────────────────────────────────────────
+    us_market_open_utc_hour: int = Field(
+        default=14, description="US market open UTC hour (14:30 UTC = 09:30 ET)"
+    )
+    us_market_close_utc_hour: int = Field(
+        default=21, description="US market close UTC hour (21:00 UTC = 16:00 ET)"
+    )
+
+    # ── Circuit Breaker ───────────────────────────────────────────────────────
+    cb_loss_window_minutes: int = Field(
+        default=30, description="Rolling window for intraday loss check"
+    )
+    cb_loss_pct_in_window: float = Field(
+        default=2.0, description="Loss % in cb_loss_window_minutes to open circuit"
+    )
+    cb_vix_spike_pct: float = Field(default=20.0, description="VIX 1h spike % to open circuit")
+    cb_data_timeout_seconds: int = Field(
+        default=60, description="Data feed silence duration to open circuit"
+    )
+    cb_price_gap_pct: float = Field(
+        default=5.0, description="Single-tick price gap % to open circuit"
+    )
+
+    # ── Pre-Event Block Window ─────────────────────────────────────────────────
+    cb_event_pre_block_minutes: int = Field(
+        default=45, description="Minutes before CB event to block new entries"
+    )
+    cb_event_post_scalp_minutes: int = Field(
+        default=60, description="Minutes after CB event to allow post-event scalp"
+    )
+    cb_event_post_size_mult: float = Field(
+        default=0.50, description="Size multiplier for post-event scalp entries"
+    )
+
+    # ── Kelly Sizer ───────────────────────────────────────────────────────────
+    kelly_divisor: int = Field(
+        default=4, description="Divide raw Kelly fraction by this (quarter-Kelly)"
+    )
+    kelly_rolling_trades: int = Field(
+        default=100, description="Rolling window of trades for Kelly stats"
+    )
+
+    # ── Signals ───────────────────────────────────────────────────────────────
+    min_signal_strength: float = Field(
+        default=0.3, ge=0.0, le=1.0, description="Minimum |strength| to act on a signal"
+    )
+    min_confluence_triggers: int = Field(
+        default=2, ge=1, description="Minimum triggers for a valid signal"
+    )
+
+    # ── Alerts ────────────────────────────────────────────────────────────────
+    alert_email: str | None = Field(default=None, description="Email address for alerts")
+    alert_smtp_host: str = Field(default="smtp.gmail.com")
+    alert_smtp_port: int = Field(default=587)
+    alert_smtp_user: str = Field(default="")
+    alert_smtp_password: str = Field(default="")
+    twilio_sid: str | None = Field(default=None, description="Twilio account SID")
+    twilio_token: str | None = Field(default=None, description="Twilio auth token")
+    twilio_from_number: str = Field(default="", description="Twilio sender phone number")
+    alert_phone_number: str = Field(default="", description="SMS recipient phone number")
+
+    # ── Monitoring Dashboard ──────────────────────────────────────────────────
+    dashboard_host: str = Field(default="0.0.0.0")  # noqa: S104
+    dashboard_port: int = Field(default=8080)
+
+    # ── Logging ───────────────────────────────────────────────────────────────
+    log_level: str = Field(default="INFO")
+
+    @field_validator("trading_mode", mode="before")
+    @classmethod
+    def normalize_mode(cls, v: object) -> str:
+        """Normalize trading mode to lowercase."""
+        if isinstance(v, str):
+            return v.lower()
+        return v  # type: ignore[return-value]
+
+
+# Module-level singleton
+_settings: Settings | None = None
+
+
+def get_settings() -> Settings:
+    """Return the singleton Settings instance, creating it on first call.
+
+    Returns:
+        Validated Settings loaded from environment / .env file.
+    """
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings

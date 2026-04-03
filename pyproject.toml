@@ -1,0 +1,88 @@
+[build-system]
+requires = ["setuptools>=75.0", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E","W","F","I","N","UP","ANN","S","B","A","C4","PT","RUF"]
+ignore = ["S101"]
+# Allow intentional mathematical/scientific Unicode in docstrings and comments.
+# These are used throughout quant formulas (σ=volatility, α=alpha, μ=mean, ×=multiply, etc.)
+allowed-confusables = ["\u00d7","\u2212","\u03b1","\u03b2","\u03b3","\u03bc","\u03c1","\u03c3","\u221a","\u2192","\u2190"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ANN","S"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[[tool.mypy.overrides]]
+module = [
+    "pandas_ta.*",
+    "binance.*",
+    "yfinance.*",
+    "fredapi.*",
+    "apex_mc.*",
+    "apex_risk.*",
+    "websockets.*",
+    "uvicorn.*",
+    "fakeredis.*",
+    "numba.*",
+    "curl_cffi.*",
+    "aiohttp.*",
+    "pydantic.*",
+    "pydantic_settings.*",
+    "fastapi.*",
+    "starlette.*",
+    "pytest.*",
+    "_pytest.*",
+    "hypothesis.*",
+    "alpaca.*",
+    "redis.*",
+    "zmq.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "core.models.*",
+    "core.config",
+    "tests.*",
+    "services.s10_monitor.dashboard",
+]
+disable_error_codes = ["misc", "untyped-def", "no-untyped-def"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = [
+    "--cov=.",
+    "--cov-report=term-missing",
+    "--cov-fail-under=85",
+    "--timeout=30",
+    "-v",
+]
+filterwarnings = [
+    "error",
+    "ignore::DeprecationWarning:pandas_ta",
+    "ignore::DeprecationWarning:binance",
+    "ignore::DeprecationWarning:pydantic",
+]
+
+[tool.coverage.run]
+omit = [
+    "tests/*",
+    "scripts/*",
+    "docker/*",
+    "rust/*",
+    "**/__init__.py",
+]
+branch = true
+
+[tool.bandit]
+exclude_dirs = ["tests", "scripts"]
+skips = ["B101"]

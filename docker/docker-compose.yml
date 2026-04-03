@@ -1,0 +1,105 @@
+name: apex-trading
+
+x-svc: &svc
+  build:
+    context: ..
+    dockerfile: docker/Dockerfile.service
+  env_file: ../.env
+  networks: [apex]
+  restart: unless-stopped
+  depends_on:
+    redis:
+      condition: service_healthy
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    networks: [apex]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    environment:
+      POSTGRES_DB: apex
+      POSTGRES_USER: apex
+      POSTGRES_PASSWORD: "${DB_PASSWORD:-apex_secret}"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    networks: [apex]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U apex"]
+      interval: 10s
+      retries: 5
+
+  s10-monitor:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s10_monitor.service
+    ports:
+      - "8080:8080"
+
+  s01-data:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s01_data_ingestion.service
+
+  s07-analytics:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s07_quant_analytics.service
+
+  s08-macro:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s08_macro_intelligence.service
+
+  s02-signal:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s02_signal_engine.service
+
+  s03-regime:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s03_regime_detector.service
+
+  s04-fusion:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s04_fusion_engine.service
+
+  s05-risk:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s05_risk_manager.service
+
+  s06-execution:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s06_execution.service
+
+  s09-feedback:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: services.s09_feedback_loop.service
+
+  supervisor:
+    <<: *svc
+    environment:
+      SERVICE_MODULE: supervisor.orchestrator
+
+networks:
+  apex:
+    driver: bridge
+
+volumes:
+  redis_data:
+  timescale_data:
