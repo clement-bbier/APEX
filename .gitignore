@@ -22,3 +22,4 @@ logs/
 rust/target/
 rust/Cargo.lock
 *.whl
+.hypothesis/
