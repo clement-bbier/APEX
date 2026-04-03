@@ -7,8 +7,9 @@ Implements health gate between service starts.
 from __future__ import annotations
 
 import asyncio
+from typing import Any, Awaitable, cast
 
-import redis.asyncio as aioredis
+from redis import asyncio as aioredis
 
 from core.config import get_settings
 from core.logger import get_logger
@@ -123,9 +124,9 @@ class Orchestrator:
             True if Redis responds to ping.
         """
         try:
-            r = aioredis.from_url(self._settings.redis_url, decode_responses=True)
-            await r.ping()
-            await r.aclose()
+            r: Any = aioredis.from_url(self._settings.redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
+            await cast(Awaitable[bool], r.ping())
+            await cast(Awaitable[None], r.aclose())
             return True
         except Exception as exc:
             logger.error("Redis check failed", error=str(exc))

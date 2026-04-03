@@ -6,11 +6,16 @@ All operations are async using redis[asyncio].
 
 from __future__ import annotations
 
+import importlib
 import json
-from typing import Any
+import types
+from typing import Any, Awaitable, cast
 
-import redis.asyncio as aioredis
-from redis.asyncio import Redis
+aioredis: types.ModuleType | None
+try:
+    aioredis = importlib.import_module("redis.asyncio")
+except ModuleNotFoundError:
+    aioredis = None
 
 from core.config import get_settings
 from core.logger import get_logger
@@ -33,20 +38,25 @@ class StateStore:
         """
         self._service_id = service_id
         self._settings = get_settings()
-        self._redis: Redis | None = None
+        self._redis: Any | None = None
 
     async def connect(self) -> None:
         """Create the Redis connection pool.
 
         Must be called before any other operation.
         """
-        self._redis = aioredis.from_url(
+        if aioredis is None:
+            raise RuntimeError(
+                "The 'redis' package is required. Install it with: pip install redis"
+            )
+        client = aioredis.from_url(
             self._settings.redis_url,
             max_connections=self._settings.redis_max_connections,
             decode_responses=True,
         )
+        self._redis = client
         # Verify connection
-        await self._redis.ping()
+        await cast(Awaitable[bool], client.ping())
         logger.info(
             "Redis connected",
             service=self._service_id,
@@ -56,11 +66,11 @@ class StateStore:
     async def disconnect(self) -> None:
         """Close the Redis connection."""
         if self._redis is not None:
-            await self._redis.aclose()
+            await cast(Awaitable[None], self._redis.aclose())
             self._redis = None
             logger.info("Redis disconnected", service=self._service_id)
 
-    def _ensure_connected(self) -> Redis:
+    def _ensure_connected(self) -> Any:
         """Return the Redis client or raise if not connected.
 
         Returns:
@@ -75,7 +85,7 @@ class StateStore:
             )
         return self._redis
 
-    # ── Key/Value ─────────────────────────────────────────────────────────────
+    # ── Key/Value ────────────────────────────────────────────────────────────
 
     async def get(self, key: str) -> Any | None:  # noqa: ANN401
         """Get a JSON-deserialized value by key.
@@ -87,7 +97,7 @@ class StateStore:
             Deserialized Python object or None if not found.
         """
         r = self._ensure_connected()
-        raw = await r.get(key)
+        raw = await cast(Awaitable[str | None], r.get(key))
         if raw is None:
             return None
         return json.loads(raw)
@@ -107,7 +117,10 @@ class StateStore:
         """
         r = self._ensure_connected()
         effective_ttl = ttl if ttl is not None else self._settings.redis_ttl_seconds
-        await r.set(key, json.dumps(value, default=str), ex=effective_ttl)
+        await cast(
+            Awaitable[bool],
+            r.set(key, json.dumps(value, default=str), ex=effective_ttl),
+        )
 
     async def delete(self, key: str) -> None:
         """Delete a key from Redis.
@@ -116,7 +129,7 @@ class StateStore:
             key: Redis key to delete.
         """
         r = self._ensure_connected()
-        await r.delete(key)
+        await cast(Awaitable[int], r.delete(key))
 
     async def exists(self, key: str) -> bool:
         """Check if a key exists.
@@ -128,7 +141,7 @@ class StateStore:
             True if the key exists.
         """
         r = self._ensure_connected()
-        return bool(await r.exists(key))
+        return bool(await cast(Awaitable[int], r.exists(key)))
 
     # ── Hash ──────────────────────────────────────────────────────────────────
 
@@ -143,7 +156,7 @@ class StateStore:
             Deserialized value or None.
         """
         r = self._ensure_connected()
-        raw = await r.hget(name, field)
+        raw = await cast(Awaitable[str | None], r.hget(name, field))
         if raw is None:
             return None
         return json.loads(raw)
@@ -157,7 +170,7 @@ class StateStore:
             value: Python object to serialize as JSON.
         """
         r = self._ensure_connected()
-        await r.hset(name, field, json.dumps(value, default=str))
+        await cast(Awaitable[int], r.hset(name, field, json.dumps(value, default=str)))
 
     async def hgetall(self, name: str) -> dict[str, Any]:
         """Get all fields of a Redis hash as a dict.
@@ -169,7 +182,7 @@ class StateStore:
             Dictionary of field→deserialized value.
         """
         r = self._ensure_connected()
-        raw = await r.hgetall(name)
+        raw = await cast(Awaitable[dict[str, str]], r.hgetall(name))
         return {k: json.loads(v) for k, v in raw.items()}
 
     async def hdel(self, name: str, field: str) -> None:
@@ -180,7 +193,7 @@ class StateStore:
             field: Field to delete.
         """
         r = self._ensure_connected()
-        await r.hdel(name, field)
+        await cast(Awaitable[int], r.hdel(name, field))
 
     # ── Pub/Sub ───────────────────────────────────────────────────────────────
 
@@ -192,7 +205,7 @@ class StateStore:
             message: Python object to serialize as JSON.
         """
         r = self._ensure_connected()
-        await r.publish(channel, json.dumps(message, default=str))
+        await cast(Awaitable[int], r.publish(channel, json.dumps(message, default=str)))
 
     # ── Streams ───────────────────────────────────────────────────────────────
 
@@ -213,9 +226,14 @@ class StateStore:
             The generated stream entry ID.
         """
         r = self._ensure_connected()
-        str_data = {k: json.dumps(v, default=str) for k, v in data.items()}
-        entry_id: str = await r.xadd(stream, str_data, maxlen=max_len, approximate=True)
-        return entry_id
+        fields: dict[str | bytes, str | bytes | int | float] = {
+            k: json.dumps(v, default=str) for k, v in data.items()
+        }
+        entry_id = await cast(
+            Awaitable[bytes | None],
+            r.xadd(stream, fields, maxlen=max_len, approximate=True),
+        )
+        return str(entry_id) if entry_id is not None else ""
 
     async def stream_read(
         self,
@@ -236,7 +254,10 @@ class StateStore:
             List of (entry_id, data_dict) tuples.
         """
         r = self._ensure_connected()
-        results = await r.xread({stream: last_id}, count=count, block=block_ms)
+        results = await cast(
+            Awaitable[list[Any]],
+            r.xread({stream: last_id}, count=count, block=block_ms),
+        )
         entries: list[tuple[str, dict[str, Any]]] = []
         if results:
             for _stream_name, records in results:
@@ -255,7 +276,10 @@ class StateStore:
             values: Values to push (serialized as JSON).
         """
         r = self._ensure_connected()
-        await r.lpush(key, *[json.dumps(v, default=str) for v in values])
+        await cast(
+            Awaitable[int],
+            r.lpush(key, *[json.dumps(v, default=str) for v in values]),
+        )
 
     async def lrange(self, key: str, start: int = 0, end: int = -1) -> list[Any]:
         """Get a range of elements from a Redis list.
@@ -269,7 +293,7 @@ class StateStore:
             List of deserialized elements.
         """
         r = self._ensure_connected()
-        raw = await r.lrange(key, start, end)
+        raw = await cast(Awaitable[list[str]], r.lrange(key, start, end))
         return [json.loads(v) for v in raw]
 
     async def ltrim(self, key: str, start: int, end: int) -> None:
@@ -281,7 +305,7 @@ class StateStore:
             end: End index to keep (-1 = last).
         """
         r = self._ensure_connected()
-        await r.ltrim(key, start, end)
+        await cast(Awaitable[bool], r.ltrim(key, start, end))
 
     # ── Increment ─────────────────────────────────────────────────────────────
 
@@ -296,4 +320,4 @@ class StateStore:
             New value after increment.
         """
         r = self._ensure_connected()
-        return int(await r.incr(key, amount=amount))
+        return int(await cast(Awaitable[int], r.incr(key, amount=amount)))

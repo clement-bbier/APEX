@@ -11,8 +11,8 @@ import asyncio
 import json
 from collections.abc import Callable
 
-import websockets
-import websockets.exceptions
+from websockets.asyncio.client import ClientConnection, connect as ws_connect
+from websockets.exceptions import ConnectionClosed
 
 from core.config import get_settings
 from core.logger import get_logger
@@ -50,7 +50,7 @@ class BinanceFeed:
         self._on_tick = on_tick
         self._settings = get_settings()
         self._running = False
-        self._ws = None
+        self._ws: ClientConnection | None = None
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -67,7 +67,7 @@ class BinanceFeed:
             url = self._build_url()
             logger.info("Connecting to Binance WebSocket", url=url)
             try:
-                async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+                async with ws_connect(url, ping_interval=20, ping_timeout=20) as ws:
                     self._ws = ws
                     backoff = _RECONNECT_BASE_SECONDS  # reset on successful connect
                     logger.info("Binance WebSocket connected", symbols=self._symbols)
@@ -75,7 +75,7 @@ class BinanceFeed:
             except asyncio.CancelledError:
                 logger.info("BinanceFeed cancelled - stopping")
                 break
-            except websockets.exceptions.WebSocketException as exc:
+            except ConnectionClosed as exc:
                 logger.warning(
                     "Binance WebSocket error - reconnecting",
                     error=str(exc),
@@ -116,14 +116,14 @@ class BinanceFeed:
         base = _TESTNET_WS_BASE if self._settings.binance_testnet else _PRODUCTION_WS_BASE
         return f"{base}/stream?streams={streams}"
 
-    async def _consume(self, ws: websockets.WebSocketClientProtocol) -> None:
+    async def _consume(self, ws: ClientConnection) -> None:
         """Read messages from *ws* until the connection closes or we stop.
 
         Parses the combined-stream envelope and invokes *on_tick* with the
         inner ``data`` dict[str, Any].
 
         Args:
-            ws: An active :mod:`websockets` connection.
+            ws: An active websockets connection.
         """
         async for raw_message in ws:
             if not self._running:

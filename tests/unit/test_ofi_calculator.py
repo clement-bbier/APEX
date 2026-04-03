@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from core.models.tick import Market, NormalizedTick, Session
+from core.models.tick import Market, NormalizedTick, Session, TradeSide
 from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
 
 
@@ -23,10 +23,10 @@ def _make_tick(
         timestamp_ms=ts,
         price=Decimal(price),
         volume=Decimal(volume),
-        side=side,
+        side=TradeSide(side),
         bid=Decimal(bid),
         ask=Decimal(ask),
-        spread_bps=2.0,
+        spread_bps=Decimal("2.0"),
         session=Session.US_NORMAL,
     )
 

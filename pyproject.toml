@@ -22,6 +22,8 @@ strict = true
 
 [[tool.mypy.overrides]]
 module = [
+    "pandas.*",
+    "pyarrow.*",
     "pandas_ta.*",
     "binance.*",
     "yfinance.*",

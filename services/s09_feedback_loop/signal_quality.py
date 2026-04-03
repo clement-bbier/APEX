@@ -64,7 +64,7 @@ class SignalQuality:
             pnl = float(getattr(trade, "net_pnl", 0.0) or 0.0)
             groups.setdefault(key, []).append(pnl)
 
-        scored = []
+        scored: list[dict[str, Any]] = []
         for (sig, regime, session), pnls in groups.items():
             arr = np.array(pnls, dtype=float)
             std = float(np.std(arr, ddof=1)) if len(arr) > 1 else 0.0

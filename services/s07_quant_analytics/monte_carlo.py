@@ -25,7 +25,7 @@ from __future__ import annotations
 
 import os
 from concurrent.futures import ProcessPoolExecutor
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 
@@ -45,7 +45,7 @@ STRESS_SCENARIOS: dict[str, dict[str, Any]] = {
 }
 
 
-def _run_chunk(args: tuple[np.ndarray, int, int]) -> np.ndarray:
+def _run_chunk(args: tuple[np.ndarray[Any, np.dtype[Any]], int, int]) -> np.ndarray[Any, np.dtype[Any]]:
     """Worker function for ProcessPoolExecutor.
 
     Args:
@@ -56,7 +56,7 @@ def _run_chunk(args: tuple[np.ndarray, int, int]) -> np.ndarray:
     """
     returns, n_sims, seed = args
     if RUST_AVAILABLE:
-        return run_mc_batch(returns, n_sims, seed)
+        return cast("np.ndarray[Any, np.dtype[Any]]", run_mc_batch(returns, n_sims, seed))
     rng = np.random.default_rng(seed)
     n_steps = len(returns)
     paths = np.zeros((n_sims, n_steps))
@@ -80,7 +80,7 @@ class MonteCarloEngine:
         self.n_simulations = n_simulations
         self._n_workers: int = os.cpu_count() or 4
 
-    def simulate_pnl_distribution(self, historical_returns: np.ndarray) -> dict[str, float]:
+    def simulate_pnl_distribution(self, historical_returns: np.ndarray[Any, np.dtype[Any]]) -> dict[str, float]:
         """Bootstrap-simulate P&L distribution and compute risk metrics.
 
         Args:
@@ -191,7 +191,7 @@ class MonteCarloEngine:
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
-    def _run_simulations(self, returns: np.ndarray) -> np.ndarray:
+    def _run_simulations(self, returns: np.ndarray[Any, np.dtype[Any]]) -> np.ndarray[Any, np.dtype[Any]]:
         """Run MC simulations in parallel, using Rust or NumPy fallback.
 
         Args:
