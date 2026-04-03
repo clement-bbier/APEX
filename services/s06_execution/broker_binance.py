@@ -162,8 +162,15 @@ class BinanceBroker:
             Balance dict or ``None`` if effectively no open position.
         """
         account = await self.get_account()
-        # Derive base asset: strip common quote suffixes.
-        base_asset = symbol.replace("USDT", "").replace("BUSD", "").replace("BTC", "", 1)
+        # Derive the base asset by stripping the longest matching quote suffix.
+        # Checked longest-first to avoid partial matches (e.g. "ETHBTC" → "ETH",
+        # not an erroneous empty string from stripping "BTC" then "ETH").
+        _QUOTE_SUFFIXES = ("USDT", "BUSD", "USDC", "BTC", "ETH", "BNB")
+        base_asset = symbol
+        for suffix in _QUOTE_SUFFIXES:
+            if symbol.endswith(suffix):
+                base_asset = symbol[: -len(suffix)]
+                break
         balances: list[dict] = account.get("balances", [])
         for balance in balances:
             if balance.get("asset") == base_asset:
