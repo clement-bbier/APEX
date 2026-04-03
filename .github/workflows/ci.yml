@@ -31,11 +31,14 @@ jobs:
       - working-directory: rust
         run: cargo test --workspace
       - name: Build and install Rust wheels
+        shell: bash
         run: |
-          pip install "maturin>=1.9.4"
-          cd rust/apex_mc && maturin build --release
-          cd ../apex_risk && maturin build --release
-          pip install rust/target/wheels/*.whl
+          set -euo pipefail
+          python -m pip install "maturin>=1.9.4"
+          (cd rust/apex_mc   && maturin build --release)
+          (cd rust/apex_risk && maturin build --release)
+          ls -la ./rust/target/wheels/
+          python -m pip install ./rust/target/wheels/*.whl
           python -c "from apex_mc import run_mc_batch, compute_var, compute_cvar; print('apex_mc OK')"
           python -c "from apex_risk import compute_exposure; print('apex_risk OK')"
 
@@ -59,12 +62,15 @@ jobs:
           python-version: "3.12"
           cache: pip
       - name: Install dependencies
+        shell: bash
         run: |
-          pip install -r requirements.txt
-          pip install "maturin>=1.9.4"
-          cd rust/apex_mc && maturin build --release
-          cd ../apex_risk && maturin build --release
-          pip install rust/target/wheels/*.whl
+          set -euo pipefail
+          python -m pip install -r requirements.txt
+          python -m pip install "maturin>=1.9.4"
+          (cd rust/apex_mc   && maturin build --release)
+          (cd rust/apex_risk && maturin build --release)
+          ls -la ./rust/target/wheels/
+          python -m pip install ./rust/target/wheels/*.whl
       - name: Run unit tests
         run: pytest tests/unit/ -v --cov=. --cov-report=xml
         env:

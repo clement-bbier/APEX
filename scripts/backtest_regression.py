@@ -60,7 +60,7 @@ async def run(fixture_path: str) -> int:
     trades = await engine.run(ticks)
 
     if not trades:
-        print("WARNING: No trades generated — check signal thresholds")
+        print("WARNING: No trades generated - check signal thresholds")
         # Not a failure: fixture may be short; return 0 to avoid flaky CI
         return 0
 

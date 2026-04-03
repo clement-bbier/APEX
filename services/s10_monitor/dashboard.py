@@ -98,7 +98,7 @@ class ConnectionManager:
 class DashboardServer:
     """FastAPI WebSocket dashboard server."""
 
-    def __init__(self, state: StateStore, host: str = "0.0.0.0", port: int = 8080) -> None:
+    def __init__(self, state: StateStore, host: str = "0.0.0.0", port: int = 8080) -> None:  # noqa: S104
         """Initialize dashboard server.
 
         Args:
@@ -186,8 +186,8 @@ class DashboardServer:
                 for k in keys[:5]:
                     sym = k.replace("signal:", "")
                     signals_raw[sym] = await self._state.get(k)
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("signal_fetch_failed", error=str(exc))
             payload["signals"] = signals_raw
             session = (regime or {}).get("session", {})
             payload["session"] = session

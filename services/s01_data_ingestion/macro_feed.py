@@ -2,9 +2,9 @@
 
 Polls external HTTP APIs for macroeconomic indicators used in regime detection:
 
-* **VIX**          – CBOE Volatility Index via FRED
-* **DXY**          – US Dollar Index via Yahoo Finance
-* **Yield Spread** – 10Y minus 2Y US Treasury yield via FRED
+* **VIX**          - CBOE Volatility Index via FRED
+* **DXY**          - US Dollar Index via Yahoo Finance
+* **Yield Spread** - 10Y minus 2Y US Treasury yield via FRED
 
 All fetches are performed asynchronously with :mod:`aiohttp` at a configurable
 polling interval (default 60 seconds).

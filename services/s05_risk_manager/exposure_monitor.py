@@ -9,9 +9,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import structlog
+
 from core.config import Settings
 from core.models.order import OrderCandidate
 from core.state import StateStore
+
+logger = structlog.get_logger(__name__)
 
 
 class ExposureMonitor:
@@ -58,7 +62,8 @@ class ExposureMonitor:
                     pos_size = Decimal(str(raw.get("size", 0)))
                     pos_entry = Decimal(str(raw.get("entry", 0)))
                     total_value += pos_size * pos_entry
-                except Exception:
+                except Exception as exc:
+                    logger.debug("position_parse_failed", error=str(exc))
                     continue
 
         return float(total_value / capital * Decimal("100"))

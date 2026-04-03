@@ -76,7 +76,7 @@ def generate_btcusdt_fixture(n_candles: int = 43_200) -> None:
     out_path = "tests/fixtures/30d_btcusdt_1m.parquet"
     df.to_parquet(out_path, index=False)
     print(f"✓ Generated {n_candles} candles → {out_path}")
-    print(f"  Price range: ${close.min():.0f} – ${close.max():.0f}")
+    print(f"  Price range: ${close.min():.0f} - ${close.max():.0f}")
     print(f"  Date range:  {timestamps[0].date()} → {timestamps[-1].date()}")
 
 

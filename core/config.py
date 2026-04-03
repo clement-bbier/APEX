@@ -200,7 +200,7 @@ class Settings(BaseSettings):
     alert_phone_number: str = Field(default="", description="SMS recipient phone number")
 
     # ── Monitoring Dashboard ──────────────────────────────────────────────────
-    dashboard_host: str = Field(default="0.0.0.0")
+    dashboard_host: str = Field(default="0.0.0.0")  # noqa: S104
     dashboard_port: int = Field(default=8080)
 
     # ── Logging ───────────────────────────────────────────────────────────────

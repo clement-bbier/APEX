@@ -8,6 +8,7 @@ schedules from an API; for now the list is hardcoded.
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
+from typing import ClassVar
 
 from core.models.regime import CentralBankEvent
 
@@ -24,7 +25,7 @@ class CBCalendar:
     # ------------------------------------------------------------------
     # Hardcoded 2024-2025 event schedule (approximate dates, 14:00 UTC)
     # ------------------------------------------------------------------
-    _RAW_SCHEDULE: list[tuple[str, str, str]] = [
+    _RAW_SCHEDULE: ClassVar[list[tuple[str, str, str]]] = [
         # (institution, event_type, "YYYY-MM-DD HH:MM")
         # ── FOMC 2024 ──────────────────────────────────────────────────
         ("FOMC", "rate_decision", "2024-01-31 19:00"),

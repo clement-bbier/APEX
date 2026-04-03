@@ -1,7 +1,7 @@
 """Microstructure analysis for the APEX Trading System Signal Engine.
 
-Computes real-time microstructure metrics — OFI, CVD, Kyle's Lambda,
-spread evolution, trade intensity, and absorption detection — from a
+Computes real-time microstructure metrics - OFI, CVD, Kyle's Lambda,
+spread evolution, trade intensity, and absorption detection - from a
 rolling window of normalized tick data.
 """
 
@@ -100,7 +100,7 @@ class MicrostructureAnalyzer:
     def kyle_lambda(self) -> float:
         """Kyle's Lambda: price-impact coefficient Cov(ΔP, Q) / Var(Q).
 
-        *Q* is signed volume — positive for buyer-initiated trades, negative
+        *Q* is signed volume - positive for buyer-initiated trades, negative
         for seller-initiated trades.  Pairs Q[t] with ΔP[t] = P[t+1] − P[t].
 
         Returns:
@@ -166,7 +166,7 @@ class MicrostructureAnalyzer:
 
         A large sell event (> mean + 2σ of the sell-volume distribution) is
         flagged as *absorbed* when the concurrent price move is smaller than
-        the mean absolute price change over the window — suggesting the sell
+        the mean absolute price change over the window - suggesting the sell
         flow was met by willing buyers without moving price.
 
         Returns:

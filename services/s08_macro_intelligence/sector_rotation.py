@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import aiohttp
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class SectorRotation:
     """Fetches sector ETF performance and classifies risk-on/off market environment."""
 
-    SECTOR_ETFS: list[str] = [
+    SECTOR_ETFS: ClassVar[list[str]] = [
         "XLK",
         "XLE",
         "XLF",
@@ -52,8 +57,8 @@ class SectorRotation:
                     if len(closes) >= 2 and closes[-2] and closes[-2] != 0:
                         pct = (closes[-1] - closes[-2]) / closes[-2]
                         performance[symbol] = float(pct)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("sector_etf_fetch_failed", symbol=symbol, error=str(exc))
 
         return performance
 

@@ -178,7 +178,8 @@ class Signal(BaseModel):
                 )
             if self.take_profit[0] <= self.entry:
                 raise ValueError(
-                    f"Long signal take_profit[0] {self.take_profit[0]} must be above entry {self.entry}"
+                    f"Long signal take_profit[0] {self.take_profit[0]} "
+                    f"must be above entry {self.entry}"
                 )
         elif self.direction == Direction.SHORT:
             if self.stop_loss <= self.entry:
@@ -187,7 +188,8 @@ class Signal(BaseModel):
                 )
             if self.take_profit[0] >= self.entry:
                 raise ValueError(
-                    f"Short signal take_profit[0] {self.take_profit[0]} must be below entry {self.entry}"
+                    f"Short signal take_profit[0] {self.take_profit[0]} "
+                    f"must be below entry {self.entry}"
                 )
         return self
 

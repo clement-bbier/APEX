@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import aiohttp
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 class GeopoliticalAnalyzer:
@@ -36,8 +39,8 @@ class GeopoliticalAnalyzer:
                     )
                     if closes:
                         result[key] = float(closes[-1])
-                except Exception:
-                    pass
+                except Exception as exc:
+                    logger.debug("energy_price_fetch_failed", error=str(exc))
 
         return result
 

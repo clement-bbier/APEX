@@ -1,4 +1,4 @@
-"""Alpaca broker adapter for APEX Trading System — S06 Execution.
+"""Alpaca broker adapter for APEX Trading System - S06 Execution.
 
 Uses the official ``alpaca-py`` SDK (NOT the deprecated ``alpaca-trade-api``).
 Wraps :class:`alpaca.trading.client.TradingClient` for equity order management.
@@ -29,7 +29,7 @@ class AlpacaBroker:
     Args:
         api_key:    Alpaca API key.
         secret_key: Alpaca secret key.
-        base_url:   Unused — kept for interface compatibility; alpaca-py
+        base_url:   Unused - kept for interface compatibility; alpaca-py
                     derives the endpoint from the *paper* flag.
         paper:      ``True`` for paper-trading, ``False`` for live.
     """

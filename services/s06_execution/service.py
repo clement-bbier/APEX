@@ -319,8 +319,8 @@ class ExecutionService(BaseService):
         if raw is not None:
             try:
                 return NormalizedTick.model_validate(raw)
-            except Exception:
-                pass
+            except Exception as exc:
+                self.logger.debug("tick_parse_failed", error=str(exc))
 
         # Synthesise a tick with generous volume so liquidity checks pass.
         entry = approved.candidate.entry

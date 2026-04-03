@@ -77,7 +77,7 @@ class NormalizedTick(BaseModel):
     """Normalized tick enriched with microstructure and session context.
 
     Created by the normalizer from a RawTick.
-    Immutable — transformations always produce new instances.
+    Immutable - transformations always produce new instances.
     Published on ZMQ topic: tick.{market}.{SYMBOL}
     """
 

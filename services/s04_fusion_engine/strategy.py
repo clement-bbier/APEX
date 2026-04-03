@@ -88,10 +88,10 @@ class StrategySelector:
         if regime.risk_mode == RiskMode.CRISIS:
             return 0.0
 
-        _MULTIPLIERS: dict[str, float] = {
+        _multipliers: dict[str, float] = {
             "momentum_scalp": 1.0,
             "mean_reversion": 0.8,
             "spike_scalp": 0.5,
             "short_momentum": 0.6,
         }
-        return _MULTIPLIERS.get(strategy, 0.0)
+        return _multipliers.get(strategy, 0.0)

@@ -4,10 +4,10 @@ Computes a comprehensive suite of performance statistics from a list of
 :class:`~core.models.order.TradeRecord` objects and an equity curve.
 
 References:
-    - Sharpe (1966) — "Mutual Fund Performance"
-    - Sortino & van der Meer (1991) — "Downside Risk"
-    - Calmar ratio — Young (1991)
-    - Lopez de Prado (2018) — "Advances in Financial Machine Learning"
+    - Sharpe (1966) - "Mutual Fund Performance"
+    - Sortino & van der Meer (1991) - "Downside Risk"
+    - Calmar ratio - Young (1991)
+    - Lopez de Prado (2018) - "Advances in Financial Machine Learning"
 """
 
 from __future__ import annotations

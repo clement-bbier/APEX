@@ -1,1 +1,1 @@
-"""APEX Trading System — Services Package."""
+"""APEX Trading System - Services Package."""

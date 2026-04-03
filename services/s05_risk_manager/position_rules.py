@@ -29,11 +29,11 @@ class PositionRules:
 
         Checks performed (in order):
 
-        1. **Capital at risk** – ``capital_at_risk ≤ capital × max_position_risk_pct / 100``.
-        2. **Stop loss exists** – ``candidate.stop_loss > 0``.
-        3. **Minimum R:R** – if a source signal is attached,
+        1. **Capital at risk** - ``capital_at_risk ≤ capital × max_position_risk_pct / 100``.
+        2. **Stop loss exists** - ``candidate.stop_loss > 0``.
+        3. **Minimum R:R** - if a source signal is attached,
            ``signal.risk_reward ≥ min_risk_reward``.
-        4. **Maximum position size** – ``size × entry ≤ capital × max_position_size_pct / 100``.
+        4. **Maximum position size** - ``size × entry ≤ capital × max_position_size_pct / 100``.
 
         Args:
             candidate: Order candidate to validate.

@@ -105,7 +105,8 @@ class MonitorService(BaseService):
                 if pnl_pct <= -settings.max_daily_drawdown_pct:
                     self._alert.alert(
                         "CRITICAL",
-                        f"Daily drawdown {pnl_pct:.2f}% exceeds limit {settings.max_daily_drawdown_pct}%",
+                        f"Daily drawdown {pnl_pct:.2f}% exceeds limit "
+                        f"{settings.max_daily_drawdown_pct}%",
                     )
                 elif pnl_pct <= -settings.max_daily_drawdown_pct * 0.67:
                     self._alert.alert(

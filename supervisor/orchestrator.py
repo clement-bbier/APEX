@@ -59,14 +59,14 @@ class Orchestrator:
             if service_id == "redis_check":
                 ok = await self.check_redis()
                 if not ok:
-                    raise RuntimeError("Redis is not available — cannot start")
+                    raise RuntimeError("Redis is not available - cannot start")
                 logger.info("Redis check passed")
                 continue
 
             if service_id == "zmq_check":
                 ok = await self.check_zmq()
                 if not ok:
-                    logger.warning("ZMQ check failed — continuing anyway")
+                    logger.warning("ZMQ check failed - continuing anyway")
                 else:
                     logger.info("ZMQ check passed")
                 continue
@@ -111,8 +111,8 @@ class Orchestrator:
                 health = await self._state.get(f"service_health:{service_id}")
                 if health and health.get("status") == "healthy":
                     return True
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("health_check_redis_failed", error=str(exc))
             await asyncio.sleep(1.0)
         return False
 

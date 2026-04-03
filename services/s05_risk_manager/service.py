@@ -30,10 +30,10 @@ class RiskManagerService(BaseService):
 
     For each ``order.candidate`` message:
 
-    1. :class:`~.circuit_breaker.CircuitBreaker` – abort immediately if open.
-    2. :class:`~.position_rules.PositionRules` – check per-trade risk limits.
-    3. :class:`~.exposure_monitor.ExposureMonitor` – check portfolio exposure.
-    4. :class:`~.cb_event_guard.CBEventGuard` – enforce CB-event windows.
+    1. :class:`~.circuit_breaker.CircuitBreaker` - abort immediately if open.
+    2. :class:`~.position_rules.PositionRules` - check per-trade risk limits.
+    3. :class:`~.exposure_monitor.ExposureMonitor` - check portfolio exposure.
+    4. :class:`~.cb_event_guard.CBEventGuard` - enforce CB-event windows.
 
     Approved orders are published on ``order.approved`` and stored in Redis.
     Blocked orders are published on ``order.blocked``.
