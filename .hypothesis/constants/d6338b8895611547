@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/zope/interface/_compat.py
+# hypothesis_version: 6.151.10
+
+['0', 'Fallback', 'PURE_PYTHON', 'Py', 'ascii', 'pypy_version_info']

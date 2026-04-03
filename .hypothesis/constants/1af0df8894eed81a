@@ -1,0 +1,4 @@
+# file: /home/runner/work/CashMachine/CashMachine/core/logger.py
+# hypothesis_version: 6.151.10
+
+['%(message)s', 'INFO', 'iso']

@@ -1,18 +1,15 @@
-"""Alpaca WebSocket trade-stream feed for the APEX Trading System.
+"""Alpaca real-time equity data feed using the official alpaca-py SDK.
 
-Connects to the Alpaca market-data streaming endpoint, authenticates, subscribes
-to trade updates for the configured symbols, and delivers raw event dicts to
-a caller-supplied callback.  Reconnects automatically with exponential back-off.
+Uses :class:`alpaca.data.live.StockDataStream` for WebSocket trade streaming.
+Auto-reconnects on failure with exponential back-off.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 from typing import Callable
 
-import websockets
-import websockets.exceptions
+from alpaca.data.live import StockDataStream
 
 from core.logger import get_logger
 
@@ -23,25 +20,19 @@ _RECONNECT_MAX_SECONDS: float = 60.0
 
 
 class AlpacaFeed:
-    """Streams real-time equity trades from the Alpaca data WebSocket.
+    """Streams real-time equity trades from Alpaca via the ``alpaca-py`` SDK.
 
-    The connection lifecycle is:
-
-    1. Connect to *url*.
-    2. Wait for the ``"connected"`` confirmation message.
-    3. Send authentication credentials.
-    4. Wait for the ``"authenticated"`` confirmation.
-    5. Subscribe to the requested trade symbols.
-    6. Forward each incoming trade message to *on_tick*.
-
-    Reconnects automatically with exponential back-off (initial 1 s, max 60 s).
+    Wraps :class:`alpaca.data.live.StockDataStream`, subscribes to trade
+    events for each configured symbol, and forwards raw event dicts to the
+    caller-supplied *on_tick* callback.  Reconnects automatically with
+    exponential back-off.
 
     Args:
-        symbols: Equity ticker symbols to subscribe to, e.g. ``["AAPL", "SPY"]``.
-        on_tick: Async (or sync) callable receiving a single trade event ``dict``.
+        symbols: Uppercase equity ticker symbols, e.g. ``["AAPL", "SPY"]``.
+        on_tick: Async or sync callable that receives a single trade-event dict.
         api_key: Alpaca API key.
         secret_key: Alpaca secret key.
-        url: Alpaca data streaming WebSocket URL.
+        url: Unused — kept for interface compatibility with BinanceFeed.
     """
 
     def __init__(
@@ -50,170 +41,85 @@ class AlpacaFeed:
         on_tick: Callable,
         api_key: str,
         secret_key: str,
-        url: str,
+        url: str = "",
     ) -> None:
-        """Initialise the feed.
-
-        Args:
-            symbols: Uppercase equity ticker symbols.
-            on_tick: Callback invoked for each raw trade event dict.
-            api_key: Alpaca API key for authentication.
-            secret_key: Alpaca secret key for authentication.
-            url: Alpaca WebSocket streaming URL.
-        """
         self._symbols = [s.upper() for s in symbols]
         self._on_tick = on_tick
         self._api_key = api_key
         self._secret_key = secret_key
-        self._url = url
         self._running = False
-        self._ws = None
+        self._stream: StockDataStream | None = None
 
     # ── Public API ────────────────────────────────────────────────────────────
 
     async def start(self) -> None:
-        """Connect to Alpaca, authenticate, subscribe, and consume trade events.
+        """Connect to Alpaca stream, subscribe, and consume trade events.
 
-        Blocks until :meth:`stop` is called.  Reconnects automatically with
-        exponential back-off on any error.
+        Blocks until :meth:`stop` is called.  Reconnects with exponential
+        back-off on any error.
         """
         self._running = True
         backoff = _RECONNECT_BASE_SECONDS
 
         while self._running:
-            logger.info("Connecting to Alpaca WebSocket", url=self._url)
+            logger.info("Connecting to Alpaca data stream", symbols=self._symbols)
             try:
-                async with websockets.connect(
-                    self._url, ping_interval=20, ping_timeout=20
-                ) as ws:
-                    self._ws = ws
-                    backoff = _RECONNECT_BASE_SECONDS  # reset on successful connect
-                    logger.info("Alpaca WebSocket connected")
-
-                    authenticated = await self._authenticate(ws)
-                    if not authenticated:
-                        logger.error("Alpaca authentication failed – will retry")
-                        continue
-
-                    await self._subscribe(ws)
-                    await self._consume(ws)
+                self._stream = StockDataStream(
+                    api_key=self._api_key,
+                    secret_key=self._secret_key,
+                )
+                self._stream.subscribe_trades(self._handle_trade, *self._symbols)
+                # _run_forever drives the asyncio event loop inside alpaca-py
+                await self._stream._run_forever()  # type: ignore[attr-defined]
+                backoff = _RECONNECT_BASE_SECONDS
 
             except asyncio.CancelledError:
-                logger.info("AlpacaFeed cancelled – stopping")
+                logger.info("AlpacaFeed cancelled — stopping")
                 break
-            except websockets.exceptions.WebSocketException as exc:
-                logger.warning(
-                    "Alpaca WebSocket error – reconnecting",
-                    error=str(exc),
-                    backoff_seconds=backoff,
-                )
             except Exception as exc:
-                logger.error(
-                    "Unexpected AlpacaFeed error – reconnecting",
+                logger.warning(
+                    "Alpaca stream error — reconnecting",
                     error=str(exc),
                     backoff_seconds=backoff,
                 )
             finally:
-                self._ws = None
+                self._stream = None
 
             if self._running:
                 await asyncio.sleep(backoff)
                 backoff = min(backoff * 2, _RECONNECT_MAX_SECONDS)
 
     async def stop(self) -> None:
-        """Gracefully disconnect from the Alpaca WebSocket."""
+        """Gracefully stop the Alpaca data stream."""
         self._running = False
-        if self._ws is not None:
+        if self._stream is not None:
             try:
-                await self._ws.close()
+                await self._stream.stop()
             except Exception as exc:
-                logger.warning("Error closing Alpaca WebSocket", error=str(exc))
+                logger.warning("Error stopping Alpaca stream", error=str(exc))
+            self._stream = None
         logger.info("AlpacaFeed stopped")
 
-    # ── Internal helpers ──────────────────────────────────────────────────────
+    # ── Internal ──────────────────────────────────────────────────────────────
 
-    async def _authenticate(self, ws) -> bool:
-        """Send auth credentials and wait for Alpaca's confirmation.
-
-        Args:
-            ws: An active :mod:`websockets` connection.
-
-        Returns:
-            ``True`` if authentication succeeded, ``False`` otherwise.
-        """
-        auth_msg = json.dumps(
-            {"action": "auth", "key": self._api_key, "secret": self._secret_key}
-        )
-        await ws.send(auth_msg)
-
-        try:
-            raw = await asyncio.wait_for(ws.recv(), timeout=10.0)
-            messages: list[dict] = json.loads(raw)
-            for msg in messages:
-                if msg.get("T") == "success" and msg.get("msg") == "authenticated":
-                    logger.info("Alpaca authentication successful")
-                    return True
-                if msg.get("T") == "error":
-                    logger.error(
-                        "Alpaca auth error",
-                        code=msg.get("code"),
-                        detail=msg.get("msg"),
-                    )
-                    return False
-        except asyncio.TimeoutError:
-            logger.error("Alpaca auth response timed out")
-            return False
-
-        return False
-
-    async def _subscribe(self, ws) -> None:
-        """Subscribe to trade updates for the configured symbols.
+    async def _handle_trade(self, trade: object) -> None:
+        """Convert an alpaca-py Trade object to a dict and dispatch to on_tick.
 
         Args:
-            ws: An authenticated :mod:`websockets` connection.
-        """
-        sub_msg = json.dumps(
-            {"action": "subscribe", "trades": self._symbols}
-        )
-        await ws.send(sub_msg)
-        logger.info("Alpaca trade subscription sent", symbols=self._symbols)
-
-    async def _consume(self, ws) -> None:
-        """Read messages from *ws* and forward trade events to *on_tick*.
-
-        Args:
-            ws: An active, subscribed :mod:`websockets` connection.
-        """
-        async for raw_message in ws:
-            if not self._running:
-                break
-            try:
-                messages: list[dict] = json.loads(raw_message)
-                for msg in messages:
-                    msg_type = msg.get("T", "")
-                    if msg_type == "t":
-                        await self._dispatch(msg)
-                    elif msg_type == "error":
-                        logger.warning(
-                            "Alpaca stream error message",
-                            code=msg.get("code"),
-                            detail=msg.get("msg"),
-                        )
-            except json.JSONDecodeError as exc:
-                logger.warning("Failed to parse Alpaca message", error=str(exc))
-            except Exception as exc:
-                logger.error("Error processing Alpaca message", error=str(exc))
-
-    async def _dispatch(self, trade: dict) -> None:
-        """Invoke *on_tick* with *trade*, supporting async and sync callables.
-
-        Args:
-            trade: A single Alpaca trade event dict.
+            trade: An :class:`alpaca.data.models.Trade` instance from the SDK.
         """
         try:
+            trade_dict: dict = {
+                "S": getattr(trade, "symbol", ""),
+                "t": str(getattr(trade, "timestamp", "")),
+                "p": str(getattr(trade, "price", "0")),
+                "s": str(getattr(trade, "size", "0")),
+                "c": getattr(trade, "conditions", []),
+                "x": getattr(trade, "exchange", ""),
+            }
             if asyncio.iscoroutinefunction(self._on_tick):
-                await self._on_tick(trade)
+                await self._on_tick(trade_dict)
             else:
-                self._on_tick(trade)
+                self._on_tick(trade_dict)
         except Exception as exc:
-            logger.error("on_tick callback raised an exception", error=str(exc))
+            logger.error("Error dispatching Alpaca trade", error=str(exc))

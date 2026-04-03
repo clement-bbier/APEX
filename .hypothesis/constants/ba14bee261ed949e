@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/zope/interface/exceptions.py
+# hypothesis_version: 6.151.10
+
+['%r', '.', ':', ': ', '<Not Given>', '<Unknown>', '<unknown>', 'An object', 'BadImplements', 'BrokenImplementation', 'DoesNotImplement', 'Invalid', 'InvalidInterface', 'MultipleInvalid', 'The object {!r}', 'implementation', '{} {}{}{}{}']

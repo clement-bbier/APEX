@@ -1,0 +1,4 @@
+# file: /home/runner/work/CashMachine/CashMachine/core/models/order.py
+# hypothesis_version: 6.151.10
+
+[0.0, 1.0, '0', '0.0001', 'Actual fill price', 'Actual filled size', 'OrderCandidate', 'Proposal time UTC ms', 'Session at entry', 'Signal type at entry', 'Trade direction', 'Unique trade ID', 'after', 'approved', 'blocked', 'cancelled', 'candidate', 'filled', 'limit', 'market', 'oco', 'partially_filled', 'rejected', 'stop', 'stop_limit', 'submitted']

@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/twisted/logger/__init__.py
+# hypothesis_version: 6.151.10
+
+['FileLogObserver', 'FilteringLogObserver', 'ILogFilterPredicate', 'ILogObserver', 'InvalidLogLevelError', 'LogBeginner', 'LogEvent', 'LogLevel', 'LogPublisher', 'Logger', 'LoggingFile', 'PredicateResult', 'STDLibLogObserver', '_loggerFor', 'capturedLogs', 'eventAsJSON', 'eventAsText', 'eventFromJSON', 'extractField', 'formatEvent', 'formatTime', 'globalLogBeginner', 'globalLogPublisher', 'jsonFileLogObserver', 'textFileLogObserver', 'timeFormatRFC3339']

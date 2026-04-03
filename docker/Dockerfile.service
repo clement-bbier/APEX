@@ -1,0 +1,29 @@
+FROM rust:1.84-slim AS rust-builder
+WORKDIR /build
+COPY rust/ rust/
+RUN pip install "maturin>=1.9.4" --break-system-packages 2>/dev/null || pip install "maturin>=1.9.4"
+RUN cd rust/apex_mc && maturin build --release --out /wheels && \
+    cd ../apex_risk && maturin build --release --out /wheels
+
+FROM python:3.11-slim AS python-builder
+WORKDIR /build
+RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ && rm -rf /var/lib/apt/lists/*
+COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
+COPY --from=rust-builder /wheels/*.whl /wheels/
+RUN pip install --no-cache-dir --user /wheels/*.whl
+
+FROM python:3.11-slim AS runtime
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app
+RUN groupadd --gid 1000 apex && \
+    useradd --uid 1000 --gid apex --create-home apex
+WORKDIR /app
+COPY --from=python-builder /root/.local /home/apex/.local
+COPY . .
+RUN chown -R apex:apex /app
+USER apex
+CMD python -m ${SERVICE_MODULE}
+HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
+    CMD python -c "import redis; redis.Redis.from_url('${REDIS_URL}').ping()"
