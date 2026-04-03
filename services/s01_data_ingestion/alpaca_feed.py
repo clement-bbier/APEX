@@ -95,7 +95,7 @@ class AlpacaFeed:
         self._running = False
         if self._stream is not None:
             try:
-                await self._stream.stop()
+                self._stream.stop()
             except Exception as exc:
                 logger.warning("Error stopping Alpaca stream", error=str(exc))
             self._stream = None

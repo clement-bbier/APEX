@@ -6,11 +6,13 @@ Wraps :class:`alpaca.trading.client.TradingClient` for equity order management.
 
 from __future__ import annotations
 from typing import Any
+from uuid import UUID
 
 from decimal import Decimal
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.models import Order, Position, TradeAccount
 from alpaca.trading.requests import LimitOrderRequest, MarketOrderRequest
 
 from core.logger import get_logger
@@ -56,7 +58,10 @@ class AlpacaBroker:
             secret_key=self._secret_key,
             paper=self._paper,
         )
-        account = self._client.get_account()
+        raw = self._client.get_account()
+        account: TradeAccount = (
+            raw if isinstance(raw, TradeAccount) else TradeAccount.model_validate(raw)
+        )
         logger.info(
             "AlpacaBroker connected",
             paper=self._paper,
@@ -97,6 +102,7 @@ class AlpacaBroker:
         client = self._ensure_client()
         order_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
 
+        req: MarketOrderRequest | LimitOrderRequest
         if order_type == "market":
             req = MarketOrderRequest(
                 symbol=symbol,
@@ -115,7 +121,8 @@ class AlpacaBroker:
                 limit_price=Decimal(str(limit_price)),
             )
 
-        order = client.submit_order(order_data=req)
+        raw = client.submit_order(order_data=req)
+        order: Order = raw if isinstance(raw, Order) else Order.model_validate(raw)
         return {
             "id": str(order.id),
             "symbol": order.symbol,
@@ -133,8 +140,6 @@ class AlpacaBroker:
             order_id: Alpaca-assigned order UUID string.
         """
         client = self._ensure_client()
-        from uuid import UUID
-
         client.cancel_order_by_id(UUID(order_id))
         logger.info("Order cancelled", order_id=order_id)
 
@@ -151,7 +156,10 @@ class AlpacaBroker:
         """
         client = self._ensure_client()
         try:
-            pos = client.get_open_position(symbol)
+            raw = client.get_open_position(symbol)
+            if not isinstance(raw, Position):
+                return None
+            pos: Position = raw
             return {
                 "symbol": pos.symbol,
                 "qty": str(pos.qty),
@@ -170,7 +178,10 @@ class AlpacaBroker:
             Account information dict[str, Any].
         """
         client = self._ensure_client()
-        account = client.get_account()
+        raw = client.get_account()
+        account: TradeAccount = (
+            raw if isinstance(raw, TradeAccount) else TradeAccount.model_validate(raw)
+        )
         return {
             "id": str(account.id),
             "equity": str(account.equity),
@@ -187,7 +198,11 @@ class AlpacaBroker:
             Mapping of ``{symbol: position_dict}`` for all open positions.
         """
         client = self._ensure_client()
-        positions = client.get_all_positions()
+        raw_list = client.get_all_positions()
+        positions: list[Position] = [
+            p if isinstance(p, Position) else Position.model_validate(p)
+            for p in raw_list
+        ]
         return {
             p.symbol: {
                 "symbol": p.symbol,

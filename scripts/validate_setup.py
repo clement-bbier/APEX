@@ -99,9 +99,13 @@ def check_alpaca() -> bool:
         return True
     try:
         from alpaca.trading.client import TradingClient
+        from alpaca.trading.models import TradeAccount
 
         client = TradingClient(api_key=api_key, secret_key=secret_key, paper=True)
-        account = client.get_account()
+        raw = client.get_account()
+        account: TradeAccount = (
+            raw if isinstance(raw, TradeAccount) else TradeAccount.model_validate(raw)
+        )
         ok(f"Alpaca API (account: {account.id})")
         return True
     except Exception as exc:

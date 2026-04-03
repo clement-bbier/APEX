@@ -60,7 +60,7 @@ class BinanceBroker:
 
     # ── Signing ───────────────────────────────────────────────────────────────
 
-    def _sign(self, params: dict[str, Any]) -> str:
+    def _sign(self, params: dict[str, str]) -> str:
         """Produce an HMAC-SHA256 signature for the given query parameters.
 
         The signature covers the URL-encoded query string (sorted by key).
@@ -103,25 +103,26 @@ class BinanceBroker:
             Binance order response dict[str, Any].
         """
         session = self._ensure_session()
-        params: dict = {
-            "symbol": symbol,
+        params: dict[str, str] = {
+            "symbol": str(symbol),
             "side": side.upper(),
             "type": order_type.upper(),
-            "quantity": quantity,
-            "timestamp": int(time.time() * 1000),
+            "quantity": str(quantity),
+            "timestamp": str(int(time.time() * 1000)),
             "timeInForce": "GTC",
         }
         if price is not None:
-            params["price"] = price
+            params["price"] = str(price)
         if stop_price is not None:
-            params["stopPrice"] = stop_price
+            params["stopPrice"] = str(stop_price)
         if order_type.upper() == "MARKET":
             params.pop("timeInForce", None)
 
         params["signature"] = self._sign(params)
         async with session.post(f"{self._base_url}/api/v3/order", params=params) as resp:
             resp.raise_for_status()
-            return await resp.json()
+            result: dict[str, Any] = dict(await resp.json())
+            return result
 
     async def cancel_order(self, symbol: str, order_id: str) -> None:
         """Cancel an open Binance order.
@@ -131,10 +132,10 @@ class BinanceBroker:
             order_id: Binance-assigned numeric order ID as a string.
         """
         session = self._ensure_session()
-        params = {
-            "symbol": symbol,
-            "orderId": order_id,
-            "timestamp": int(time.time() * 1000),
+        params: dict[str, str] = {
+            "symbol": str(symbol),
+            "orderId": str(order_id),
+            "timestamp": str(int(time.time() * 1000)),
         }
         params["signature"] = self._sign(params)
         async with session.delete(f"{self._base_url}/api/v3/order", params=params) as resp:
@@ -181,11 +182,12 @@ class BinanceBroker:
             Account information dict[str, Any] from Binance.
         """
         session = self._ensure_session()
-        params = {"timestamp": int(time.time() * 1000)}
+        params: dict[str, str] = {"timestamp": str(int(time.time() * 1000))}
         params["signature"] = self._sign(params)
         async with session.get(f"{self._base_url}/api/v3/account", params=params) as resp:
             resp.raise_for_status()
-            return await resp.json()
+            result: dict[str, Any] = dict(await resp.json())
+            return result
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 

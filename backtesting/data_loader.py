@@ -12,13 +12,14 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
 
 from core.logger import get_logger
-from core.models.tick import Market, NormalizedTick, Session
+from core.models.tick import Market, NormalizedTick, Session, TradeSide
 
 logger = get_logger("backtesting.data_loader")
 
@@ -77,10 +78,10 @@ def load_parquet(path: str | Path) -> list[NormalizedTick]:
                 timestamp_ms=int(row.timestamp_ms),
                 price=Decimal(str(row.price)),
                 volume=Decimal(str(row.volume)),
-                side=getattr(row, "side", "unknown"),
+                side=TradeSide(str(getattr(row, "side", "unknown"))),
                 bid=Decimal(str(getattr(row, "bid", row.price))),
                 ask=Decimal(str(getattr(row, "ask", row.price))),
-                spread_bps=float(getattr(row, "spread_bps", 1.0)),
+                spread_bps=Decimal(str(getattr(row, "spread_bps", "1.0"))),
                 session=Session(getattr(row, "session", "after_hours")),
             )
             ticks.append(tick)
@@ -104,8 +105,8 @@ def save_parquet(ticks: list[NormalizedTick], path: str | Path) -> None:
             "price": float(t.price),
             "volume": float(t.volume),
             "side": t.side,
-            "bid": float(t.bid),
-            "ask": float(t.ask),
+            "bid": float(t.bid) if t.bid is not None else 0.0,
+            "ask": float(t.ask) if t.ask is not None else 0.0,
             "spread_bps": t.spread_bps,
             "session": t.session.value,
         }
@@ -152,16 +153,16 @@ class BinanceHistoricalLoader:
         async with aiohttp.ClientSession() as session:
             cursor = start_ms
             while cursor < end_ms:
-                params = {
+                params: dict[str, str] = {
                     "symbol": self._symbol,
                     "interval": interval,
-                    "startTime": cursor,
-                    "endTime": end_ms,
-                    "limit": 1000,
+                    "startTime": str(cursor),
+                    "endTime": str(end_ms),
+                    "limit": "1000",
                 }
                 async with session.get(url, params=params) as resp:
                     resp.raise_for_status()
-                    klines: list = await resp.json()
+                    klines: list[Any] = await resp.json()
 
                 if not klines:
                     break
@@ -176,10 +177,10 @@ class BinanceHistoricalLoader:
                         timestamp_ms=ts_ms,
                         price=close_price,
                         volume=volume,
-                        side="unknown",
+                        side=TradeSide.UNKNOWN,
                         bid=close_price,
                         ask=close_price,
-                        spread_bps=1.0,
+                        spread_bps=Decimal("1.0"),
                         session=Session.AFTER_HOURS,
                     )
                     ticks.append(tick)
@@ -253,10 +254,10 @@ class AlpacaHistoricalLoader:
                 timestamp_ms=ts_ms,
                 price=close,
                 volume=vol,
-                side="unknown",
+                side=TradeSide.UNKNOWN,
                 bid=close,
                 ask=close,
-                spread_bps=2.0,
+                spread_bps=Decimal("2.0"),
                 session=Session.US_NORMAL,
             )
             ticks.append(tick)
