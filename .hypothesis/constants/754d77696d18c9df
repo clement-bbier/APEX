@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/twisted/logger/_format.py
+# hypothesis_version: 6.151.10
+
+[' = ', '%Y-%m-%dT%H:%M:%S%z', '()', ', ', '-', 'UNFORMATTABLE', '[', ']', 'log_failure', 'log_flattened', 'log_format', 'log_level', 'log_namespace', 'log_system', 'log_time', 'utf-8', '{namespace}#{level}']

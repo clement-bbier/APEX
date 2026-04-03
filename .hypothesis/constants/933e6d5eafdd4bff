@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/twisted/python/deprecate.py
+# hypothesis_version: 6.151.10
+
+['.', ': ', '; ', 'Already passed.', 'Too many arguments.', '_P', '_R', '_Tc', '__path__', '__warningregistry__', '_module', 'deprecated', 'deprecatedProperty', 'fqpn', 'fullyQualifiedName', 'getWarningMethod', 'no such param', 'proxy', 'setWarningMethod', 'version', '{}; {}']

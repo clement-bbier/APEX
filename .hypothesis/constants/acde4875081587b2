@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/zope/interface/interface.py
+# hypothesis_version: 6.151.10
+
+['(%s)', '*', '**', ', ', '.', '<WithCustomMethods>', "<class '{}.{}'>", '<unknown>', '<{} {}>', '=', 'Concrete attribute, ', 'Could not adapt', 'Interface', 'InterfaceClass', 'Specification', '_CALL_CUSTOM_ADAPT', '__adapt__', '__annotations__', '__classcell__', '__defaults__', '__defaults_count__', '__doc__', '__ibmodule__', '__iro__', '__locals__', '__module__', '__module_property__', '__name__', '__qualname__', '__slots__', '__sro__', '__weakref__', '_bases', '_dependents', '_implied', '_v_attrs', '_v_cached_hash', 'adapter_hooks', 'invariants', 'kwargs', 'optional', 'positional', 'required', 'varargs', 'zope.interface', '{}.{}']

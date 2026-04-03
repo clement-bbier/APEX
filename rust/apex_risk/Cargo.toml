@@ -1,0 +1,13 @@
+[package]
+name = "apex_risk"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.28", features = ["abi3-py311"] }
+numpy = "0.22"
+ndarray = "0.15"
+rayon = "1.10"

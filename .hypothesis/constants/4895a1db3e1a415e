@@ -1,0 +1,4 @@
+# file: /home/runner/work/CashMachine/CashMachine/core/models/signal.py
+# hypothesis_version: 6.151.10
+
+[-1.0, 0.0, 0.5, 1.0, 1.5, '0', 'Mandatory stop loss', 'Signal', 'Trade direction', 'after', 'bb_bounce', 'bb_breakout', 'composite', 'cvd', 'ema_cross', 'flat', 'funding_extreme', 'gex_magnet', 'liquidation_cascade', 'long', 'macro_momentum', 'ofi', 'rsi_divergence', 'short', 'stop_cluster', 'symbol', 'vwap_bounce']

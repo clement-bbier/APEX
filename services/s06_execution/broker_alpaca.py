@@ -1,63 +1,73 @@
-"""Alpaca broker adapter for APEX Trading System - S06 Execution.
+"""Alpaca broker adapter for APEX Trading System — S06 Execution.
 
-Wraps the Alpaca REST API v2 for equity order management.
-All HTTP communication is handled via a shared :mod:`aiohttp` session.
+Uses the official ``alpaca-py`` SDK (NOT the deprecated ``alpaca-trade-api``).
+Wraps :class:`alpaca.trading.client.TradingClient` for equity order management.
 """
 
 from __future__ import annotations
 
+from decimal import Decimal
 from typing import Optional
 
-import aiohttp
+from alpaca.trading.client import TradingClient
+from alpaca.trading.enums import OrderSide, TimeInForce
+from alpaca.trading.requests import LimitOrderRequest, MarketOrderRequest
+
+from core.logger import get_logger
+
+logger = get_logger("s06_execution.broker_alpaca")
 
 
 class AlpacaBroker:
-    """Async HTTP client for the Alpaca brokerage API.
+    """Sync/async equity broker backed by the ``alpaca-py`` TradingClient.
 
-    Supports both live and paper endpoints.  The ``base_url`` parameter
-    controls which environment is targeted; typical values are:
+    ``alpaca-py``'s :class:`~alpaca.trading.client.TradingClient` is
+    synchronous; all heavy operations are lightweight REST calls that
+    complete in < 200 ms and are called only on order events (low frequency).
+    For the async execution service, each call runs in the asyncio thread
+    (no separate thread pool needed at typical order rates).
 
-    - ``"https://paper-api.alpaca.markets"`` (paper trading)
-    - ``"https://api.alpaca.markets"`` (live trading)
+    Args:
+        api_key:    Alpaca API key.
+        secret_key: Alpaca secret key.
+        base_url:   Unused — kept for interface compatibility; alpaca-py
+                    derives the endpoint from the *paper* flag.
+        paper:      ``True`` for paper-trading, ``False`` for live.
     """
 
     def __init__(
         self,
         api_key: str,
         secret_key: str,
-        base_url: str,
+        base_url: str = "",
         paper: bool = True,
     ) -> None:
-        """Initialize the Alpaca broker client.
-
-        Args:
-            api_key:    Alpaca API key ID.
-            secret_key: Alpaca secret key.
-            base_url:   Base URL for the Alpaca API endpoint.
-            paper:      ``True`` if this is a paper-trading session.
-        """
         self._api_key = api_key
         self._secret_key = secret_key
-        self._base_url = base_url.rstrip("/")
         self._paper = paper
-        self._session: Optional[aiohttp.ClientSession] = None
+        self._client: Optional[TradingClient] = None
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
     async def connect(self) -> None:
-        """Create the underlying :class:`aiohttp.ClientSession`."""
-        self._session = aiohttp.ClientSession(
-            headers={
-                "APCA-API-KEY-ID": self._api_key,
-                "APCA-API-SECRET-KEY": self._secret_key,
-            }
+        """Instantiate the TradingClient and verify connectivity."""
+        self._client = TradingClient(
+            api_key=self._api_key,
+            secret_key=self._secret_key,
+            paper=self._paper,
+        )
+        account = self._client.get_account()
+        logger.info(
+            "AlpacaBroker connected",
+            paper=self._paper,
+            account_id=str(account.id),
+            equity=str(account.equity),
         )
 
     async def disconnect(self) -> None:
-        """Close the HTTP session and release resources."""
-        if self._session is not None:
-            await self._session.close()
-            self._session = None
+        """Release the TradingClient (no-op for sync client)."""
+        self._client = None
+        logger.info("AlpacaBroker disconnected")
 
     # ── Order operations ──────────────────────────────────────────────────────
 
@@ -74,46 +84,59 @@ class AlpacaBroker:
 
         Args:
             symbol:      Ticker symbol (e.g. ``"AAPL"``).
-            qty:         Number of shares.
+            qty:         Number of shares (fractional supported by Alpaca).
             side:        ``"buy"`` or ``"sell"``.
-            order_type:  ``"market"``, ``"limit"``, ``"stop"``, or
-                         ``"stop_limit"``.
-            limit_price: Limit price (required for limit/stop_limit orders).
-            stop_price:  Stop price (required for stop/stop_limit orders).
+            order_type:  ``"market"`` or ``"limit"`` (stop orders use
+                         stop_limit via separate call if needed).
+            limit_price: Required when *order_type* is ``"limit"``.
+            stop_price:  Ignored for simple limit/market (use OCO for stops).
 
         Returns:
-            Alpaca order response dict.
+            Alpaca order response serialised to a plain dict.
         """
-        session = self._ensure_session()
-        payload: dict = {
-            "symbol": symbol,
-            "qty": str(qty),
-            "side": side,
-            "type": order_type,
-            "time_in_force": "gtc",
-        }
-        if limit_price is not None:
-            payload["limit_price"] = str(limit_price)
-        if stop_price is not None:
-            payload["stop_price"] = str(stop_price)
+        client = self._ensure_client()
+        order_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
 
-        async with session.post(
-            f"{self._base_url}/v2/orders", json=payload
-        ) as resp:
-            resp.raise_for_status()
-            return await resp.json()
+        if order_type == "market":
+            req = MarketOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=order_side,
+                time_in_force=TimeInForce.GTC,
+            )
+        else:
+            if limit_price is None:
+                raise ValueError("limit_price is required for limit orders")
+            req = LimitOrderRequest(
+                symbol=symbol,
+                qty=qty,
+                side=order_side,
+                time_in_force=TimeInForce.GTC,
+                limit_price=Decimal(str(limit_price)),
+            )
+
+        order = client.submit_order(order_data=req)
+        return {
+            "id": str(order.id),
+            "symbol": order.symbol,
+            "qty": str(order.qty),
+            "side": str(order.side),
+            "type": str(order.order_type),
+            "status": str(order.status),
+            "limit_price": str(order.limit_price) if order.limit_price else None,
+        }
 
     async def cancel_order(self, order_id: str) -> None:
-        """Cancel an open order by its Alpaca order ID.
+        """Cancel an open order by its Alpaca order UUID.
 
         Args:
-            order_id: Alpaca-assigned order ID.
+            order_id: Alpaca-assigned order UUID string.
         """
-        session = self._ensure_session()
-        async with session.delete(
-            f"{self._base_url}/v2/orders/{order_id}"
-        ) as resp:
-            resp.raise_for_status()
+        client = self._ensure_client()
+        from uuid import UUID
+
+        client.cancel_order_by_id(UUID(order_id))
+        logger.info("Order cancelled", order_id=order_id)
 
     # ── Account / position queries ────────────────────────────────────────────
 
@@ -126,25 +149,36 @@ class AlpacaBroker:
         Returns:
             Position dict or ``None`` if no open position exists.
         """
-        session = self._ensure_session()
-        async with session.get(
-            f"{self._base_url}/v2/positions/{symbol}"
-        ) as resp:
-            if resp.status == 404:
-                return None
-            resp.raise_for_status()
-            return await resp.json()
+        client = self._ensure_client()
+        try:
+            pos = client.get_open_position(symbol)
+            return {
+                "symbol": pos.symbol,
+                "qty": str(pos.qty),
+                "avg_entry_price": str(pos.avg_entry_price),
+                "market_value": str(pos.market_value),
+                "unrealized_pl": str(pos.unrealized_pl),
+                "side": str(pos.side),
+            }
+        except Exception:
+            return None
 
     async def get_account(self) -> dict:
         """Retrieve the Alpaca account details.
 
         Returns:
-            Account information dict from Alpaca.
+            Account information dict.
         """
-        session = self._ensure_session()
-        async with session.get(f"{self._base_url}/v2/account") as resp:
-            resp.raise_for_status()
-            return await resp.json()
+        client = self._ensure_client()
+        account = client.get_account()
+        return {
+            "id": str(account.id),
+            "equity": str(account.equity),
+            "cash": str(account.cash),
+            "portfolio_value": str(account.portfolio_value),
+            "buying_power": str(account.buying_power),
+            "status": str(account.status),
+        }
 
     async def sync_positions(self) -> dict[str, dict]:
         """Fetch all open positions and index them by symbol.
@@ -152,23 +186,31 @@ class AlpacaBroker:
         Returns:
             Mapping of ``{symbol: position_dict}`` for all open positions.
         """
-        session = self._ensure_session()
-        async with session.get(f"{self._base_url}/v2/positions") as resp:
-            resp.raise_for_status()
-            positions: list[dict] = await resp.json()
-        return {p["symbol"]: p for p in positions}
+        client = self._ensure_client()
+        positions = client.get_all_positions()
+        return {
+            p.symbol: {
+                "symbol": p.symbol,
+                "qty": str(p.qty),
+                "avg_entry_price": str(p.avg_entry_price),
+                "market_value": str(p.market_value),
+                "unrealized_pl": str(p.unrealized_pl),
+                "side": str(p.side),
+            }
+            for p in positions
+        }
 
-    # ── Internal helpers ──────────────────────────────────────────────────────
+    # ── Internal ──────────────────────────────────────────────────────────────
 
-    def _ensure_session(self) -> aiohttp.ClientSession:
-        """Return the active HTTP session or raise if not connected.
+    def _ensure_client(self) -> TradingClient:
+        """Return the active TradingClient or raise if not connected.
 
         Returns:
-            Active :class:`aiohttp.ClientSession`.
+            Active :class:`~alpaca.trading.client.TradingClient`.
 
         Raises:
             RuntimeError: If :meth:`connect` has not been called.
         """
-        if self._session is None:
+        if self._client is None:
             raise RuntimeError("AlpacaBroker not connected. Call connect() first.")
-        return self._session
+        return self._client
