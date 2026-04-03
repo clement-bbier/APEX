@@ -1,13 +1,14 @@
-//! APEX Monte Carlo engine — PyO3 0.28 / numpy 0.22 extension.
+//! APEX Monte Carlo engine — PyO3 0.28 / numpy 0.28 extension.
 //!
 //! Exposes three functions to Python:
 //! - `run_mc_batch`: Simulate N price paths via bootstrap resampling.
 //! - `compute_var`:  Historical Value-at-Risk at confidence level α.
 //! - `compute_cvar`: Conditional VaR (Expected Shortfall) at α.
 
-use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1};
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1};
 use pyo3::prelude::*;
 use rand::prelude::*;
+use rand::rngs::SmallRng;
 use rand_distr::Uniform;
 use rayon::prelude::*;
 
