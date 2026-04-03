@@ -83,7 +83,7 @@ class ExecutionService(BaseService):
             self._binance = BinanceBroker(
                 api_key=settings.binance_api_key,
                 secret_key=settings.binance_secret_key,
-                base_url=settings.binance_base_url,
+                base_url=settings.binance_rest_url,
                 testnet=False,
             )
 

@@ -5,6 +5,7 @@ Wraps :class:`alpaca.trading.client.TradingClient` for equity order management.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from decimal import Decimal
 
@@ -78,7 +79,7 @@ class AlpacaBroker:
         order_type: str = "limit",
         limit_price: float | None = None,
         stop_price: float | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         """Submit an order to Alpaca.
 
         Args:
@@ -91,7 +92,7 @@ class AlpacaBroker:
             stop_price:  Ignored for simple limit/market (use OCO for stops).
 
         Returns:
-            Alpaca order response serialised to a plain dict.
+            Alpaca order response serialised to a plain dict[str, Any].
         """
         client = self._ensure_client()
         order_side = OrderSide.BUY if side.lower() == "buy" else OrderSide.SELL
@@ -139,14 +140,14 @@ class AlpacaBroker:
 
     # ── Account / position queries ────────────────────────────────────────────
 
-    async def get_position(self, symbol: str) -> dict | None:
+    async def get_position(self, symbol: str) -> dict[str, Any] | None:
         """Retrieve the current open position for a symbol.
 
         Args:
             symbol: Ticker symbol.
 
         Returns:
-            Position dict or ``None`` if no open position exists.
+            Position dict[str, Any] or ``None`` if no open position exists.
         """
         client = self._ensure_client()
         try:
@@ -162,11 +163,11 @@ class AlpacaBroker:
         except Exception:
             return None
 
-    async def get_account(self) -> dict:
+    async def get_account(self) -> dict[str, Any]:
         """Retrieve the Alpaca account details.
 
         Returns:
-            Account information dict.
+            Account information dict[str, Any].
         """
         client = self._ensure_client()
         account = client.get_account()
@@ -179,7 +180,7 @@ class AlpacaBroker:
             "status": str(account.status),
         }
 
-    async def sync_positions(self) -> dict[str, dict]:
+    async def sync_positions(self) -> dict[str, dict[str, Any]]:
         """Fetch all open positions and index them by symbol.
 
         Returns:

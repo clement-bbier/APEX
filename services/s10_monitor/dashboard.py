@@ -122,11 +122,11 @@ class DashboardServer:
             return HTMLResponse(_DASHBOARD_HTML)
 
         @app.get("/health")
-        async def health() -> dict:
+        async def health() -> dict[str, Any]:
             return {"status": "ok"}
 
         @app.get("/positions")
-        async def positions() -> dict:
+        async def positions() -> dict[str, Any]:
             try:
                 keys_raw = await self._state._ensure_connected().keys("positions:*")
                 result = {}
@@ -138,16 +138,16 @@ class DashboardServer:
                 return {"error": str(exc)}
 
         @app.get("/regime")
-        async def regime() -> dict:
+        async def regime() -> dict[str, Any]:
             return await self._state.get("regime:current") or {}
 
         @app.get("/equity")
-        async def equity() -> dict:
+        async def equity() -> dict[str, Any]:
             curve = await self._state.lrange("equity_curve", 0, 99)
             return {"curve": curve}
 
         @app.get("/signals")
-        async def signals() -> dict:
+        async def signals() -> dict[str, Any]:
             try:
                 keys_raw = await self._state._ensure_connected().keys("signal:*")
                 result = {}

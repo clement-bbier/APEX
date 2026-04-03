@@ -156,7 +156,8 @@ class MessageBus:
                 f"[{self._service_id}] PULL socket not initialized. Call init_puller() first."
             )
         raw = await self._pull_socket.recv_string()
-        return json.loads(raw)
+        result: dict[str, Any] = json.loads(raw)
+        return result
 
     async def subscribe(
         self, topics: list[str], handler: Callable[[str, dict[str, Any]], Any]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from enum import StrEnum
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -56,7 +57,7 @@ class RawTick(BaseModel):
     side: TradeSide = Field(default=TradeSide.UNKNOWN, description="Aggressor side")
     bid: Decimal | None = Field(default=None, description="Best bid price")
     ask: Decimal | None = Field(default=None, description="Best ask price")
-    raw_data: dict | None = Field(default=None, description="Original broker payload")
+    raw_data: dict[str, Any] | None = Field(default=None, description="Original broker payload")
 
     @field_validator("symbol")
     @classmethod

@@ -1,6 +1,7 @@
 """Market statistics and econometric tests for APEX Trading System."""
 
 from __future__ import annotations
+from typing import Any
 
 import numpy as np
 
@@ -8,7 +9,7 @@ import numpy as np
 class MarketStats:
     """Provides econometric and statistical tests for market data analysis."""
 
-    def ljung_box(self, returns: list[float], lags: int = 10) -> dict:
+    def ljung_box(self, returns: list[float], lags: int = 10) -> dict[str, Any]:
         """Compute the Ljung-Box Q-statistic test for autocorrelation.
 
         Q = n(n+2) × Σ(ρ_k²/(n-k)) for k=1..lags.
@@ -18,7 +19,7 @@ class MarketStats:
             lags: Number of lags to include in the test.
 
         Returns:
-            dict with keys "q_stat" (float) and "significant" (bool).
+            dict[str, Any] with keys "q_stat" (float) and "significant" (bool).
             Significant is True if Q > chi-squared critical value (approx lags * 1.5).
         """
         n = len(returns)

@@ -7,6 +7,7 @@ All normalizers produce :class:`~core.models.tick.NormalizedTick` instances.
 """
 
 from __future__ import annotations
+from typing import Any
 
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -114,8 +115,8 @@ class BinanceNormalizer:
 
     _tagger = SessionTagger()
 
-    def normalize(self, raw_data: dict) -> NormalizedTick:
-        """Convert a Binance trade ``data`` dict to a :class:`NormalizedTick`.
+    def normalize(self, raw_data: dict[str, Any]) -> NormalizedTick:
+        """Convert a Binance trade ``data`` dict[str, Any] to a :class:`NormalizedTick`.
 
         Args:
             raw_data: The ``data`` field from a Binance combined-stream message.
@@ -187,11 +188,11 @@ class AlpacaNormalizer:
 
     _tagger = SessionTagger()
 
-    def normalize(self, raw_data: dict) -> NormalizedTick:
-        """Convert an Alpaca trade message dict to a :class:`NormalizedTick`.
+    def normalize(self, raw_data: dict[str, Any]) -> NormalizedTick:
+        """Convert an Alpaca trade message dict[str, Any] to a :class:`NormalizedTick`.
 
         Args:
-            raw_data: A single Alpaca trade event dict.
+            raw_data: A single Alpaca trade event dict[str, Any].
 
         Returns:
             A fully populated :class:`NormalizedTick` for the equity market.

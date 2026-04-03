@@ -164,7 +164,7 @@ class MonteCarloEngine:
 
         return best_f / 4.0  # quarter-Kelly
 
-    def stress_test_positions(self, positions: dict[str, float], capital: float) -> list[dict]:
+    def stress_test_positions(self, positions: dict[str, float], capital: float) -> list[dict[str, Any]]:
         """Apply stress scenarios to current positions and estimate losses.
 
         Args:
@@ -174,7 +174,7 @@ class MonteCarloEngine:
         Returns:
             List of dicts with {scenario, estimated_loss, pct_capital}.
         """
-        results: list[dict] = []
+        results: list[dict[str, Any]] = []
         for scenario_name, params in STRESS_SCENARIOS.items():
             price_shock = float(params.get("price_shock", 0.0))
             total_notional = sum(abs(v) for v in positions.values())

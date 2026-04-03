@@ -5,6 +5,7 @@ Auto-reconnects on failure with exponential back-off.
 """
 
 from __future__ import annotations
+from typing import Any
 
 import asyncio
 from collections.abc import Callable
@@ -29,7 +30,7 @@ class AlpacaFeed:
 
     Args:
         symbols: Uppercase equity ticker symbols, e.g. ``["AAPL", "SPY"]``.
-        on_tick: Async or sync callable that receives a single trade-event dict.
+        on_tick: Async or sync callable that receives a single trade-event dict[str, Any].
         api_key: Alpaca API key.
         secret_key: Alpaca secret key.
         url: Unused - kept for interface compatibility with BinanceFeed.
@@ -38,7 +39,7 @@ class AlpacaFeed:
     def __init__(
         self,
         symbols: list[str],
-        on_tick: Callable,
+        on_tick: Callable[..., Any],
         api_key: str,
         secret_key: str,
         url: str = "",
@@ -70,7 +71,7 @@ class AlpacaFeed:
                 )
                 self._stream.subscribe_trades(self._handle_trade, *self._symbols)
                 # _run_forever drives the asyncio event loop inside alpaca-py
-                await self._stream._run_forever()  # type: ignore[attr-defined]
+                await self._stream._run_forever()
                 backoff = _RECONNECT_BASE_SECONDS
 
             except asyncio.CancelledError:
@@ -103,13 +104,13 @@ class AlpacaFeed:
     # ── Internal ──────────────────────────────────────────────────────────────
 
     async def _handle_trade(self, trade: object) -> None:
-        """Convert an alpaca-py Trade object to a dict and dispatch to on_tick.
+        """Convert an alpaca-py Trade object to a dict[str, Any] and dispatch to on_tick.
 
         Args:
             trade: An :class:`alpaca.data.models.Trade` instance from the SDK.
         """
         try:
-            trade_dict: dict = {
+            trade_dict: dict[str, Any] = {
                 "S": getattr(trade, "symbol", ""),
                 "t": str(getattr(trade, "timestamp", "")),
                 "p": str(getattr(trade, "price", "0")),
