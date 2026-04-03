@@ -205,7 +205,10 @@ class CrowdBehaviorAnalyzer:
         current_price = float(prices[-1])
         price_std = float(np.std(prices, ddof=1))
 
-        # Cluster candidates: ±1σ, ±2σ, ±3σ below/above current price
+        # Multipliers represent ±½σ through ±2½σ bands around the current
+        # price.  These correspond roughly to common exchange leverage tiers
+        # (5×–20×) where isolated-margin positions face liquidation, providing
+        # five granular levels per side without overwhelming the consumer.
         multipliers = [0.5, 1.0, 1.5, 2.0, 2.5]
         longs = sorted(
             [round(current_price - m * price_std, 8) for m in multipliers
