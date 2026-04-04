@@ -364,7 +364,7 @@ class TechnicalAnalyzer:
             upper: Upper Bollinger Band.
             lower: Lower Bollinger Band.
             middle: Middle band (SMA).
-            bandwidth_pct: Current bandwidth as % of historical (0–100).
+            bandwidth_pct: Current bandwidth as % of historical (0-100).
 
         Returns:
             Score in [-1.0, +1.0].

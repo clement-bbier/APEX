@@ -178,3 +178,74 @@ class CircuitBreaker:
     def trip_reason(self) -> str:
         """Human-readable reason for the last trip, or empty string."""
         return self._trip_reason
+
+    # ── Convenience API (used by services and integration tests) ──────────────
+
+    def allows_new_orders(self) -> bool:
+        """Return True if the circuit breaker permits new orders.
+
+        Equivalent to ``is_closed``.
+        """
+        return self.is_closed
+
+    def reset(self) -> None:
+        """Force-reset the breaker to CLOSED state.
+
+        Used at the start of each trading day to clear previous day's trip.
+        """
+        self._state = CircuitState.CLOSED
+        self._trip_reason = ""
+        self._tripped_at = 0.0
+        self._last_trade_success = False
+
+    def update_daily_pnl(self, pnl_pct: float) -> None:
+        """Check daily PnL and trip the breaker if the threshold is breached.
+
+        Args:
+            pnl_pct: Daily P&L as a fraction (e.g., -0.031 = -3.1%).
+        """
+        if self.check_daily_drawdown(pnl_pct * 100):
+            self.trip(f"daily_pnl {pnl_pct:.3%} breached threshold")
+
+    def update_30min_pnl(self, pnl_pct: float) -> None:
+        """Check rolling 30-min losses and trip if threshold exceeded.
+
+        Args:
+            pnl_pct: Rolling loss as a fraction (e.g., -0.021 = -2.1%).
+        """
+        loss_pct = abs(pnl_pct) * 100
+        if self.check_rolling_loss([loss_pct]):
+            self.trip(f"30min_pnl {pnl_pct:.3%} breached threshold")
+
+    def update_vix_change(self, relative_change: float) -> None:
+        """Check VIX spike and trip if threshold exceeded.
+
+        Args:
+            relative_change: Relative VIX change (e.g., 0.21 = 21% spike).
+        """
+        threshold = self._settings.cb_vix_spike_pct / 100.0
+        if relative_change > threshold:
+            self.trip(f"vix_spike {relative_change:.1%} breached threshold")
+
+    def notify_service_down(self, service_id: str, seconds_down: int) -> None:
+        """Trip the breaker if a critical service has been unavailable too long.
+
+        Args:
+            service_id: Service identifier (e.g., 's01').
+            seconds_down: Number of seconds the service has been unavailable.
+        """
+        threshold = self._settings.cb_data_timeout_seconds
+        if seconds_down > threshold:
+            self.trip(
+                f"service {service_id} down for {seconds_down}s "
+                f"(threshold: {threshold}s)"
+            )
+
+    def update_price_gap(self, gap_pct: float) -> None:
+        """Check price gap and trip if threshold exceeded.
+
+        Args:
+            gap_pct: Price gap as a fraction (e.g., 0.06 = 6% gap).
+        """
+        if self.check_price_gap(prev_price=1.0, curr_price=1.0 + gap_pct):
+            self.trip(f"price_gap {gap_pct:.1%} breached threshold")

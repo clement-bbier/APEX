@@ -1,106 +1,148 @@
-"""Session tracker for APEX Trading System - S03 Regime Detector.
+"""Session Tracker - Intraday session classification with DST support.
 
-Maps a UTC millisecond timestamp to a :class:`~core.models.regime.SessionContext`
-that captures the current trading session, its sizing multiplier, and US-market
-flags used downstream by the Fusion Engine.
+Sessions drive session_mult [0.5, 1.5] in S04 FusionEngine.
+Getting sessions wrong = systematic undersizing during prime windows.
+
+US sessions follow America/New_York timezone (handles EST/EDT automatically).
+Crypto sessions follow UTC (24/7 market, no DST).
+
+Session schedule (all times in LOCAL timezone):
+  US_OPEN     : 09:30-10:30 ET  -> mult = 1.30 (prime, highest edge)
+  US_MORNING  : 10:30-12:00 ET  -> mult = 1.00
+  US_LUNCH    : 12:00-13:30 ET  -> mult = 0.60 (avoid - low edge)
+  US_AFTERNOON: 13:30-15:00 ET  -> mult = 1.10
+  US_CLOSE    : 15:00-16:00 ET  -> mult = 1.20 (prime)
+  AFTER_HOURS : 16:00-09:30 ET  -> mult = 0.50
+  ASIAN       : 00:00-08:00 UTC -> mult = 0.70 (crypto only)
+  LONDON      : 08:00-13:30 UTC -> mult = 0.90 (crypto only)
 """
-
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
+from enum import StrEnum
+from zoneinfo import ZoneInfo  # Python 3.9+ standard library
 
-from core.models.regime import SessionContext
+
+class Session(StrEnum):
+    """Trading session identifiers."""
+
+    US_OPEN = "us_open"
+    US_MORNING = "us_morning"
+    US_LUNCH = "us_lunch"
+    US_AFTERNOON = "us_afternoon"
+    US_CLOSE = "us_close"
+    AFTER_HOURS = "after_hours"
+    ASIAN = "asian"
+    LONDON = "london"
+    WEEKEND = "weekend"
+
+
+SESSION_MULTIPLIERS: dict[Session, float] = {
+    Session.US_OPEN: 1.30,
+    Session.US_MORNING: 1.00,
+    Session.US_LUNCH: 0.60,
+    Session.US_AFTERNOON: 1.10,
+    Session.US_CLOSE: 1.20,
+    Session.AFTER_HOURS: 0.50,
+    Session.ASIAN: 0.70,
+    Session.LONDON: 0.90,
+    Session.WEEKEND: 0.40,
+}
+
+PRIME_SESSIONS = {Session.US_OPEN, Session.US_CLOSE}
+
+NY_TZ = ZoneInfo("America/New_York")
+UTC_TZ = UTC
 
 
 class SessionTracker:
-    """Classify UTC timestamps into trading sessions and produce multipliers.
+    """Maps any UTC datetime to the current trading session.
 
-    Sessions (all times UTC):
-    - us_prime   : 14:30-15:30 **and** 20:00-21:00  → mult 1.3
-    - us_normal  : 14:30-21:00 (outside prime slots) → mult 1.0
-    - london     : 08:00-10:00                        → mult 1.1
-    - asian      : 00:00-02:00                        → mult 0.7
-    - weekend    : Saturday or Sunday                 → mult 0.5
-    - after_hours: everything else                    → mult 0.8
+    Uses America/New_York for US sessions (auto-handles EST/EDT transitions).
     """
 
-    def get_session(self, timestamp_ms: int) -> SessionContext:
-        """Return a :class:`SessionContext` for the given UTC millisecond timestamp.
+    def get_session(self, utc_now: datetime) -> Session:
+        """Classify the current session for a UTC timestamp.
 
         Args:
-            timestamp_ms: UTC epoch time in milliseconds.
+            utc_now: UTC-aware datetime (must have tzinfo set).
 
         Returns:
-            A fully-populated :class:`SessionContext` instance.
+            Session enum for current market session.
         """
-        dt = datetime.fromtimestamp(timestamp_ms / 1000.0, tz=UTC)
+        assert utc_now.tzinfo is not None, "utc_now must be timezone-aware"
 
-        # Weekend check (Mon=0 … Sun=6)
-        if dt.weekday() >= 5:
-            return SessionContext(
-                timestamp_ms=timestamp_ms,
-                session="weekend",
-                session_mult=0.5,
-                is_us_prime=False,
-                is_us_open=False,
-            )
+        # Weekend check (UTC-based, simple)
+        if utc_now.weekday() >= 5:  # Saturday=5, Sunday=6
+            return Session.WEEKEND
 
-        hour = dt.hour
-        minute = dt.minute
-        # Express time-of-day as fractional hours for easier comparison.
-        tod = hour + minute / 60.0
+        # Convert to NY time for US session classification (DST-safe via ZoneInfo)
+        ny_now = utc_now.astimezone(NY_TZ)
+        ny_time = ny_now.time()
 
-        # US prime windows: 14:30-15:30 and 20:00-21:00 UTC
-        is_us_prime_morning = 14.5 <= tod < 15.5
-        is_us_prime_close = 20.0 <= tod < 21.0
-        is_us_prime = is_us_prime_morning or is_us_prime_close
+        if time(9, 30) <= ny_time < time(10, 30):
+            return Session.US_OPEN
+        if time(10, 30) <= ny_time < time(12, 0):
+            return Session.US_MORNING
+        if time(12, 0) <= ny_time < time(13, 30):
+            return Session.US_LUNCH
+        if time(13, 30) <= ny_time < time(15, 0):
+            return Session.US_AFTERNOON
+        if time(15, 0) <= ny_time < time(16, 0):
+            return Session.US_CLOSE
 
-        # Full US regular session: 14:30-21:00 UTC
-        is_us_open = 14.5 <= tod < 21.0
+        # Outside US hours - classify by UTC for crypto
+        utc_time = utc_now.time().replace(tzinfo=None)
+        if time(0, 0) <= utc_time < time(8, 0):
+            return Session.ASIAN
+        if time(8, 0) <= utc_time < time(13, 30):
+            return Session.LONDON
 
-        if is_us_prime:
-            return SessionContext(
-                timestamp_ms=timestamp_ms,
-                session="us_prime",
-                session_mult=1.3,
-                is_us_prime=True,
-                is_us_open=True,
-            )
+        return Session.AFTER_HOURS
 
-        if is_us_open:
-            return SessionContext(
-                timestamp_ms=timestamp_ms,
-                session="us_normal",
-                session_mult=1.0,
-                is_us_prime=False,
-                is_us_open=True,
-            )
+    def get_multiplier(self, session: Session) -> float:
+        """Return the sizing multiplier for a session.
 
-        # London session: 08:00-10:00 UTC
-        if 8.0 <= tod < 10.0:
-            return SessionContext(
-                timestamp_ms=timestamp_ms,
-                session="london",
-                session_mult=1.1,
-                is_us_prime=False,
-                is_us_open=False,
-            )
+        Args:
+            session: Session enum value.
 
-        # Asian session: 00:00-02:00 UTC
-        if 0.0 <= tod < 2.0:
-            return SessionContext(
-                timestamp_ms=timestamp_ms,
-                session="asian",
-                session_mult=0.7,
-                is_us_prime=False,
-                is_us_open=False,
-            )
+        Returns:
+            Float multiplier in [0.40, 1.30].
+        """
+        return SESSION_MULTIPLIERS[session]
 
-        # After-hours / other
-        return SessionContext(
-            timestamp_ms=timestamp_ms,
-            session="after_hours",
-            session_mult=0.8,
-            is_us_prime=False,
-            is_us_open=False,
+    def is_prime_window(self, utc_now: datetime) -> bool:
+        """Return True if current time is in US_OPEN or US_CLOSE prime window.
+
+        Args:
+            utc_now: UTC-aware datetime.
+
+        Returns:
+            True if in a prime trading window.
+        """
+        return self.get_session(utc_now) in PRIME_SESSIONS
+
+    def get_next_prime_window(self, utc_now: datetime) -> datetime:
+        """Return the UTC datetime of the next US_OPEN session start.
+
+        Args:
+            utc_now: UTC-aware datetime.
+
+        Returns:
+            UTC datetime of next 09:30 ET opening (skips weekends).
+        """
+        from datetime import timedelta
+
+        candidate = utc_now.astimezone(NY_TZ).replace(
+            hour=9, minute=30, second=0, microsecond=0
         )
+        candidate_utc = candidate.astimezone(UTC_TZ)
+
+        if candidate_utc <= utc_now:
+            candidate_utc += timedelta(days=1)
+
+        # Skip weekends
+        while candidate_utc.weekday() >= 5:
+            candidate_utc += timedelta(days=1)
+
+        return candidate_utc

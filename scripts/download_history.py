@@ -75,7 +75,14 @@ def download_alpaca(
     print(f"    ✓ {len(ticks)} bars → {fname}")
 
 
-async def main(years: int, days: int, symbol: str, output_dir: str, alpaca_key: str, alpaca_secret: str) -> None:
+async def main(
+    years: int,
+    days: int,
+    symbol: str,
+    output_dir: str,
+    alpaca_key: str,
+    alpaca_secret: str,
+) -> None:
     """Entry point for the download script.
 
     Args:
@@ -156,7 +163,9 @@ def cli() -> None:
     alpaca_key = os.environ.get("ALPACA_API_KEY", "")
     alpaca_secret = os.environ.get("ALPACA_SECRET_KEY", "")
 
-    asyncio.run(main(args.years, args.days, args.symbol, args.output_dir, alpaca_key, alpaca_secret))
+    asyncio.run(
+        main(args.years, args.days, args.symbol, args.output_dir, alpaca_key, alpaca_secret)
+    )
 
 
 if __name__ == "__main__":

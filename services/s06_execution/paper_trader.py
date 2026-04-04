@@ -34,6 +34,29 @@ class PaperTrader:
     Latency is sampled uniformly from ``[5 ms, 50 ms]`` to mimic network delays.
     """
 
+    def compute_slippage(
+        self,
+        spread_bps: float,
+        kyle_lambda: float,
+        size: Decimal,
+        price: Decimal,
+    ) -> float:
+        """Compute expected slippage in basis points.
+
+        Formula: half_spread_bps + kyle_lambda * size
+
+        Args:
+            spread_bps:  Bid-ask spread in basis points.
+            kyle_lambda: Price-impact coefficient (higher = more illiquid).
+            size:        Order size in base currency units.
+            price:       Current market price (reserved for future scaling).
+
+        Returns:
+            Slippage in basis points (>= 0).
+        """
+        _ = price  # reserved for future price-impact scaling
+        return max(0.0, spread_bps / 2.0 + kyle_lambda * float(size))
+
     async def execute(
         self,
         approved: ApprovedOrder,

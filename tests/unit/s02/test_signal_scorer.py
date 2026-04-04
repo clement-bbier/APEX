@@ -18,7 +18,7 @@ class TestSignalScorer:
             make_component("microstructure", 0.8, triggered=True),
             make_component("bollinger", 0.7, triggered=False),
         ]
-        score, triggers = scorer.compute(components)
+        score, _ = scorer.compute(components)
         assert score == 0.0
 
     def test_strong_bullish_confluence(self) -> None:
@@ -38,7 +38,7 @@ class TestSignalScorer:
             make_component("microstructure", -0.9),
             make_component("bollinger", -0.8),
         ]
-        score, triggers = scorer.compute(components)
+        score, _ = scorer.compute(components)
         assert score < -0.2
 
     def test_conflicting_signals_reduce_strength(self) -> None:

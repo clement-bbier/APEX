@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
 from core.models.order import TradeRecord
+
+if TYPE_CHECKING:
+    from core.state import StateStore
 
 logger = structlog.get_logger(__name__)
 
@@ -15,7 +18,7 @@ logger = structlog.get_logger(__name__)
 class TradeAnalyzer:
     """Analyzes individual and batch trade records for attribution."""
 
-    def __init__(self, state: Any = None) -> None:
+    def __init__(self, state: StateStore | None = None) -> None:
         """Initialize analyzer with optional StateStore for Redis updates.
 
         Args:
@@ -50,11 +53,11 @@ class TradeAnalyzer:
             "r_multiple": r_multiple,
         }
 
-    def batch_analyze(self, trades: list[TradeRecord]) -> list[dict[str, Any]]:
+    def batch_analyze(self, trades: list[Any]) -> list[dict[str, Any]]:
         """Analyze a list of trade records.
 
         Args:
-            trades: List of TradeRecord instances.
+            trades: List of TradeRecord instances (or any object with TradeRecord fields).
 
         Returns:
             List of attribution dicts, one per trade.
@@ -96,7 +99,7 @@ class TradeAnalyzer:
                 "win_rate": round(win_rate, 4),
                 "avg_rr": round(avg_rr, 4),
                 "n_trades": len(recent),
-                "updated_at": datetime.now(timezone.utc).isoformat(),
+                "updated_at": datetime.now(UTC).isoformat(),
             },
         )
 

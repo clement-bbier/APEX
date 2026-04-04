@@ -12,7 +12,7 @@ Only publishes a Signal when |final_strength| > MIN_SIGNAL_STRENGTH (configurabl
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 
@@ -39,7 +39,7 @@ class SignalScorer:
         VWAP position                 : 0.05
     """
 
-    WEIGHTS: dict[str, float] = {
+    WEIGHTS: ClassVar[dict[str, float]] = {
         "microstructure": 0.35,
         "bollinger": 0.25,
         "ema_mtf": 0.20,

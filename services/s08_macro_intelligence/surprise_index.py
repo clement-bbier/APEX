@@ -14,7 +14,7 @@ Negative surprise → risk-off, reduce macro_mult
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 
@@ -113,7 +113,7 @@ class SurpriseIndexEngine:
             Fully populated EconRelease.
         """
         if released_at is None:
-            released_at = datetime.now(timezone.utc)
+            released_at = datetime.now(UTC)
         return EconRelease(
             name=name,
             released_at=released_at,

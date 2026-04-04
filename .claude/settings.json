@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip list:*)",
+      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pytest --version)",
+      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pip show pytest-asyncio fakeredis hypothesis pydantic)",
+      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pip show redis structlog)",
+      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pip install \"pytest>=8.3.0,<9.0.0\" \"pytest-asyncio>=0.24.0,<1.0.0\" \"fakeredis>=2.26.0\" \"redis[asyncio]>=5.2.0\" \"structlog>=24.4.0\" \"pytest-timeout>=2.3.0\" \"pytest-cov>=6.0.0\" --quiet)",
+      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pytest tests/unit/s07/test_regime_ml.py tests/unit/s05/test_position_rules.py tests/unit/s03/test_regime_engine_legacy.py -v --no-header --tb=short --override-ini=\"asyncio_mode=auto\")",
+      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pytest tests/unit/s05/test_position_rules.py -v --no-header --tb=short --override-ini=\"asyncio_mode=auto\" --no-cov)"
+    ]
+  }
+}
