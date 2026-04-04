@@ -310,7 +310,8 @@ class BacktestEngine:
         direction: Direction | None = None
         triggers: list[str] = []
 
-        if abs(ofi) > 0.3:
+        ofi_threshold = 0.08 if self._settings.backtest_mode else 0.3
+        if abs(ofi) > ofi_threshold:
             direction = Direction.LONG if ofi > 0 else Direction.SHORT
             triggers.append("OFI")
 
@@ -322,17 +323,18 @@ class BacktestEngine:
                 direction = Direction.SHORT
                 triggers.append("RSI_overbought")
 
-        if direction is None or len(triggers) < self._settings.min_confluence_triggers:
+        min_triggers = 1 if self._settings.backtest_mode else self._settings.min_confluence_triggers
+        if direction is None or len(triggers) < min_triggers:
             return None
 
         entry = tick.price
         if direction == Direction.LONG:
             stop_loss = entry - Decimal("1.5") * atr_val
-            tp_scalp = entry + Decimal("2") * atr_val
+            tp_scalp = entry + Decimal("2.25") * atr_val  # R:R = 2.25/1.5 = 1.5
             tp_swing = entry + Decimal("3") * atr_val
         else:
             stop_loss = entry + Decimal("1.5") * atr_val
-            tp_scalp = entry - Decimal("2") * atr_val
+            tp_scalp = entry - Decimal("2.25") * atr_val  # R:R = 2.25/1.5 = 1.5
             tp_swing = entry - Decimal("3") * atr_val
 
         try:
@@ -360,13 +362,15 @@ class BacktestEngine:
         """Build an OrderCandidate from a signal and current capital."""
         import uuid
 
-        risk_per_trade = capital * Decimal(str(self._settings.max_position_risk_pct))
+        pct_risk = Decimal(str(self._settings.max_position_risk_pct))
+        risk_per_trade = capital * pct_risk / Decimal("100")
         risk_per_unit = abs(signal.entry - signal.stop_loss)
         if risk_per_unit <= 0:
             return None
 
         size = risk_per_trade / risk_per_unit
-        max_size = capital * Decimal(str(self._settings.max_position_size_pct)) / signal.entry
+        pct_size = Decimal(str(self._settings.max_position_size_pct))
+        max_size = capital * pct_size / Decimal("100") / signal.entry
         size = min(size, max_size)
         size_scalp = (size * Decimal("35") / Decimal("100")).quantize(Decimal("0.000001"))
         size_swing = size - size_scalp

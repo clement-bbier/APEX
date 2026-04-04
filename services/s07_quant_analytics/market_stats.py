@@ -1,6 +1,7 @@
 """Market statistics and econometric tests for APEX Trading System."""
 
 from __future__ import annotations
+
 from typing import Any
 
 import numpy as np

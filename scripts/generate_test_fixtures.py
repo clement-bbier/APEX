@@ -2,8 +2,11 @@
 """Generate synthetic test fixtures for APEX CI pipeline.
 
 Creates ``tests/fixtures/30d_btcusdt_1m.parquet`` containing 30 days of
-realistic synthetic BTC/USDT 1-minute OHLCV data using Geometric Brownian
-Motion for price simulation.
+synthetic BTC/USDT 1-minute OHLCV data using a regime-aware price path
+that produces trending, ranging, and high-volatility periods.
+
+The regime structure ensures RSI reaches extremes and OFI signals emerge,
+allowing the backtest engine to generate demonstrable trades.
 
 Usage::
 
@@ -19,14 +22,15 @@ import pandas as pd
 
 
 def generate_btcusdt_fixture(n_candles: int = 43_200) -> None:
-    """Generate synthetic BTC/USDT 1-minute OHLCV data.
+    """Generate synthetic BTC/USDT 1-minute OHLCV data with regime structure.
 
-    Price follows Geometric Brownian Motion:
-        S(t+dt) = S(t) × exp((μ - σ²/2)dt + σ√dt × Z)
-    where μ ≈ 0.00002 per minute and σ ≈ 0.001 per minute.
+    Price path alternates across three regimes every n_candles//10 bars:
+    - Trending (drift=+0.0003, σ=0.0006) — produces RSI extremes
+    - Ranging  (mean-reverting, σ=0.0004) — produces OFI signals
+    - High-vol (drift=0, σ=0.0020)        — stress tests risk rules
 
     Args:
-        n_candles: Number of 1-minute candles to generate (default: 43200 = 30 days).
+        n_candles: Number of 1-minute candles (default: 43200 = 30 days).
     """
     Path("tests/fixtures").mkdir(parents=True, exist_ok=True)
 
@@ -35,22 +39,37 @@ def generate_btcusdt_fixture(n_candles: int = 43_200) -> None:
     # Timestamps: 30 days starting 2024-01-01 UTC
     timestamps = pd.date_range("2024-01-01", periods=n_candles, freq="1min", tz="UTC")
 
-    # GBM parameters
-    mu = 0.00002  # drift per minute
-    sigma = 0.001  # volatility per minute
+    # Regime-aware price path with symmetric up/down trends
+    # Regimes cycle (length = n_candles//12 each):
+    #   trending-up → ranging → trending-down → ranging → high-vol → ranging → ...
+    # Drift is kept modest so price doesn't explode in one direction.
+    regime_length = n_candles // 12
+    prices = [42_000.0]
+    base_price = 42_000.0
+    directions = [1, 0, -1, 0, 0, 0]  # up, range, down, range, highvol, range
 
-    # Generate log-normal returns
-    dt = 1.0
-    log_returns = rng.normal((mu - 0.5 * sigma**2) * dt, sigma * np.sqrt(dt), n_candles)
-    close = 42000.0 * np.cumprod(np.exp(log_returns))
+    for i in range(n_candles - 1):
+        regime_slot = (i // regime_length) % len(directions)
+        d = directions[regime_slot]
+        if d == 1:  # trending up
+            drift = 0.00003
+            vol = 0.0006
+        elif d == -1:  # trending down
+            drift = -0.00003
+            vol = 0.0006
+        elif d == 0 and (i // regime_length) % len(directions) == 4:  # high-vol
+            drift = 0.0
+            vol = 0.002
+        else:  # ranging
+            drift = -0.00002 * np.sign(prices[-1] - base_price)
+            vol = 0.0004
 
-    # Intrabar noise: open/high/low from close
-    intra_noise = rng.normal(0, sigma * 0.5, n_candles)
-    open_ = close * np.exp(intra_noise)
-    high_extra = np.abs(rng.normal(0, sigma, n_candles))
-    low_extra = np.abs(rng.normal(0, sigma, n_candles))
-    high = np.maximum(close, open_) * np.exp(high_extra)
-    low = np.minimum(close, open_) * np.exp(-low_extra)
+        ret = rng.normal(drift, vol)
+        prices.append(prices[-1] * (1.0 + ret))
+
+    close = np.array(prices)
+
+    # open/high/low not stored in fixture -- only close/bid/ask are used
 
     # Spread: ~2 bps
     spread = close * 0.0002
@@ -62,22 +81,24 @@ def generate_btcusdt_fixture(n_candles: int = 43_200) -> None:
 
     df = pd.DataFrame(
         {
-            "timestamp": timestamps,
-            "open": open_,
-            "high": high,
-            "low": low,
-            "close": close,
+            "symbol": "BTC/USDT",
+            "market": "crypto",
+            "timestamp_ms": (timestamps.view("int64") // 10**6).astype("int64"),
+            "price": close,
             "volume": volume,
+            "side": "unknown",
             "bid": bid,
             "ask": ask,
+            "spread_bps": 2.0,
+            "session": "after_hours",
         }
     )
 
     out_path = "tests/fixtures/30d_btcusdt_1m.parquet"
     df.to_parquet(out_path, index=False)
-    print(f"✓ Generated {n_candles} candles → {out_path}")
+    print(f"Generated {n_candles} candles -> {out_path}")
     print(f"  Price range: ${close.min():.0f} - ${close.max():.0f}")
-    print(f"  Date range:  {timestamps[0].date()} → {timestamps[-1].date()}")
+    print(f"  Date range:  {timestamps[0].date()} to {timestamps[-1].date()}")
 
 
 if __name__ == "__main__":

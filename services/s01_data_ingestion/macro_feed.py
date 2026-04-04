@@ -11,9 +11,9 @@ polling interval (default 60 seconds).
 """
 
 from __future__ import annotations
-from typing import Any
 
 import asyncio
+from typing import Any
 
 import aiohttp
 

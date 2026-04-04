@@ -5,10 +5,10 @@ Auto-reconnects on failure with exponential back-off.
 """
 
 from __future__ import annotations
-from typing import Any
 
 import asyncio
 from collections.abc import Callable
+from typing import Any
 
 from alpaca.data.live import StockDataStream
 

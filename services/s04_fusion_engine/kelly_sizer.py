@@ -6,9 +6,9 @@ position size adjusted for regime, session, market-impact, and asset class.
 """
 
 from __future__ import annotations
-from typing import Any
 
 from decimal import Decimal
+from typing import Any
 
 from core.config import get_settings
 from core.state import StateStore

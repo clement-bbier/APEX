@@ -127,7 +127,6 @@ fn apex_risk(m: &Bound<'_, PyModule>) -> PyResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ndarray::array;
 
     #[test]
     fn max_drawdown_simple() {

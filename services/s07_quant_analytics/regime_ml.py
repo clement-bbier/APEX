@@ -1,6 +1,7 @@
 """Regime detection via ML methods (Phase 2 stubs) for APEX Trading System."""
 
 from __future__ import annotations
+
 from typing import Any
 
 

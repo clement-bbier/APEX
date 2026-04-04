@@ -5,13 +5,14 @@ a caller-supplied callback, and auto-reconnects on failure with exponential back
 """
 
 from __future__ import annotations
-from typing import Any
 
 import asyncio
 import json
 from collections.abc import Callable
+from typing import Any
 
-from websockets.asyncio.client import ClientConnection, connect as ws_connect
+from websockets.asyncio.client import ClientConnection
+from websockets.asyncio.client import connect as ws_connect
 from websockets.exceptions import ConnectionClosed
 
 from core.config import get_settings

@@ -6,9 +6,9 @@ or simultaneous-position limits.
 """
 
 from __future__ import annotations
-from typing import Any
 
 from decimal import Decimal
+from typing import Any
 
 import structlog
 

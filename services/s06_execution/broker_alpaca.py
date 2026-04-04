@@ -5,10 +5,10 @@ Wraps :class:`alpaca.trading.client.TradingClient` for equity order management.
 """
 
 from __future__ import annotations
-from typing import Any
-from uuid import UUID
 
 from decimal import Decimal
+from typing import Any
+from uuid import UUID
 
 from alpaca.trading.client import TradingClient
 from alpaca.trading.enums import OrderSide, TimeInForce
@@ -200,8 +200,7 @@ class AlpacaBroker:
         client = self._ensure_client()
         raw_list = client.get_all_positions()
         positions: list[Position] = [
-            p if isinstance(p, Position) else Position.model_validate(p)
-            for p in raw_list
+            p if isinstance(p, Position) else Position.model_validate(p) for p in raw_list
         ]
         return {
             p.symbol: {
