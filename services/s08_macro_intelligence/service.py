@@ -20,7 +20,7 @@ class MacroIntelligenceService(BaseService):
     def __init__(self) -> None:
         """Initialise macro sub-modules."""
         super().__init__("s08_macro_intelligence")
-        self._cb_watcher = CBWatcher()
+        self._cb_watcher = CBWatcher(state=self.state, bus=self.bus)
         self._geo = GeopoliticalAnalyzer()
         self._sector_rotation = SectorRotation()
 
