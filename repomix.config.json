@@ -1,0 +1,18 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "parsable": true
+  },
+  "include": ["**/*"],
+  "ignore": {
+    "customPatterns": [
+      "**/__pycache__/**",
+      "**/*.pyc",
+      ".venv/**",
+      "node_modules/**",
+      "rust/target/**",
+      "*.parquet"
+    ]
+  }
+}
