@@ -1,5 +1,6 @@
 # APEX Trading System — Phase 3: Integration, Hardening & Paper Trading Readiness
-# Complete Development Prompt for Claude Code
+
+## Complete Development Prompt for Claude Code
 
 Read CLAUDE.md and MANIFEST.md and DEVELOPMENT_PLAN.md first.
 They are the source of truth for every decision here.
@@ -1440,6 +1441,7 @@ git push origin main
 ## DEFINITION OF DONE (from DEVELOPMENT_PLAN.md)
 
 Phase 3 is DONE when ALL of:
+
 - [ ] All specified files exist and are implemented
 - [ ] mypy --strict passes with zero errors
 - [ ] ruff check passes with zero warnings
