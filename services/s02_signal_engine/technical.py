@@ -342,6 +342,55 @@ class TechnicalAnalyzer:
             atr_val = (atr_val * (period - 1) + tr) / period
         return Decimal(str(round(atr_val, 8)))
 
+    def compute_bollinger_score(
+        self,
+        price: float,
+        upper: float,
+        lower: float,
+        middle: float,
+        bandwidth_pct: float,
+    ) -> float:
+        """Bollinger score for confluence.
+
+        +1.0 = price at/below lower band (oversold → long signal)
+        -1.0 = price at/above upper band (overbought → short signal)
+         0.0 = price within bands (neutral)
+
+        Squeeze bonus: if bandwidth < 20th percentile, multiply score by 1.3
+        (squeeze → imminent breakout, higher conviction)
+
+        Args:
+            price: Current price.
+            upper: Upper Bollinger Band.
+            lower: Lower Bollinger Band.
+            middle: Middle band (SMA).
+            bandwidth_pct: Current bandwidth as % of historical (0–100).
+
+        Returns:
+            Score in [-1.0, +1.0].
+        """
+        band_range = upper - lower
+        if band_range == 0:
+            return 0.0
+
+        # Position within bands: 0 = lower, 0.5 = middle, 1.0 = upper
+        position = (price - lower) / band_range
+
+        if position <= 0.0:  # at or below lower band
+            base_score = 1.0
+        elif position >= 1.0:  # at or above upper band
+            base_score = -1.0
+        elif position < 0.2:  # near lower band
+            base_score = 0.5
+        elif position > 0.8:  # near upper band
+            base_score = -0.5
+        else:
+            return 0.0  # inside bands, no signal
+
+        # Squeeze amplifier
+        squeeze_mult = 1.3 if bandwidth_pct < 20.0 else 1.0
+        return max(-1.0, min(1.0, base_score * squeeze_mult))
+
     def volume_profile(self, bins: int = 50) -> dict[str, Decimal | None]:
         """Compute volume-profile metrics: POC, VAH, VAL.
 

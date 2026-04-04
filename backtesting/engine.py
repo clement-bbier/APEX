@@ -15,7 +15,9 @@ Design principles:
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from typing import Any
 
 from core.config import get_settings
 from core.logger import get_logger
@@ -43,6 +45,43 @@ from services.s05_risk_manager.position_rules import PositionRules
 from services.s06_execution.paper_trader import PaperTrader
 
 logger = get_logger("backtesting.engine")
+
+
+def load_macro_events_calendar() -> list[dict[str, Any]]:
+    """Return historical CB events for backtesting.
+
+    These are the actual 2024 dates when FOMC decisions were made.
+    Used to validate that S08 correctly blocks trades 45min before announcements.
+
+    Returns:
+        List of event dicts with 'type', 'timestamp', and optional 'outcome'/'surprise'.
+    """
+    return [
+        # 2024 FOMC decisions (actual market-moving events)
+        {"type": "FOMC", "timestamp": "2024-01-31T19:00:00Z", "outcome": "hold", "surprise": 0.0},
+        {"type": "FOMC", "timestamp": "2024-03-20T18:00:00Z", "outcome": "hold", "surprise": 0.0},
+        {
+            "type": "FOMC",
+            "timestamp": "2024-09-18T18:00:00Z",
+            "outcome": "cut_25bp",
+            "surprise": 0.0,
+        },
+        # NFP releases
+        {
+            "type": "NFP",
+            "timestamp": "2024-01-05T13:30:00Z",
+            "consensus": 173000,
+            "actual": 216000,
+            "surprise": 0.25,
+        },
+        {
+            "type": "NFP",
+            "timestamp": "2024-02-02T13:30:00Z",
+            "consensus": 185000,
+            "actual": 353000,
+            "surprise": 0.91,
+        },
+    ]
 
 
 @dataclass
@@ -91,7 +130,11 @@ class BacktestEngine:
         initial_capital: Starting portfolio equity in USD.
     """
 
-    def __init__(self, initial_capital: Decimal = Decimal("100000")) -> None:
+    def __init__(
+        self,
+        initial_capital: Decimal = Decimal("100000"),
+        macro_events: list[dict[str, Any]] | None = None,
+    ) -> None:
         self._capital = initial_capital
         self._settings = get_settings()
         self._session_tagger = SessionTagger()
@@ -101,6 +144,10 @@ class BacktestEngine:
         # Per-symbol analyzers
         self._micro: dict[str, MicrostructureAnalyzer] = {}
         self._tech: dict[str, TechnicalAnalyzer] = {}
+        # Macro event calendar for backtest block simulation
+        self.macro_events: list[dict[str, Any]] = (
+            macro_events if macro_events is not None else load_macro_events_calendar()
+        )
 
     # ── Public API ─────────────────────────────────────────────────────────────
 
@@ -130,6 +177,26 @@ class BacktestEngine:
 
         logger.info("Backtest complete", trade_count=len(state.trades))
         return state.trades
+
+    def is_blocked_by_macro(self, timestamp: datetime) -> tuple[bool, str]:
+        """Check if timestamp falls in a CB event block window.
+
+        Mirrors the S08 CBWatcher logic for historical backtesting.
+
+        Args:
+            timestamp: UTC-aware datetime to check.
+
+        Returns:
+            (blocked, reason) tuple.
+        """
+        for event in self.macro_events:
+            event_time = datetime.fromisoformat(
+                event["timestamp"].replace("Z", "+00:00")
+            )
+            block_start = event_time - timedelta(minutes=45)
+            if block_start <= timestamp <= event_time:
+                return True, f"{event['type']} block window"
+        return False, ""
 
     # ── Internal ──────────────────────────────────────────────────────────────
 

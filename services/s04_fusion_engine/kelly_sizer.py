@@ -10,8 +10,12 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
+import structlog
+
 from core.config import get_settings
 from core.state import StateStore
+
+_logger = structlog.get_logger(__name__)
 
 
 class KellySizer:
@@ -23,6 +27,46 @@ class KellySizer:
     """
 
     # ── Statistics ────────────────────────────────────────────────────────────
+
+    async def get_rolling_stats_from_redis(
+        self,
+        state: StateStore,
+        strategy_key: str = "default",
+    ) -> tuple[float, float]:
+        """Fetch rolling win_rate and avg_rr from Redis.
+
+        Written by S09 FeedbackLoop after every closed trade.
+
+        Redis key: feedback:kelly_stats:{strategy_key}
+        Expected: {"win_rate": 0.54, "avg_rr": 1.6, "n_trades": 47}
+
+        Returns (win_rate, avg_rr) — defaults to conservative (0.50, 1.5) if no data.
+
+        Args:
+            state: Connected StateStore instance.
+            strategy_key: Key suffix for multi-strategy isolation.
+
+        Returns:
+            (win_rate, avg_rr) with sanity-clamped values.
+        """
+        data: dict[str, Any] | None = await state.get(f"feedback:kelly_stats:{strategy_key}")
+
+        if not isinstance(data, dict) or data.get("n_trades", 0) < 20:
+            _logger.info(
+                "kelly_using_defaults",
+                reason="insufficient_trade_history",
+                n_trades=data.get("n_trades", 0) if isinstance(data, dict) else 0,
+            )
+            return 0.50, 1.50
+
+        win_rate = float(data["win_rate"])
+        avg_rr = float(data["avg_rr"])
+
+        # Sanity bounds — never trust extreme estimates
+        win_rate = max(0.40, min(0.70, win_rate))
+        avg_rr = max(1.0, min(4.0, avg_rr))
+
+        return win_rate, avg_rr
 
     async def get_stats(
         self,

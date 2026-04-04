@@ -92,6 +92,53 @@ class MTFAligner:
             return 0.70
         return 1.00
 
+    def compute_alignment_score(
+        self,
+        ema_fast_1m: float,
+        ema_slow_1m: float,
+        ema_fast_15m: float,
+        ema_slow_15m: float,
+        price_above_vwap: bool,
+    ) -> float:
+        """Multi-timeframe EMA alignment score.
+
+        Score +1.0: 1m bullish cross AND 15m bullish AND price above VWAP
+        Score -1.0: 1m bearish cross AND 15m bearish AND price below VWAP
+        Score 0.5: partial alignment (only 2/3 agree)
+        Score 0.0: no alignment or conflicting
+
+        This implements the cascade logic from MANIFEST.md Section 4:
+        "use higher timeframes for direction, lower for precision entry"
+
+        Args:
+            ema_fast_1m: EMA(8) on 1min.
+            ema_slow_1m: EMA(21) on 1min.
+            ema_fast_15m: EMA(8) on 15min.
+            ema_slow_15m: EMA(21) on 15min.
+            price_above_vwap: True if current price > VWAP.
+
+        Returns:
+            Alignment score in [-1.0, +1.0].
+        """
+        dir_1m = 1 if ema_fast_1m > ema_slow_1m else -1
+        dir_15m = 1 if ema_fast_15m > ema_slow_15m else -1
+        dir_vwap = 1 if price_above_vwap else -1
+
+        votes = [dir_1m, dir_15m, dir_vwap]
+        positive = sum(1 for v in votes if v > 0)
+        negative = sum(1 for v in votes if v < 0)
+
+        if positive == 3:
+            return 1.0
+        elif negative == 3:
+            return -1.0
+        elif positive == 2:
+            return 0.5
+        elif negative == 2:
+            return -0.5
+        else:
+            return 0.0
+
     def build_context(self, target_direction: str, timestamp_ms: int) -> MTFContext:
         """Construct a full :class:`MTFContext` for the given signal direction.
 

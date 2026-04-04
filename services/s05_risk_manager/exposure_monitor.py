@@ -18,6 +18,29 @@ from core.state import StateStore
 
 logger = structlog.get_logger(__name__)
 
+# ── Sector classification ─────────────────────────────────────────────────────
+
+SECTOR_MAP: dict[str, str] = {
+    "AAPL": "tech",
+    "MSFT": "tech",
+    "NVDA": "tech",
+    "GOOGL": "tech",
+    "META": "tech",
+    "AMZN": "tech",
+    "TSLA": "tech",
+    "JPM": "finance",
+    "BAC": "finance",
+    "GS": "finance",
+    "XOM": "energy",
+    "CVX": "energy",
+    "BTCUSDT": "crypto",
+    "ETHUSDT": "crypto",
+    "SPY": "index",
+    "QQQ": "index",
+}
+
+MAX_SECTOR_EXPOSURE_PCT = 0.25  # max 25% of capital in one sector
+
 
 class ExposureMonitor:
     """Track and validate portfolio-level exposure limits.
@@ -130,4 +153,39 @@ class ExposureMonitor:
                 f"open positions {position_count} at max {settings.max_simultaneous_positions}",
             )
 
+        return True, ""
+
+    def check_sector_exposure(
+        self,
+        positions: dict[str, Any],
+        new_order_symbol: str,
+        new_order_size_usd: float,
+        total_capital: float,
+    ) -> tuple[bool, str]:
+        """Ensure adding this position doesn't exceed 25% sector concentration.
+
+        Args:
+            positions: Current open positions dict {symbol: {"market_value_usd": ...}}.
+            new_order_symbol: Symbol being considered for entry.
+            new_order_size_usd: Notional USD value of the new order.
+            total_capital: Total portfolio capital in USD.
+
+        Returns:
+            (allowed, reason) — reason is empty string when allowed.
+        """
+        new_sector = SECTOR_MAP.get(new_order_symbol, "other")
+        max_allowed = total_capital * MAX_SECTOR_EXPOSURE_PCT
+
+        current_exposure = sum(
+            pos.get("market_value_usd", 0)
+            for sym, pos in positions.items()
+            if SECTOR_MAP.get(sym, "other") == new_sector
+        )
+
+        if current_exposure + new_order_size_usd > max_allowed:
+            return False, (
+                f"Sector {new_sector} exposure would reach "
+                f"${current_exposure + new_order_size_usd:.0f} "
+                f"(limit: ${max_allowed:.0f})"
+            )
         return True, ""

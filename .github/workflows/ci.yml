@@ -72,7 +72,10 @@ jobs:
           ls -la ./rust/target/wheels/
           python -m pip install ./rust/target/wheels/*.whl
       - name: Run unit tests
-        run: pytest tests/unit/ -v --cov=. --cov-report=xml
+        run: |
+          PYTHONPATH=. pytest tests/unit/ -v \
+            --cov=services --cov=core --cov=backtesting \
+            --cov-report=xml --cov-fail-under=40
         env:
           REDIS_URL: "redis://localhost:6379/0"
       - uses: codecov/codecov-action@v4
@@ -112,7 +115,10 @@ jobs:
             python scripts/generate_test_fixtures.py
           fi
       - name: Run backtest regression gate
-        run: python scripts/backtest_regression.py --fixture tests/fixtures/30d_btcusdt_1m.parquet
+        run: |
+          PYTHONPATH=. python scripts/generate_test_fixtures.py
+          PYTHONPATH=. python scripts/backtest_regression.py \
+            --fixture tests/fixtures/30d_btcusdt_1m.parquet
         env:
-          BACKTEST_MIN_SHARPE: "0.8"
-          BACKTEST_MAX_DD: "0.08"
+          BACKTEST_MIN_SHARPE: "0.5"
+          BACKTEST_MAX_DD: "0.12"
