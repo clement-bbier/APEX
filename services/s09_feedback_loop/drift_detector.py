@@ -1,14 +1,84 @@
-"""Drift detection and regime change monitoring for APEX Trading System."""
+"""Drift Detector - Model performance degradation detection.
 
+Monitors rolling win rate over last 50 trades.
+Alerts if win rate drops > 10% from 3-month baseline.
+Triggers daily review cycle.
+
+This service does NOT automatically adjust parameters.
+It observes and reports - humans validate all changes.
+(per MANIFEST.md Section 9, Service 09)
+"""
 from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 
 from core.models.order import TradeRecord
 
 
+@dataclass
+class DriftAlert:
+    """Alert fired when win rate drifts significantly from its baseline."""
+
+    timestamp: datetime
+    current_win_rate: float
+    baseline_win_rate: float
+    drop_pct: float
+    n_trades_in_window: int
+    message: str
+
+
 class DriftDetector:
-    """Detects performance drift and volatility changes in trade outcomes."""
+    """Detects when system performance has drifted below its baseline.
+
+    Alert threshold: win rate drops > 10% relative to 3-month baseline.
+    Minimum sample: 50 trades required before any alert fires.
+    """
+
+    DRIFT_THRESHOLD = 0.10  # 10% relative drop triggers alert
+    MIN_TRADES = 50
+
+    def check_drift(
+        self,
+        recent_trades: list[Any],
+        baseline_win_rate: float,
+    ) -> DriftAlert | None:
+        """Check if recent performance has drifted from baseline.
+
+        Args:
+            recent_trades:    Last N trade objects with a pnl_net attribute.
+            baseline_win_rate: 3-month historical win rate [0.0, 1.0].
+
+        Returns:
+            :class:`DriftAlert` if drift detected, None if healthy.
+        """
+        if len(recent_trades) < self.MIN_TRADES:
+            return None  # insufficient data
+
+        wins = sum(1 for t in recent_trades if getattr(t, "pnl_net", 0) > 0)
+        current_wr = wins / len(recent_trades)
+
+        drop = baseline_win_rate - current_wr
+        drop_pct = drop / baseline_win_rate if baseline_win_rate > 0 else 0.0
+
+        if drop_pct >= self.DRIFT_THRESHOLD:
+            return DriftAlert(
+                timestamp=datetime.now(UTC),
+                current_win_rate=current_wr,
+                baseline_win_rate=baseline_win_rate,
+                drop_pct=drop_pct,
+                n_trades_in_window=len(recent_trades),
+                message=(
+                    f"WIN RATE DRIFT DETECTED: {current_wr:.1%} vs baseline "
+                    f"{baseline_win_rate:.1%} ({drop_pct:.1%} drop over "
+                    f"{len(recent_trades)} trades). "
+                    f"Review signal quality and current regime."
+                ),
+            )
+        return None
 
     def rolling_win_rate(self, trades: list[TradeRecord], window: int = 50) -> float:
         """Compute win rate over the most recent `window` trades.
@@ -37,7 +107,7 @@ class DriftDetector:
         Args:
             current_win_rate: Recent rolling win rate.
             baseline_win_rate: Historical baseline win rate.
-            threshold: Maximum acceptable drop in win rate.
+            threshold: Maximum acceptable absolute drop in win rate.
 
         Returns:
             True if current_win_rate has dropped more than threshold below baseline.
@@ -45,16 +115,16 @@ class DriftDetector:
         return (baseline_win_rate - current_win_rate) > threshold
 
     def pnl_garch_vol(self, pnl_series: list[float]) -> float:
-        """Estimate current volatility of PnL using GARCH(1,1).
+        """Estimate current PnL volatility using GARCH(1,1).
 
-        σ²_t = ω + α×ε²_(t-1) + β×σ²_(t-1)
-        Uses default params: ω=0.0001, α=0.1, β=0.85.
+        sigma^2_t = omega + alpha * eps^2_(t-1) + beta * sigma^2_(t-1)
+        Default params: omega=0.0001, alpha=0.1, beta=0.85.
 
         Args:
             pnl_series: List of PnL values over time.
 
         Returns:
-            Current conditional volatility (σ) estimate.
+            Current conditional volatility (sigma) estimate.
         """
         omega, alpha, beta = 0.0001, 0.1, 0.85
         if not pnl_series:

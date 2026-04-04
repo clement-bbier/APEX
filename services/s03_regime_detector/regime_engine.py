@@ -15,10 +15,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import ClassVar
 
 from core.models.regime import (
     RiskMode as CoreRiskMode,
+)
+from core.models.regime import (
     TrendRegime,
+)
+from core.models.regime import (
     VolRegime as CoreVolRegime,
 )
 
@@ -70,13 +75,13 @@ class RegimeEngine:
 
     # ── Phase-2 API ───────────────────────────────────────────────────────────
 
-    VIX_THRESHOLDS: dict[str, float] = {
+    VIX_THRESHOLDS: ClassVar[dict[str, float]] = {
         "crisis": 35.0,
         "high_vol": 25.0,
         "normal": 15.0,
     }
 
-    BASE_MULT: dict[VolRegime, float] = {
+    BASE_MULT: ClassVar[dict[VolRegime, float]] = {
         VolRegime.CRISIS: 0.0,
         VolRegime.HIGH_VOL: 0.3,
         VolRegime.NORMAL: 1.0,

@@ -1,7 +1,7 @@
 """Tests for Central Bank event watcher."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from unittest.mock import AsyncMock
 
 import pytest
@@ -41,7 +41,7 @@ class TestCBWatcher:
         first_event = datetime.fromisoformat(events[0]["scheduled_at"])
         after_event = first_event + timedelta(minutes=30)
 
-        monitoring, event = watcher.is_in_monitor_window(after_event)
+        monitoring, _ = watcher.is_in_monitor_window(after_event)
         assert monitoring is True
 
     def test_not_monitoring_before_event(self) -> None:
@@ -67,7 +67,6 @@ class TestCBWatcher:
         """Exactly at block_start → blocked; 1s before → not blocked."""
         watcher = self.make_watcher()
         events = watcher._events
-        first_event = datetime.fromisoformat(events[0]["scheduled_at"])
         block_start = datetime.fromisoformat(events[0]["block_start"])
 
         blocked_at_start, _ = watcher.is_in_block_window(block_start)

@@ -1,7 +1,7 @@
 """Session tracker tests - all sessions, DST transitions, weekends."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -14,7 +14,7 @@ from services.s03_regime_detector.session_tracker import (
 
 def utc(year: int, month: int, day: int, hour: int, minute: int = 0) -> datetime:
     """Build a UTC-aware datetime."""
-    return datetime(year, month, day, hour, minute, tzinfo=timezone.utc)
+    return datetime(year, month, day, hour, minute, tzinfo=UTC)
 
 
 class TestSessionClassification:

@@ -13,11 +13,15 @@ For live announcement detection, monitors:
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
-from typing import Any
+from datetime import UTC, datetime, timedelta
+from typing import TYPE_CHECKING, Any
 
 import aiohttp
 import structlog
+
+if TYPE_CHECKING:
+    from core.bus import MessageBus
+    from core.state import StateStore
 
 logger = structlog.get_logger(__name__)
 
@@ -56,7 +60,7 @@ class CBWatcher:
       macro:cb:monitor_active  → True if within 60min post-event window
     """
 
-    def __init__(self, state: Any, bus: Any) -> None:
+    def __init__(self, state: StateStore, bus: MessageBus) -> None:
         self._state = state
         self._bus = bus
         self._events = self._load_hardcoded_events()
@@ -65,7 +69,7 @@ class CBWatcher:
         events: list[dict[str, Any]] = []
         for e in FOMC_DATES_2024_2025:
             dt = datetime.fromisoformat(e["date"]).replace(
-                hour=14, minute=0, tzinfo=timezone.utc  # FOMC typically 2pm ET = 19:00 UTC
+                hour=14, minute=0, tzinfo=UTC  # FOMC typically 2pm ET = 19:00 UTC
             )
             events.append(
                 {
@@ -84,7 +88,7 @@ class CBWatcher:
 
     async def get_next_event(self) -> dict[str, Any] | None:
         """Return the next upcoming CB event from now."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         future = [
             e
             for e in self._events
@@ -99,7 +103,7 @@ class CBWatcher:
     ) -> tuple[bool, dict[str, Any] | None]:
         """Return (True, event) if we're within the 45min pre-event block window."""
         if now is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
         for event in self._events:
             block_start = datetime.fromisoformat(event["block_start"])
             event_time = datetime.fromisoformat(event["scheduled_at"])
@@ -112,7 +116,7 @@ class CBWatcher:
     ) -> tuple[bool, dict[str, Any] | None]:
         """Return (True, event) if we're within the 60min post-event scalp window."""
         if now is None:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
         for event in self._events:
             event_time = datetime.fromisoformat(event["scheduled_at"])
             monitor_end = datetime.fromisoformat(event["monitor_end"])
@@ -126,7 +130,7 @@ class CBWatcher:
         Returns:
             List of dicts with keys "title", "link", and "published".
         """
-        import xml.etree.ElementTree as ET  # noqa: S405
+        import xml.etree.ElementTree as ET
 
         async with aiohttp.ClientSession() as session:
             async with session.get(
@@ -176,8 +180,8 @@ class CBWatcher:
             items = await self.fetch_fed_rss()
             if items:
                 return items[0].get("title")
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("fed_rss_unavailable", error=str(exc))
         return None
 
     async def detect_surprise(self, statement: str) -> str | None:
@@ -209,7 +213,7 @@ class CBWatcher:
     async def run_loop(self) -> None:
         """Main loop — checks every 60s and updates Redis."""
         while True:
-            now = datetime.now(timezone.utc)
+            now = datetime.now(UTC)
             blocked, event = self.is_in_block_window(now)
             monitoring, post_event = self.is_in_monitor_window(now)
             next_event = await self.get_next_event()

@@ -7,7 +7,6 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from core.models.order import TradeRecord
-from core.models.signal import Direction
 from services.s09_feedback_loop.trade_analyzer import TradeAnalyzer
 
 

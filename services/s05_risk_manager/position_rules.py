@@ -6,10 +6,19 @@ portfolio-level thresholds defined in application settings.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal
 
 from core.config import Settings
 from core.models.order import OrderCandidate
+
+
+@dataclass
+class RuleResult:
+    """Result of a single position risk rule check."""
+
+    passed: bool
+    reason: str = ""
 
 
 class PositionRules:
@@ -77,3 +86,37 @@ class PositionRules:
             )
 
         return True, ""
+
+
+def check_max_risk_per_trade(order: object, capital: Decimal) -> RuleResult:
+    """Check that a single trade does not risk more than 0.5% of capital.
+
+    Used by integration tests and S05 pre-approval checks.
+
+    Args:
+        order: Object with entry_price, stop_loss, and size_total attributes.
+        capital: Total portfolio capital.
+
+    Returns:
+        RuleResult with passed=True if risk is within budget.
+    """
+    max_risk = capital * Decimal("0.005")
+    entry = Decimal(str(getattr(order, "entry_price", 0)))
+    stop = Decimal(str(getattr(order, "stop_loss", 0)))
+    size = Decimal(str(getattr(order, "size_total", 0)))
+
+    if entry <= 0 or stop <= 0 or size <= 0:
+        return RuleResult(passed=False, reason="invalid order fields (zero or negative)")
+
+    risk_per_unit = abs(entry - stop)
+    total_risk = risk_per_unit * size
+
+    if total_risk > max_risk:
+        return RuleResult(
+            passed=False,
+            reason=(
+                f"total_risk {total_risk:.4f} exceeds max {max_risk:.4f} "
+                f"(0.5% of capital {capital})"
+            ),
+        )
+    return RuleResult(passed=True)

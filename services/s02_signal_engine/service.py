@@ -205,7 +205,9 @@ class SignalEngineService(BaseService):
 
         # RSI divergence score
         rsi_div = tech.rsi_divergence(timeframe="5m")
-        rsi_divergence_score = 1.0 if rsi_div == "bullish" else (-1.0 if rsi_div == "bearish" else 0.0)
+        rsi_divergence_score = (
+            1.0 if rsi_div == "bullish" else (-1.0 if rsi_div == "bearish" else 0.0)
+        )
 
         # VWAP score: (price - vwap) / vwap, normalised to [-1, +1]
         if vwap_val is not None and vwap_val > Decimal("0"):
@@ -282,7 +284,9 @@ class SignalEngineService(BaseService):
 
         # ── Signal strength and confidence ───────────────────────────────────
         strength = final_strength  # already signed and in [-1.0, +1.0]
-        confidence = min(1.0, abs(final_strength) + len(triggers) / _MAX_TRIGGERS_FOR_CONFIDENCE * 0.3)
+        confidence = min(
+            1.0, abs(final_strength) + len(triggers) / _MAX_TRIGGERS_FOR_CONFIDENCE * 0.3
+        )
 
         # ── MTF context ───────────────────────────────────────────────────────
         self._mtf.update("5m", direction.value, abs(final_strength))

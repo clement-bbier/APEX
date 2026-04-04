@@ -7,7 +7,7 @@ regime, writes the result back to Redis, and publishes it on ZMQ.
 from __future__ import annotations
 
 import asyncio
-import time
+from datetime import UTC, datetime
 from typing import Any
 
 from core.base_service import BaseService
@@ -21,7 +21,11 @@ from core.models.regime import (
 )
 from services.s03_regime_detector.cb_calendar import CBCalendar
 from services.s03_regime_detector.regime_engine import RegimeEngine
-from services.s03_regime_detector.session_tracker import SessionTracker
+from services.s03_regime_detector.session_tracker import (
+    PRIME_SESSIONS,
+    Session,
+    SessionTracker,
+)
 
 _POLL_INTERVAL_S: int = 30
 _REGIME_KEY = "regime:current"
@@ -83,7 +87,8 @@ class RegimeDetectorService(BaseService):
 
     async def _tick(self) -> None:
         """Execute one regime-detection cycle."""
-        now_ms = int(time.time() * 1000)
+        now = datetime.now(UTC)
+        now_ms = int(now.timestamp() * 1000)
 
         # ── Read macro inputs ─────────────────────────────────────────────────
         vix_raw = await self.state.get("macro:vix")
@@ -94,8 +99,20 @@ class RegimeDetectorService(BaseService):
         dxy: float | None = float(dxy_raw) if dxy_raw is not None else None
         yield_spread: float | None = float(spread_raw) if spread_raw is not None else None
 
-        # ── Session context ────────────────────────────────────────────────────
-        session_ctx: SessionContext = self._session.get_session(now_ms)
+        # ── Session context (DST-aware) ────────────────────────────────────────
+        session: Session = self._session.get_session(now)
+        session_mult = self._session.get_multiplier(session)
+        us_sessions = {
+            Session.US_OPEN, Session.US_MORNING, Session.US_LUNCH,
+            Session.US_AFTERNOON, Session.US_CLOSE,
+        }
+        session_ctx = SessionContext(
+            timestamp_ms=now_ms,
+            session=session.value,
+            session_mult=session_mult,
+            is_us_prime=session in PRIME_SESSIONS,
+            is_us_open=session in us_sessions,
+        )
 
         # ── CB calendar ────────────────────────────────────────────────────────
         event_active = self._calendar.active_block()

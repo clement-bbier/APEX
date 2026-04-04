@@ -21,6 +21,7 @@ import sys
 
 # Ensure the root directory is in sys.path so we can import from backtesting/ and core/
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 
 # Force backtest mode logic for relaxed thresholds
@@ -79,21 +80,21 @@ async def run(fixture_path: str) -> int:
     print(f"  Trades   : {trade_count}")
     print(f"  Win rate : {report.get('win_rate', 0.0):.2%}")
     print(f"  PF       : {report.get('profit_factor', 0.0):.2f}")
-    
+
     # Financial metrics
     total_pnl = report.get("total_pnl", 0.0)
     final_eq = report.get("final_equity", 100_000.0)
     ret_pct = (final_eq / 100_000.0 - 1) * 100
     avg_w = report.get("avg_win", 0.0)
     avg_l = report.get("avg_loss", 0.0)
-    
+
     print(f"  Net PnL  : ${total_pnl:,.2f} ({ret_pct:+.2f}%)")
     print(f"  Final Eq : ${final_eq:,.2f}")
     print(f"  Avg W/L  : +${avg_w:,.2f} / -${avg_l:,.2f}")
-    
+
     from core.config import get_settings
     print(f"  DEBUG Backtest Mode: {get_settings().backtest_mode}")
-    
+
     # Risk metrics
     print(f"\n  Sharpe   : {sharpe:.4f}  (min: {min_sharpe})")
     print(f"  Max DD   : {drawdown:.4f}  (max: {max_dd})")
@@ -117,7 +118,7 @@ def main() -> None:
     # Force backtest mode logic for relaxed thresholds
     import os
     os.environ["BACKTEST_MODE"] = "True"
-    
+
     parser = argparse.ArgumentParser(description="APEX backtest regression gate")
     parser.add_argument(
         "--fixture",

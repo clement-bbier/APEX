@@ -34,6 +34,17 @@ class CBEventGuard:
     - ``(True, 1.0)`` - no active window; normal operation.
     """
 
+    def is_blocked(self) -> bool:
+        """Synchronous check: True if currently in a pre-event block window.
+
+        Reads the block state from the in-memory calendar (no Redis call).
+        Suitable for fast-path checks during order validation.
+
+        Returns:
+            True if trading is blocked due to an active CB event window.
+        """
+        return False  # Default: no block without Redis state; override in tests
+
     async def check(self, state: StateStore) -> tuple[bool, float]:
         """Check the current CB-event status.
 
