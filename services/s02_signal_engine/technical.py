@@ -6,10 +6,10 @@ profile indicators.
 """
 
 from __future__ import annotations
-from typing import Any
 
 from collections import deque
 from decimal import Decimal
+from typing import Any
 
 import numpy as np
 
@@ -45,7 +45,9 @@ class TechnicalAnalyzer:
 
         # Completed bars per timeframe.  Each bar is a dict[str, Any]:
         # {open, high, low, close, volume, timestamp_ms}
-        self._bars: dict[str, deque[dict[str, Any]]] = {tf: deque(maxlen=_MAX_BARS) for tf in _TIMEFRAME_MS}
+        self._bars: dict[str, deque[dict[str, Any]]] = {
+            tf: deque(maxlen=_MAX_BARS) for tf in _TIMEFRAME_MS
+        }
         # In-progress (current) bar per timeframe.
         self._current: dict[str, dict[str, Any] | None] = dict[str, Any].fromkeys(_TIMEFRAME_MS)
 

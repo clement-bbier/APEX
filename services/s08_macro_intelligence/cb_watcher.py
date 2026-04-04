@@ -1,9 +1,9 @@
 """Federal Reserve statement watcher for APEX Trading System."""
 
 from __future__ import annotations
-from typing import Any
 
 import xml.etree.ElementTree as ET
+from typing import Any
 
 import aiohttp
 

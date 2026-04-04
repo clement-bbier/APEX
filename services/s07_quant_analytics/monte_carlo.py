@@ -45,7 +45,9 @@ STRESS_SCENARIOS: dict[str, dict[str, Any]] = {
 }
 
 
-def _run_chunk(args: tuple[np.ndarray[Any, np.dtype[Any]], int, int]) -> np.ndarray[Any, np.dtype[Any]]:
+def _run_chunk(
+    args: tuple[np.ndarray[Any, np.dtype[Any]], int, int],
+) -> np.ndarray[Any, np.dtype[Any]]:
     """Worker function for ProcessPoolExecutor.
 
     Args:
@@ -80,7 +82,9 @@ class MonteCarloEngine:
         self.n_simulations = n_simulations
         self._n_workers: int = os.cpu_count() or 4
 
-    def simulate_pnl_distribution(self, historical_returns: np.ndarray[Any, np.dtype[Any]]) -> dict[str, float]:
+    def simulate_pnl_distribution(
+        self, historical_returns: np.ndarray[Any, np.dtype[Any]]
+    ) -> dict[str, float]:
         """Bootstrap-simulate P&L distribution and compute risk metrics.
 
         Args:
@@ -164,7 +168,9 @@ class MonteCarloEngine:
 
         return best_f / 4.0  # quarter-Kelly
 
-    def stress_test_positions(self, positions: dict[str, float], capital: float) -> list[dict[str, Any]]:
+    def stress_test_positions(
+        self, positions: dict[str, float], capital: float
+    ) -> list[dict[str, Any]]:
         """Apply stress scenarios to current positions and estimate losses.
 
         Args:
@@ -191,7 +197,9 @@ class MonteCarloEngine:
 
     # ── Internal ──────────────────────────────────────────────────────────────
 
-    def _run_simulations(self, returns: np.ndarray[Any, np.dtype[Any]]) -> np.ndarray[Any, np.dtype[Any]]:
+    def _run_simulations(
+        self, returns: np.ndarray[Any, np.dtype[Any]]
+    ) -> np.ndarray[Any, np.dtype[Any]]:
         """Run MC simulations in parallel, using Rust or NumPy fallback.
 
         Args:

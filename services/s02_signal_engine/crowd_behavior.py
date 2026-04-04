@@ -6,10 +6,10 @@ positioning extremes.
 """
 
 from __future__ import annotations
-from typing import Any
 
 from collections import deque
 from decimal import Decimal
+from typing import Any
 
 import numpy as np
 

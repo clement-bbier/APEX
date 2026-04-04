@@ -187,6 +187,10 @@ class Settings(BaseSettings):
     min_confluence_triggers: int = Field(
         default=2, ge=1, description="Minimum triggers for a valid signal"
     )
+    backtest_mode: bool = Field(
+        default=False,
+        description="Relaxed signal thresholds for backtesting synthetic data",
+    )
 
     # ── Alerts ────────────────────────────────────────────────────────────────
     alert_email: str | None = Field(default=None, description="Email address for alerts")

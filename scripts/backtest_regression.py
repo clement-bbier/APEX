@@ -33,7 +33,7 @@ async def run(fixture_path: str) -> int:
     min_sharpe = float(os.environ.get("BACKTEST_MIN_SHARPE", "0.8"))
     max_dd = float(os.environ.get("BACKTEST_MAX_DD", "0.08"))
 
-    print("\n── Backtest Regression Gate ──")
+    print("\n-- Backtest Regression Gate --")
     print(f"  fixture  : {fixture_path}")
     print(f"  min_sharpe: {min_sharpe}")
     print(f"  max_dd    : {max_dd}\n")
@@ -77,14 +77,14 @@ async def run(fixture_path: str) -> int:
 
     passed = True
     if sharpe < min_sharpe:
-        print(f"\n✗ FAIL Sharpe {sharpe:.4f} < {min_sharpe}", file=sys.stderr)
+        print(f"\nFAIL Sharpe {sharpe:.4f} < {min_sharpe}", file=sys.stderr)
         passed = False
     if drawdown > max_dd:
-        print(f"\n✗ FAIL Max DD {drawdown:.4f} > {max_dd}", file=sys.stderr)
+        print(f"\nFAIL Max DD {drawdown:.4f} > {max_dd}", file=sys.stderr)
         passed = False
 
     if passed:
-        print("\n✓ PASS All regression gates passed")
+        print("\nPASS All regression gates passed")
         return 0
     return 1
 

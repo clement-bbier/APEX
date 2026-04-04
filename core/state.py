@@ -9,7 +9,8 @@ from __future__ import annotations
 import importlib
 import json
 import types
-from typing import Any, Awaitable, cast
+from collections.abc import Awaitable
+from typing import Any, cast
 
 aioredis: types.ModuleType | None
 try:
@@ -17,8 +18,8 @@ try:
 except ModuleNotFoundError:
     aioredis = None
 
-from core.config import get_settings
-from core.logger import get_logger
+from core.config import get_settings  # noqa: E402
+from core.logger import get_logger  # noqa: E402
 
 logger = get_logger("core.state")
 
@@ -70,7 +71,7 @@ class StateStore:
             self._redis = None
             logger.info("Redis disconnected", service=self._service_id)
 
-    def _ensure_connected(self) -> Any:
+    def _ensure_connected(self) -> Any:  # noqa: ANN401
         """Return the Redis client or raise if not connected.
 
         Returns:

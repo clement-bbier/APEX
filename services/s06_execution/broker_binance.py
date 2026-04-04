@@ -5,12 +5,12 @@ Request signing uses HMAC-SHA256 as required by the Binance API.
 """
 
 from __future__ import annotations
-from typing import Any
 
 import hashlib
 import hmac
 import time
 import urllib.parse
+from typing import Any
 
 import aiohttp
 

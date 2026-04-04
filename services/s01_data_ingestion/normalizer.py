@@ -7,10 +7,10 @@ All normalizers produce :class:`~core.models.tick.NormalizedTick` instances.
 """
 
 from __future__ import annotations
-from typing import Any
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from typing import Any
 
 from core.logger import get_logger
 from core.models.tick import Market, NormalizedTick, RawTick, Session, TradeSide
