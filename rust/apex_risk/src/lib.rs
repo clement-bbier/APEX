@@ -126,8 +126,6 @@ fn apex_risk(m: &Bound<'_, PyModule>) -> PyResult<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     fn max_drawdown_simple() {
         let curve = vec![100.0, 110.0, 90.0, 105.0];
