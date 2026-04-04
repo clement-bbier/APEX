@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.venv/Scripts/python -m mypy .)",
+      "Bash(python -m mypy .)",
+      "Bash(py -m mypy .)",
+      "Bash(where mypy:*)",
+      "Bash(where python:*)",
+      "Bash(\"C:\\\\Users\\\\cleme\\\\AppData\\\\Local\\\\Programs\\\\Python\\\\Python312\\\\python.exe\" -m mypy .)",
+      "Bash(ls .venv/Scripts/mypy*)",
+      "Bash(ls venv/Scripts/mypy*)",
+      "Bash(.venv/Scripts/mypy.exe .)",
+      "Bash(.venv/Scripts/python -m pytest tests/ -v --tb=short)"
+    ]
+  }
+}
