@@ -157,6 +157,57 @@ class RegimeDetectorService(BaseService):
             event_active=event_active,
         )
 
+    async def _update_regime(self) -> None:
+        """Recompute regime using Phase-2 engine with live macro data from Redis.
+
+        Reads VIX, DXY, and yield data published by S08 MacroIntelligence
+        and writes the result to Redis for all downstream services.
+        """
+        from core.topics import Topics
+
+        vix_data = await self.state.get("macro:vix:current")
+        dxy_data = await self.state.get("macro:dxy:1h_change")
+        yield_data = await self.state.get("macro:yields:current")
+
+        vix = float(vix_data.get("value", 20.0)) if isinstance(vix_data, dict) else 20.0
+        dxy_change = float(dxy_data.get("pct_change", 0.0)) if isinstance(dxy_data, dict) else 0.0
+        yield_10y = float(yield_data.get("y10", 4.5)) if isinstance(yield_data, dict) else 4.5
+        yield_2y = float(yield_data.get("y2", 5.0)) if isinstance(yield_data, dict) else 5.0
+
+        regime = self._engine.compute(
+            vix=vix,
+            dxy_1h_change_pct=dxy_change,
+            yield_10y=yield_10y,
+            yield_2y=yield_2y,
+        )
+
+        await self.state.set(
+            "regime:current:v2",
+            {
+                "vol_regime": regime.vol_regime,
+                "risk_mode": regime.risk_mode,
+                "macro_mult": regime.macro_mult,
+                "vix": regime.vix,
+                "yield_inverted": regime.yield_curve_inverted,
+                "reasoning": regime.reasoning,
+            },
+        )
+
+        await self.bus.publish(
+            Topics.REGIME_UPDATE,
+            {
+                "macro_mult": regime.macro_mult,
+                "vol_regime": regime.vol_regime,
+            },
+        )
+
+        self.logger.info(
+            "regime_updated_v2",
+            macro_mult=regime.macro_mult,
+            vol_regime=regime.vol_regime,
+            reasoning=regime.reasoning,
+        )
+
     async def _is_circuit_open(self) -> bool:
         """Check whether the circuit breaker flag is set in Redis.
 

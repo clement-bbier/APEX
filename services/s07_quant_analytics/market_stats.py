@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 
 class MarketStats:
@@ -114,3 +115,72 @@ class MarketStats:
         if implied_vol == 0.0:
             return None
         return realized_vol / implied_vol
+
+    def compute_rolling_correlation(
+        self,
+        returns_a: npt.NDArray[Any],
+        returns_b: npt.NDArray[Any],
+        window: int = 60,
+    ) -> float:
+        """Pearson correlation between two return series over rolling window.
+
+        Used for cross-asset protection:
+        If corr(BTC, SPY) > 0.7 AND SPY is falling → block BTC long signals.
+
+        Returns: correlation ∈ [-1.0, +1.0], or NaN if insufficient data.
+
+        Academic reference: Markowitz (1952) — correlation as portfolio risk measure.
+
+        Args:
+            returns_a: First return series (e.g. BTC returns).
+            returns_b: Second return series (e.g. SPY returns).
+            window: Rolling window in periods.
+
+        Returns:
+            Pearson correlation coefficient, or float('nan') if insufficient data.
+        """
+        if len(returns_a) < window or len(returns_b) < window:
+            return float("nan")
+
+        a = returns_a[-window:]
+        b = returns_b[-window:]
+
+        if np.std(a) == 0 or np.std(b) == 0:
+            return 0.0
+
+        return float(np.corrcoef(a, b)[0, 1])
+
+    def check_cross_asset_block(
+        self,
+        btc_spy_correlation: float,
+        spy_1h_return_pct: float,
+        signal_direction: str,
+    ) -> tuple[bool, str]:
+        """Should we block a BTC trade due to SPY divergence?
+
+        Block BTC LONG if:
+          corr(BTC, SPY) > 0.7 (high correlation)
+          AND SPY fell > 0.5% in last hour (risk-off signal from equities)
+
+        Args:
+            btc_spy_correlation: Rolling Pearson correlation between BTC and SPY.
+            spy_1h_return_pct: SPY 1-hour percentage return.
+            signal_direction: "long" or "short".
+
+        Returns:
+            (should_block, reason)
+        """
+        if signal_direction != "long":
+            return False, ""
+
+        if btc_spy_correlation > 0.70 and spy_1h_return_pct < -0.5:
+            return True, (
+                f"Cross-asset block: BTC/SPY correlation={btc_spy_correlation:.2f}, "
+                f"SPY return={spy_1h_return_pct:.2f}% → blocking long"
+            )
+
+        return False, ""
+
+
+# Alias: tests import MarketStatsEngine per prompt_phase2 specification
+MarketStatsEngine = MarketStats

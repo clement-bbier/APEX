@@ -2,16 +2,29 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
+import structlog
+
 from core.models.order import TradeRecord
+
+logger = structlog.get_logger(__name__)
 
 
 class TradeAnalyzer:
     """Analyzes individual and batch trade records for attribution."""
 
+    def __init__(self, state: Any = None) -> None:
+        """Initialize analyzer with optional StateStore for Redis updates.
+
+        Args:
+            state: Optional StateStore instance. Required for _update_kelly_stats.
+        """
+        self._state = state
+
     def analyze(self, trade: TradeRecord) -> dict[str, Any]:
-        """Return a full attribution dict[str, Any] for a single trade.
+        """Return a full attribution dict for a single trade.
 
         Args:
             trade: TradeRecord instance to analyze.
@@ -47,3 +60,49 @@ class TradeAnalyzer:
             List of attribution dicts, one per trade.
         """
         return [self.analyze(trade) for trade in trades]
+
+    async def _update_kelly_stats(self, trades: list[Any]) -> None:
+        """Update Kelly statistics in Redis after each closed trade.
+
+        Called by S09 whenever a TradeRecord is finalized.
+        Writes rolling win_rate and avg_rr over the last 50 trades.
+
+        Args:
+            trades: All closed trades seen so far (any object with pnl_net and pnl_pct).
+        """
+        if self._state is None:
+            return
+
+        if len(trades) < 5:
+            return  # need minimum trades
+
+        recent = trades[-50:]  # rolling last 50 trades
+        wins = [t for t in recent if getattr(t, "net_pnl", 0.0) > 0]
+        losses = [t for t in recent if getattr(t, "net_pnl", 0.0) <= 0]
+
+        win_rate = len(wins) / len(recent)
+
+        avg_win = (
+            sum(abs(float(getattr(t, "pnl_pct", 0.0))) for t in wins) / max(len(wins), 1)
+        )
+        avg_loss = (
+            sum(abs(float(getattr(t, "pnl_pct", 0.0))) for t in losses) / max(len(losses), 1)
+        )
+        avg_rr = avg_win / avg_loss if avg_loss > 0 else 1.5
+
+        await self._state.set(
+            "feedback:kelly_stats:default",
+            {
+                "win_rate": round(win_rate, 4),
+                "avg_rr": round(avg_rr, 4),
+                "n_trades": len(recent),
+                "updated_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
+
+        logger.info(
+            "kelly_stats_updated",
+            win_rate=win_rate,
+            avg_rr=avg_rr,
+            n_trades=len(recent),
+        )

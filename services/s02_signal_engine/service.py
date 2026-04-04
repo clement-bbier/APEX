@@ -28,6 +28,7 @@ from core.models.signal import (
 from core.models.tick import NormalizedTick
 from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
 from services.s02_signal_engine.mtf_aligner import MTFAligner
+from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
 from services.s02_signal_engine.technical import TechnicalAnalyzer
 
 logger = get_logger("s02_signal_engine.service")
@@ -83,6 +84,9 @@ class SignalEngineService(BaseService):
 
         # Shared multi-timeframe aligner (all symbols share one instance).
         self._mtf = MTFAligner()
+
+        # Confluence scorer - aggregates all signal components.
+        self._scorer = SignalScorer(min_components=2, min_strength=0.20)
 
         # Previous EMA values per symbol - needed for cross detection.
         self._prev_ema_8: dict[str, Decimal | None] = {}
@@ -146,64 +150,112 @@ class SignalEngineService(BaseService):
         micro.update(tick)
         tech.update(tick)
 
-        # ── Evaluate triggers ─────────────────────────────────────────────────
-        long_triggers: list[str] = []
-        short_triggers: list[str] = []
-
-        # OFI signal
+        # ── Compute indicators ────────────────────────────────────────────────
         ofi_val = micro.ofi()
-        if ofi_val > _OFI_THRESHOLD:
-            long_triggers.append("OFI_positive")
-        elif ofi_val < -_OFI_THRESHOLD:
-            short_triggers.append("OFI_negative")
-
-        # RSI oversold / overbought (1-minute bars)
         rsi_1m = tech.rsi(period=14, timeframe="1m")
-        if rsi_1m is not None:
-            if rsi_1m < 30.0:
-                long_triggers.append("RSI_oversold")
-            elif rsi_1m > 70.0:
-                short_triggers.append("RSI_overbought")
-
-        # Bollinger Band bounce (5-minute bars)
         bb_upper, _bb_middle, bb_lower = tech.bollinger_bands(period=20, std=2.0, timeframe="5m")
         entry_price: Decimal = tick.price
-        if bb_upper is not None and bb_lower is not None:
-            bb_range = bb_upper - bb_lower
-            if bb_range > Decimal("0"):
-                proximity = bb_range * Decimal("0.05")
-                if entry_price >= bb_upper - proximity:
-                    short_triggers.append("BB_upper_bounce")
-                elif entry_price <= bb_lower + proximity:
-                    long_triggers.append("BB_lower_bounce")
 
-        # EMA 8 / 21 cross (5-minute bars)
+        # EMA 5m (for cross detection state persistence)
         ema_8 = tech.ema(period=8, timeframe="5m")
         ema_21 = tech.ema(period=21, timeframe="5m")
-        prev_8 = self._prev_ema_8.get(symbol)
-        prev_21 = self._prev_ema_21.get(symbol)
-
-        if ema_8 is not None and ema_21 is not None and prev_8 is not None and prev_21 is not None:
-            if prev_8 < prev_21 and ema_8 > ema_21:
-                long_triggers.append("EMA_cross_bullish")
-            elif prev_8 > prev_21 and ema_8 < ema_21:
-                short_triggers.append("EMA_cross_bearish")
-
-        # Persist EMA values for next tick's cross detection.
         self._prev_ema_8[symbol] = ema_8
         self._prev_ema_21[symbol] = ema_21
 
-        # ── Determine consensus direction ─────────────────────────────────────
-        n_long = len(long_triggers)
-        n_short = len(short_triggers)
+        # EMA 1m and 15m (for MTF alignment scorer)
+        ema_8_1m = tech.ema(period=8, timeframe="1m")
+        ema_21_1m = tech.ema(period=21, timeframe="1m")
+        ema_8_15m = tech.ema(period=8, timeframe="15m")
+        ema_21_15m = tech.ema(period=21, timeframe="15m")
+        vwap_val = tech.vwap()
 
-        if n_long == 0 and n_short == 0:
-            return  # No triggers - no signal.
-        if n_long == n_short:
-            return  # Tied - ambiguous direction.
+        # ── Build scorer components ───────────────────────────────────────────
+        # Microstructure: OFI normalised to [-1, +1]
+        ofi_score = max(-1.0, min(1.0, ofi_val / max(abs(ofi_val), 1e-6))) if ofi_val != 0 else 0.0
 
-        direction = Direction.LONG if n_long > n_short else Direction.SHORT
-        triggers = long_triggers if direction == Direction.LONG else short_triggers
+        # Bollinger score
+        if bb_upper is not None and bb_lower is not None and _bb_middle is not None:
+            bb_score = tech.compute_bollinger_score(
+                price=float(entry_price),
+                upper=float(bb_upper),
+                lower=float(bb_lower),
+                middle=float(_bb_middle),
+                bandwidth_pct=50.0,  # conservative default (no historical pct yet)
+            )
+        else:
+            bb_score = 0.0
+
+        # EMA MTF alignment score
+        if (
+            ema_8_1m is not None
+            and ema_21_1m is not None
+            and ema_8_15m is not None
+            and ema_21_15m is not None
+        ):
+            price_above_vwap = vwap_val is not None and entry_price > vwap_val
+            ema_alignment_score = self._mtf.compute_alignment_score(
+                ema_fast_1m=float(ema_8_1m),
+                ema_slow_1m=float(ema_21_1m),
+                ema_fast_15m=float(ema_8_15m),
+                ema_slow_15m=float(ema_21_15m),
+                price_above_vwap=price_above_vwap,
+            )
+        else:
+            ema_alignment_score = 0.0
+
+        # RSI divergence score
+        rsi_div = tech.rsi_divergence(timeframe="5m")
+        rsi_divergence_score = 1.0 if rsi_div == "bullish" else (-1.0 if rsi_div == "bearish" else 0.0)
+
+        # VWAP score: (price - vwap) / vwap, normalised to [-1, +1]
+        if vwap_val is not None and vwap_val > Decimal("0"):
+            raw_vwap = float((entry_price - vwap_val) / vwap_val)
+            # Invert: price above VWAP → short pressure; below → long pressure
+            vwap_score = max(-1.0, min(1.0, -raw_vwap * 20.0))
+        else:
+            vwap_score = 0.0
+
+        components = [
+            SignalComponent(
+                name="microstructure",
+                score=ofi_score,
+                weight=0.35,
+                triggered=abs(ofi_val) > _OFI_THRESHOLD,
+                metadata={"ofi": ofi_val, "cvd": micro.cvd()},
+            ),
+            SignalComponent(
+                name="bollinger",
+                score=bb_score,
+                weight=0.25,
+                triggered=abs(bb_score) > 0.15,
+                metadata={"squeeze": tech.bb_squeeze(timeframe="5m")},
+            ),
+            SignalComponent(
+                name="ema_mtf",
+                score=ema_alignment_score,
+                weight=0.20,
+                triggered=abs(ema_alignment_score) > 0.10,
+            ),
+            SignalComponent(
+                name="rsi_divergence",
+                score=rsi_divergence_score,
+                weight=0.15,
+                triggered=rsi_divergence_score != 0.0,
+            ),
+            SignalComponent(
+                name="vwap",
+                score=vwap_score,
+                weight=0.05,
+                triggered=abs(vwap_score) > 0.002,
+            ),
+        ]
+
+        final_strength, triggers = self._scorer.compute(components)
+
+        if final_strength == 0.0:
+            return  # No confluent signal
+
+        direction = Direction.LONG if final_strength > 0 else Direction.SHORT
 
         # ── Price levels (ATR-based) ──────────────────────────────────────────
         atr = tech.atr(period=14, timeframe="5m")
@@ -229,12 +281,11 @@ class SignalEngineService(BaseService):
             stop_loss = entry_price * _FALLBACK_SL_PCT
 
         # ── Signal strength and confidence ───────────────────────────────────
-        raw_strength = min(1.0, len(triggers) / _MAX_TRIGGERS_FOR_CONFIDENCE)
-        strength = -raw_strength if direction == Direction.SHORT else raw_strength
-        confidence = raw_strength  # mirrors magnitude of strength
+        strength = final_strength  # already signed and in [-1.0, +1.0]
+        confidence = min(1.0, abs(final_strength) + len(triggers) / _MAX_TRIGGERS_FOR_CONFIDENCE * 0.3)
 
         # ── MTF context ───────────────────────────────────────────────────────
-        self._mtf.update("5m", direction.value, raw_strength)
+        self._mtf.update("5m", direction.value, abs(final_strength))
         mtf_ctx: MTFContext = self._mtf.build_context(direction.value, tick.timestamp_ms)
 
         # ── TechnicalFeatures snapshot ────────────────────────────────────────
