@@ -12,7 +12,7 @@
 //!     Proceedings of the Royal Society of London, 58, 240-242.
 
 use pyo3::prelude::*;
-use numpy::{IntoPyArray, PyArray1, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
+use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1, PyReadonlyArray2};
 use rayon::prelude::*;
 use ndarray::Array2;
 
