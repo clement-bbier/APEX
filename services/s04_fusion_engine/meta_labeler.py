@@ -197,6 +197,9 @@ class MetaLabeler:
         regime_s = min(1.0, (f.session_mult / 1.5) * f.macro_mult) * 2.0 - 1.0
         meta_score += self.WEIGHTS["regime"] * regime_s
 
+        # Clamp meta_score to ensure mathematically bounded output [-1.0, +1.0]
+        meta_score = max(-1.0, min(1.0, meta_score))
+
         # ── Decision ──────────────────────────────────────────────────────────
         confidence = max(0.0, min(1.0, (meta_score + 1.0) / 2.0))
         size_mult = min(
@@ -243,22 +246,14 @@ class MetaLabeler:
         """
         vpin: dict[str, Any] = redis_data.get(f"vpin:{symbol}") or {}
         analytics: dict[str, Any] = redis_data.get("analytics:fast") or {}
-        regime: dict[str, Any] = (
-            redis_data.get("regime:current")
-            if isinstance(redis_data.get("regime:current"), dict)
-            else {}
-        )
-        signal: dict[str, Any] = (
-            redis_data.get(f"signal:{symbol}")
-            if isinstance(redis_data.get(f"signal:{symbol}"), dict)
-            else {}
-        )
-        session: dict[str, Any] = (
-            regime.get("session") if isinstance(regime.get("session"), dict) else {}
-        )
-        feats: dict[str, Any] = (
-            signal.get("features") if isinstance(signal.get("features"), dict) else {}
-        )
+        raw_regime = redis_data.get("regime:current")
+        regime: dict[str, Any] = raw_regime if isinstance(raw_regime, dict) else {}
+        raw_signal = redis_data.get(f"signal:{symbol}")
+        signal: dict[str, Any] = raw_signal if isinstance(raw_signal, dict) else {}
+        raw_session = regime.get("session")
+        session: dict[str, Any] = raw_session if isinstance(raw_session, dict) else {}
+        raw_feats = signal.get("features")
+        feats: dict[str, Any] = raw_feats if isinstance(raw_feats, dict) else {}
 
         return MetaFeatures(
             signal_strength=float(abs(signal.get("strength", 0.5) or 0.5)),

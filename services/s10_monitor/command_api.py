@@ -507,3 +507,65 @@ async def get_recent_alerts(state: StateStore) -> list[AlertEntry]:
         return results
     except Exception:
         return []
+import json
+
+async def get_risk_status(state: StateStore) -> dict[str, Any]:
+    """
+    Risk Manager real-time status for S10 Dashboard.
+
+    Aggregates:
+    - Circuit breaker state + daily P&L (from Redis circuit_breaker snapshot)
+    - Portfolio capital and total exposure (from Redis portfolio key)
+    - Last 100 risk decisions: approval rate, block reason breakdown
+    - Kelly fraction distribution of approved orders (for sparkline)
+    """
+    cb_raw = await state.get("risk:circuit_breaker:state") or {}
+    portfolio = await state.get("portfolio:capital") or {}
+
+    raw_decisions = await state.lrange("risk:decision_history", 0, 99) or []
+    decisions: list[dict[str, Any]] = []
+    for item in raw_decisions:
+        try:
+            decisions.append(json.loads(item) if isinstance(item, str) else item)
+        except Exception:
+            pass
+
+    approved = [d for d in decisions if d.get("approved") is True]
+    blocked  = [d for d in decisions if d.get("approved") is False]
+
+    kelly_finals = [float(d.get("kelly_fraction_final", 0)) for d in approved]
+    avg_kelly = sum(kelly_finals) / len(kelly_finals) if kelly_finals else 0.0
+
+    block_reasons: dict[str, int] = {}
+    for d in blocked:
+        r = str(d.get("first_failure", "unknown"))
+        block_reasons[r] = block_reasons.get(r, 0) + 1
+
+    return {
+        "circuit_breaker": {
+            "state": cb_raw.get("state", "CLOSED") if isinstance(cb_raw, dict) else "CLOSED",
+            "daily_pnl": str(cb_raw.get("daily_pnl", "0")) if isinstance(cb_raw, dict) else "0",
+            "daily_loss_pct": round(float(cb_raw.get("daily_loss_pct", 0.0) if isinstance(cb_raw, dict) else 0.0), 4),
+            "tripped_reason": cb_raw.get("tripped_reason") if isinstance(cb_raw, dict) else None,
+            "consecutive_losses": int(cb_raw.get("consecutive_losses", 0) if isinstance(cb_raw, dict) else 0),
+            "recovery_attempts": int(cb_raw.get("recovery_attempts", 0) if isinstance(cb_raw, dict) else 0),
+        },
+        "portfolio": {
+            "available_capital": str(portfolio.get("available", "0")) if isinstance(portfolio, dict) else "0",
+            "total_exposure_pct": round(float(portfolio.get("exposure_pct", 0.0) if isinstance(portfolio, dict) else 0.0), 4),
+            "open_positions": int(portfolio.get("n_positions", 0) if isinstance(portfolio, dict) else 0),
+        },
+        "decisions_last_100": {
+            "total": len(decisions),
+            "approved": len(approved),
+            "blocked": len(blocked),
+            "approval_rate_pct": round(
+                len(approved) / len(decisions) * 100, 1
+            ) if decisions else 0.0,
+        },
+        "kelly_stats": {
+            "avg_kelly_final": round(avg_kelly, 4),
+            "sparkline": kelly_finals[:20],
+        },
+        "block_reasons": block_reasons,
+    }

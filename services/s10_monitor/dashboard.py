@@ -138,18 +138,38 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
     <canvas id="equityChart"></canvas>
   </div>
 
-  <!-- Circuit Breaker -->
-  <div class="card">
-    <h2>Circuit Breaker</h2>
-    <div id="cb-panel" class="cb-panel cb-closed">
-      <div style="font-size:11px;color:var(--text2)">STATUS</div>
-      <div id="cb-state" class="cb-state green">CLOSED</div>
-      <div id="cb-allows" style="font-size:11px" class="green">Orders allowed</div>
+  <!-- Risk Manager -->
+  <div class="card grid-wide">
+    <h2>Risk Manager</h2>
+    <div style="display:flex; gap:20px; align-items: flex-start;">
+      <!-- CB Panel -->
+      <div style="flex:1">
+        <div id="cb-panel" class="cb-panel cb-closed">
+          <div style="font-size:11px;color:var(--text2)">C.B. STATUS</div>
+          <div id="cb-state" class="cb-state green">CLOSED</div>
+          <div id="cb-allows" style="font-size:11px" class="green">Orders allowed</div>
+        </div>
+        <button onclick="resetCB()" id="cb-reset-btn" style="display:none;background:var(--red);margin-top:8px">
+          Reset Circuit Breaker
+        </button>
+        <div id="cb-daily-pnl" style="margin-top:8px;font-size:11px;color:var(--text2)"></div>
+      </div>
+      <!-- Exposure -->
+      <div style="flex: 1;">
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Total Exposure (<span id="exp-text">0.0%</span>/20%)</div>
+        <div class="bar-track"><div id="exp-bar" class="bar-fill" style="width:0%"></div></div>
+        
+        <div style="font-size:11px;color:var(--text2);margin-bottom:4px;margin-top:10px">Approval Rate (Last 100) <span id="ar-text">0.0%</span></div>
+        <div class="bar-track"><div id="ar-bar" class="bar-fill" style="width:0%; background:var(--blue)"></div></div>
+      </div>
+      <!-- Blocks & Kelly -->
+      <div style="flex: 1.5;font-size:11px;">
+        <div style="color:var(--text2);margin-bottom:4px">Kelly Fractions (recent)</div>
+        <div style="display:flex; gap:2px; height:30px; align-items:flex-end; border-bottom:1px solid var(--border)" id="kelly-spark"></div>
+        <div style="color:var(--text2);margin-top:10px;margin-bottom:4px">Block Reasons (Last 100)</div>
+        <div id="block-reasons-list"></div>
+      </div>
     </div>
-    <button onclick="resetCB()" id="cb-reset-btn" style="display:none;background:var(--red)">
-      Reset Circuit Breaker
-    </button>
-    <div id="cb-daily-pnl" style="margin-top:8px;font-size:11px;color:var(--text2)"></div>
   </div>
 
   <!-- Regime Dashboard -->
@@ -280,13 +300,42 @@ function render(d) {
     const panel = document.getElementById('cb-panel');
     const stateEl = document.getElementById('cb-state');
     const allowsEl = document.getElementById('cb-allows');
-    stateEl.textContent = state;
-    panel.className = 'cb-panel ' + (state === 'CLOSED' ? 'cb-closed' : state === 'OPEN' ? 'cb-open' : 'cb-half');
-    stateEl.className = 'cb-state ' + (state === 'CLOSED' ? 'green' : state === 'OPEN' ? 'red' : 'yellow');
-    allowsEl.textContent = cb.allows_new_orders ? 'Orders allowed' : 'Orders BLOCKED';
-    allowsEl.className = cb.allows_new_orders ? 'green' : 'red';
-    document.getElementById('cb-reset-btn').style.display = state !== 'CLOSED' ? 'block' : 'none';
-    document.getElementById('cb-daily-pnl').textContent = 'Daily PnL: ' + (cb.daily_pnl_pct || 0).toFixed(3) + '% (limit: -3%)';
+    if (stateEl && allowsEl && panel) {
+      stateEl.textContent = state;
+      panel.className = 'cb-panel ' + (state === 'CLOSED' ? 'cb-closed' : state === 'OPEN' ? 'cb-open' : 'cb-half');
+      stateEl.className = 'cb-state ' + (state === 'CLOSED' ? 'green' : state === 'OPEN' ? 'red' : 'yellow');
+      allowsEl.textContent = cb.allows_new_orders ? 'Orders allowed' : 'Orders BLOCKED';
+      allowsEl.className = cb.allows_new_orders ? 'green' : 'red';
+      document.getElementById('cb-reset-btn').style.display = state !== 'CLOSED' ? 'block' : 'none';
+      document.getElementById('cb-daily-pnl').textContent = 'Daily PnL: ' + (cb.daily_pnl_pct || 0).toFixed(3) + '% (limit: -3%)';
+    }
+  }
+  if (d.risk) {
+    const r = d.risk;
+    const d100 = r.decisions_last_100 || {};
+    const kelly = r.kelly_stats || {};
+    const expPct = (r.portfolio.total_exposure_pct || 0) * 100;
+    
+    if (document.getElementById('exp-text')) {
+      document.getElementById('exp-text').textContent = expPct.toFixed(1) + '%';
+      const expBar = document.getElementById('exp-bar');
+      expBar.style.width = Math.min(expPct / 20 * 100, 100) + '%';
+      expBar.style.background = expPct > 15 ? 'var(--red)' : '';
+      
+      document.getElementById('ar-text').textContent = (d100.approval_rate_pct || 0).toFixed(1) + '%';
+      document.getElementById('ar-bar').style.width = (d100.approval_rate_pct || 0) + '%';
+      
+      const spark = document.getElementById('kelly-spark');
+      if (kelly.sparkline && kelly.sparkline.length) {
+        spark.innerHTML = kelly.sparkline.map(v => 
+          '<div style="flex:1;background:var(--purple);height:'+ (v*100) +'%">%</div>'
+        ).join('');
+      }
+      
+      const br = r.block_reasons || {};
+      const brList = Object.entries(br).sort((a,b)=>b[1]-a[1]).map(x => '<div style="margin-bottom:2px">'+x[0]+': '+x[1]+'</div>').join('');
+      document.getElementById('block-reasons-list').innerHTML = brList || 'none';
+    }
   }
   if (d.regime) {
     const r = d.regime;
@@ -497,6 +546,11 @@ class DashboardServer:
             from services.s10_monitor.command_api import get_circuit_breaker
             return await get_circuit_breaker(state)
 
+        @app.get("/api/v1/risk")
+        async def risk() -> dict[str, Any]:
+            from services.s10_monitor.command_api import get_risk_status
+            return await get_risk_status(state)
+
         @app.post("/api/v1/circuit-breaker/reset")
         async def cb_reset(x_confirm: str | None = None) -> dict[str, Any]:
             from services.s10_monitor.command_api import reset_circuit_breaker
@@ -549,6 +603,7 @@ class DashboardServer:
             get_recent_signals,
             get_regime,
             get_system_status,
+            get_risk_status,
         )
         state = self._state
         payload: dict[str, Any] = {}
@@ -563,10 +618,11 @@ class DashboardServer:
                 get_cb_events(state),
                 get_recent_alerts(state),
                 get_system_status(state),
+                get_risk_status(state),
                 return_exceptions=True,
             )
             labels = ["pnl", "positions", "regime", "signals", "circuit_breaker",
-                      "performance", "cb_events", "alerts", "system"]
+                      "performance", "cb_events", "alerts", "system", "risk"]
             for label, result in zip(labels, results, strict=True):
                 if isinstance(result, Exception):
                     logger.debug("broadcast_partial_fail", label=label, error=str(result))
@@ -590,3 +646,4 @@ class DashboardServer:
         config = uvicorn.Config(self.app, host=self._host, port=self._port, log_level="warning")
         server = uvicorn.Server(config)
         await server.serve()
+

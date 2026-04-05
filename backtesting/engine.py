@@ -40,8 +40,12 @@ from core.models.tick import NormalizedTick, Session
 from services.s01_data_ingestion.normalizer import SessionTagger
 from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
 from services.s02_signal_engine.technical import TechnicalAnalyzer
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.position_rules import PositionRules
+from services.s05_risk_manager.position_rules import (
+    check_max_risk_per_trade,
+    check_max_size,
+    check_min_rr,
+    check_stop_loss_present,
+)
 from services.s06_execution.paper_trader import PaperTrader
 
 logger = get_logger("backtesting.engine")
@@ -139,8 +143,7 @@ class BacktestEngine:
         self._settings = get_settings()
         self._session_tagger = SessionTagger()
         self._paper_trader = PaperTrader()
-        self._position_rules = PositionRules()
-        self._circuit_breaker = CircuitBreaker(self._settings)
+        self._circuit_breaker_open: bool = False
         # Per-symbol analyzers
         self._micro: dict[str, MicrostructureAnalyzer] = {}
         self._tech: dict[str, TechnicalAnalyzer] = {}
@@ -217,7 +220,7 @@ class BacktestEngine:
             self._check_exits(tick, state)
 
         # Skip signal generation if circuit breaker open or max positions reached
-        if self._circuit_breaker.is_open:
+        if self._circuit_breaker_open:
             return
         if len(state.positions) >= self._settings.max_simultaneous_positions:
             return
@@ -237,11 +240,18 @@ class BacktestEngine:
         if candidate is None:
             return
 
-        # Risk check
-        ok, reason = self._position_rules.validate(candidate, state.capital, self._settings)
-        if not ok:
-            logger.debug("Order blocked by risk", reason=reason, symbol=symbol)
-            return
+        # Risk check (Phase 6 pure functions)
+        from services.s05_risk_manager.models import RuleResult as _RuleResult
+        _checks: list[_RuleResult] = [
+            check_stop_loss_present(candidate),
+            check_min_rr(candidate),
+            check_max_risk_per_trade(candidate, state.capital),
+            check_max_size(candidate, state.capital),
+        ]
+        for result in _checks:
+            if not result.passed:
+                logger.debug("Order blocked by risk", reason=result.reason, symbol=symbol)
+                return
 
         # Execute via paper trader
         approved = ApprovedOrder(

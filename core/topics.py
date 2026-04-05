@@ -40,6 +40,10 @@ class Topics:
     RISK_BREACH: str = "risk.breach"
     CIRCUIT_OPEN: str = "risk.circuit_open"
     CIRCUIT_CLOSED: str = "risk.circuit_closed"
+    RISK_APPROVED: str = "risk.approved"      # RiskDecision published (approved=True)
+    RISK_BLOCKED: str = "risk.blocked"        # RiskDecision published (approved=False)
+    RISK_CB_TRIPPED: str = "risk.cb.tripped"  # Circuit breaker state change notification
+    RISK_AUDIT: str = "risk.audit"            # Full audit stream (all decisions)
 
     # ── Service health (all services → supervisor) ────────────────────────────
     SERVICE_HEALTH: str = "service.health"  # e.g. service.health.s01_data_ingestion
