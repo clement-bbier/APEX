@@ -1,251 +1,302 @@
-"""Circuit breaker state machine for APEX Trading System - S05 Risk Manager.
-
-Implements a three-state machine (CLOSED → OPEN → HALF_OPEN → CLOSED) that
-trips on drawdown, rolling loss, VIX spike, or price-gap conditions and
-auto-resets after a 15-minute cool-down.
 """
+Circuit Breaker -- Catastrophic Loss Prevention State Machine.
 
+Three-state circuit breaker (CLOSED -> OPEN -> HALF_OPEN) that halts
+all trading when loss thresholds are exceeded. Redis-persisted state
+ensures a service restart does NOT reset a tripped breaker.
+
+State transitions:
+    CLOSED    -> OPEN      : any trigger condition exceeded
+    OPEN      -> HALF_OPEN : after HALF_OPEN_RECOVERY_MINUTES cooldown
+    HALF_OPEN -> CLOSED    : probe order succeeds (PnL >= 0)
+    HALF_OPEN -> OPEN      : probe order fails (PnL < 0) -> reset cooldown
+
+Trigger conditions (evaluated in priority order):
+    1. Daily drawdown   > MAX_DAILY_LOSS_PCT (3%)
+    2. 30min loss       > MAX_INTRADAY_LOSS_30M_PCT (2%)
+    3. VIX spike        > VIX_SPIKE_THRESHOLD_PCT (+20% in 1h)
+    4. Critical service down > SERVICE_DOWN_SECONDS (60s)
+
+The CB event trigger (#5 in MANIFEST) is handled separately
+by CBEventGuard (OBJ-4) -- cleaner separation of concerns.
+
+Reference:
+    Nygard, M.T. (2007). Release It! Pragmatic Bookshelf. Ch. 5.
+    NYSE Rule 80B (market-wide circuit breakers) -- institutional precedent.
+"""
 from __future__ import annotations
 
-import time
-from enum import StrEnum
+import json
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
-from core.config import Settings
+import structlog
+from redis.asyncio import Redis
 
+from services.s05_risk_manager.models import (
+    HALF_OPEN_RECOVERY_MINUTES,
+    MAX_DAILY_LOSS_PCT,
+    MAX_INTRADAY_LOSS_30M_PCT,
+    REDIS_CB_KEY,
+    REDIS_CB_TTL,
+    SERVICE_DOWN_SECONDS,
+    VIX_SPIKE_THRESHOLD_PCT,
+    BlockReason,
+    CircuitBreakerSnapshot,
+    CircuitBreakerState,
+    RuleResult,
+)
 
-class CircuitState(StrEnum):
-    """Circuit breaker state machine states."""
-
-    CLOSED = "closed"
-    HALF_OPEN = "half_open"
-    OPEN = "open"
-
-
-# Seconds the breaker must remain OPEN before transitioning to HALF_OPEN.
-_RESET_DELAY_S: float = 15 * 60.0
+logger = structlog.get_logger(__name__)
 
 
 class CircuitBreaker:
-    """Three-state circuit breaker that halts trading on extreme adverse conditions.
+    """Redis-persisted three-state circuit breaker.
 
-    States:
-    - ``CLOSED``    : Normal operation; new positions may be placed.
-    - ``OPEN``      : Tripped; no new positions until cool-down expires.
-    - ``HALF_OPEN`` : Tentative resume; one successful trade closes the breaker.
+    All state mutations are persisted in Redis with a 24h TTL.
+    A service restart does NOT reset a tripped breaker.
 
-    The breaker is tripped (:meth:`trip`) when any of the following checks
-    returns ``True``:
-
-    - :meth:`check_daily_drawdown`
-    - :meth:`check_rolling_loss`
-    - :meth:`check_vix_spike`
-    - :meth:`check_price_gap`
+    Args:
+        redis: Async Redis client instance.
     """
 
-    def __init__(self, settings: Settings) -> None:
-        """Initialize the circuit breaker in the CLOSED state.
+    def __init__(self, redis: Redis) -> None:
+        self._redis = redis
+
+    async def check(
+        self,
+        current_daily_pnl: Decimal,
+        starting_capital: Decimal,
+        intraday_loss_30m: Decimal,
+        vix_current: float,
+        vix_1h_ago: float,
+        service_last_seen: dict[str, datetime],
+    ) -> RuleResult:
+        """Evaluate all triggers and return a RuleResult.
 
         Args:
-            settings: Application settings used for threshold values.
-        """
-        self._settings = settings
-        self._state: CircuitState = CircuitState.CLOSED
-        self._tripped_at: float = 0.0
-        self._trip_reason: str = ""
-        self._last_trade_success: bool = False
-
-    # ── Condition checks ──────────────────────────────────────────────────────
-
-    def check_daily_drawdown(self, daily_pnl_pct: float) -> bool:
-        """Return ``True`` if the daily drawdown exceeds the configured threshold.
-
-        Args:
-            daily_pnl_pct: Today's P&L as a percentage of capital (negative = loss).
+            current_daily_pnl:  Today's cumulative P&L (negative = loss).
+            starting_capital:   Capital at start of day (Decimal("0") safe).
+            intraday_loss_30m:  Cumulative loss in last 30 minutes (negative = loss).
+            vix_current:        Current VIX level.
+            vix_1h_ago:         VIX level one hour ago.
+            service_last_seen:  Map of service_id -> last heartbeat datetime.
 
         Returns:
-            ``True`` when the breaker should be tripped.
+            RuleResult.ok if CLOSED/HALF_OPEN and no triggers.
+            RuleResult.fail with appropriate BlockReason otherwise.
         """
-        return abs(daily_pnl_pct) > self._settings.max_daily_drawdown_pct
+        snapshot = await self._load_snapshot()
+        now = datetime.now(timezone.utc)
 
-    def check_rolling_loss(self, recent_losses_pct: list[float]) -> bool:
-        """Return ``True`` if total losses in the rolling window exceed 2 %.
+        if snapshot.state == CircuitBreakerState.OPEN:
+            snapshot = await self._try_half_open(snapshot, now)
 
-        Args:
-            recent_losses_pct: Per-trade loss percentages within the last 30 min
-                               (positive values represent losses).
-
-        Returns:
-            ``True`` when the breaker should be tripped.
-        """
-        return sum(recent_losses_pct) > 2.0
-
-    def check_vix_spike(self, vix_now: float, vix_1h_ago: float) -> bool:
-        """Return ``True`` if VIX has spiked beyond the configured threshold.
-
-        The spike is measured as a relative increase:
-        ``(vix_now - vix_1h_ago) / vix_1h_ago > cb_vix_spike_pct / 100``.
-
-        Args:
-            vix_now:    Current VIX level.
-            vix_1h_ago: VIX level one hour ago.
-
-        Returns:
-            ``True`` when the breaker should be tripped.
-        """
-        if vix_1h_ago <= 0:
-            return False
-        relative_change = (vix_now - vix_1h_ago) / vix_1h_ago
-        return relative_change > self._settings.cb_vix_spike_pct / 100.0
-
-    def check_price_gap(self, prev_price: float, curr_price: float) -> bool:
-        """Return ``True`` if the price has gapped beyond the configured threshold.
-
-        Args:
-            prev_price: Price in the previous bar or snapshot.
-            curr_price: Current price.
-
-        Returns:
-            ``True`` when the breaker should be tripped.
-        """
-        if prev_price <= 0:
-            return False
-        change_pct = abs(curr_price - prev_price) / prev_price * 100.0
-        return change_pct > self._settings.cb_price_gap_pct
-
-    # ── State transitions ─────────────────────────────────────────────────────
-
-    def trip(self, reason: str) -> None:
-        """Trip the circuit breaker, setting state to OPEN.
-
-        Args:
-            reason: Human-readable description of why the breaker was tripped.
-        """
-        self._state = CircuitState.OPEN
-        self._tripped_at = time.monotonic()
-        self._trip_reason = reason
-
-    def attempt_reset(self) -> bool:
-        """Attempt to transition from OPEN → HALF_OPEN or HALF_OPEN → CLOSED.
-
-        Transition rules:
-        - OPEN for > 15 min → HALF_OPEN.
-        - HALF_OPEN and the last trade was successful → CLOSED.
-
-        Returns:
-            ``True`` if a state transition occurred.
-        """
-        if self._state == CircuitState.OPEN:
-            elapsed = time.monotonic() - self._tripped_at
-            if elapsed > _RESET_DELAY_S:
-                self._state = CircuitState.HALF_OPEN
-                return True
-
-        if self._state == CircuitState.HALF_OPEN and self._last_trade_success:
-            self._state = CircuitState.CLOSED
-            self._trip_reason = ""
-            return True
-
-        return False
-
-    def record_trade_result(self, success: bool) -> None:
-        """Record whether the last trade was a success or failure.
-
-        Used by :meth:`attempt_reset` to decide HALF_OPEN → CLOSED transitions.
-
-        Args:
-            success: ``True`` if the trade closed profitably.
-        """
-        self._last_trade_success = success
-
-    # ── Properties ────────────────────────────────────────────────────────────
-
-    @property
-    def is_open(self) -> bool:
-        """``True`` when the circuit breaker is in the OPEN state."""
-        return self._state == CircuitState.OPEN
-
-    @property
-    def is_closed(self) -> bool:
-        """``True`` when the circuit breaker is in the CLOSED state."""
-        return self._state == CircuitState.CLOSED
-
-    @property
-    def state(self) -> CircuitState:
-        """Current :class:`CircuitState`."""
-        return self._state
-
-    @property
-    def trip_reason(self) -> str:
-        """Human-readable reason for the last trip, or empty string."""
-        return self._trip_reason
-
-    # ── Convenience API (used by services and integration tests) ──────────────
-
-    def allows_new_orders(self) -> bool:
-        """Return True if the circuit breaker permits new orders.
-
-        Equivalent to ``is_closed``.
-        """
-        return self.is_closed
-
-    def reset(self) -> None:
-        """Force-reset the breaker to CLOSED state.
-
-        Used at the start of each trading day to clear previous day's trip.
-        """
-        self._state = CircuitState.CLOSED
-        self._trip_reason = ""
-        self._tripped_at = 0.0
-        self._last_trade_success = False
-
-    def update_daily_pnl(self, pnl_pct: float) -> None:
-        """Check daily PnL and trip the breaker if the threshold is breached.
-
-        Args:
-            pnl_pct: Daily P&L as a fraction (e.g., -0.031 = -3.1%).
-        """
-        if self.check_daily_drawdown(pnl_pct * 100):
-            self.trip(f"daily_pnl {pnl_pct:.3%} breached threshold")
-
-    def update_30min_pnl(self, pnl_pct: float) -> None:
-        """Check rolling 30-min losses and trip if threshold exceeded.
-
-        Args:
-            pnl_pct: Rolling loss as a fraction (e.g., -0.021 = -2.1%).
-        """
-        loss_pct = abs(pnl_pct) * 100
-        if self.check_rolling_loss([loss_pct]):
-            self.trip(f"30min_pnl {pnl_pct:.3%} breached threshold")
-
-    def update_vix_change(self, relative_change: float) -> None:
-        """Check VIX spike and trip if threshold exceeded.
-
-        Args:
-            relative_change: Relative VIX change (e.g., 0.21 = 21% spike).
-        """
-        threshold = self._settings.cb_vix_spike_pct / 100.0
-        if relative_change > threshold:
-            self.trip(f"vix_spike {relative_change:.1%} breached threshold")
-
-    def notify_service_down(self, service_id: str, seconds_down: int) -> None:
-        """Trip the breaker if a critical service has been unavailable too long.
-
-        Args:
-            service_id: Service identifier (e.g., 's01').
-            seconds_down: Number of seconds the service has been unavailable.
-        """
-        threshold = self._settings.cb_data_timeout_seconds
-        if seconds_down > threshold:
-            self.trip(
-                f"service {service_id} down for {seconds_down}s "
-                f"(threshold: {threshold}s)"
+        if snapshot.state == CircuitBreakerState.OPEN:
+            return RuleResult.fail(
+                rule_name="circuit_breaker",
+                block_reason=BlockReason.CIRCUIT_BREAKER_OPEN,
+                reason=(
+                    f"Circuit breaker OPEN since {snapshot.tripped_at}: "
+                    f"{snapshot.tripped_reason}"
+                ),
             )
 
-    def update_price_gap(self, gap_pct: float) -> None:
-        """Check price gap and trip if threshold exceeded.
+        # HALF_OPEN: allow probe order through without re-evaluating triggers.
+        # record_trade_result() handles the HALF_OPEN -> CLOSED/OPEN transition.
+        if snapshot.state == CircuitBreakerState.HALF_OPEN:
+            return RuleResult.ok(rule_name="circuit_breaker", reason="CB HALF_OPEN probe allowed")
+
+        trigger = self._evaluate_triggers(
+            current_daily_pnl=current_daily_pnl,
+            starting_capital=starting_capital,
+            intraday_loss_30m=intraday_loss_30m,
+            vix_current=vix_current,
+            vix_1h_ago=vix_1h_ago,
+            service_last_seen=service_last_seen,
+            now=now,
+        )
+
+        if trigger is not None:
+            await self._trip(snapshot, trigger, current_daily_pnl, starting_capital)
+            return RuleResult.fail(
+                rule_name="circuit_breaker",
+                block_reason=trigger,
+                reason=f"Circuit breaker tripped: {trigger.value}",
+            )
+
+        return RuleResult.ok(rule_name="circuit_breaker", reason=f"CB {snapshot.state.value}")
+
+    async def record_trade_result(self, pnl: Decimal) -> None:
+        """Update CB state after a probe trade (HALF_OPEN only).
+
+        HALF_OPEN + pnl >= 0 -> CLOSED
+        HALF_OPEN + pnl < 0  -> OPEN (reset cooldown)
 
         Args:
-            gap_pct: Price gap as a fraction (e.g., 0.06 = 6% gap).
+            pnl: Net P&L of the probe trade.
         """
-        if self.check_price_gap(prev_price=1.0, curr_price=1.0 + gap_pct):
-            self.trip(f"price_gap {gap_pct:.1%} breached threshold")
+        snapshot = await self._load_snapshot()
+        if snapshot.state != CircuitBreakerState.HALF_OPEN:
+            return
+
+        now = datetime.now(timezone.utc)
+        if pnl >= Decimal("0"):
+            new_snap = CircuitBreakerSnapshot(
+                state=CircuitBreakerState.CLOSED,
+                tripped_at=None,
+                tripped_reason=None,
+                daily_pnl=snapshot.daily_pnl + pnl,
+                daily_loss_pct=snapshot.daily_loss_pct,
+                intraday_loss_30m=Decimal("0"),
+                consecutive_losses=0,
+                recovery_attempts=snapshot.recovery_attempts,
+                last_updated=now,
+            )
+            logger.info("circuit_breaker_closed", probe_pnl=str(pnl))
+        else:
+            new_snap = CircuitBreakerSnapshot(
+                state=CircuitBreakerState.OPEN,
+                tripped_at=now,
+                tripped_reason=snapshot.tripped_reason,
+                daily_pnl=snapshot.daily_pnl + pnl,
+                daily_loss_pct=snapshot.daily_loss_pct,
+                intraday_loss_30m=snapshot.intraday_loss_30m,
+                consecutive_losses=snapshot.consecutive_losses + 1,
+                recovery_attempts=snapshot.recovery_attempts + 1,
+                last_updated=now,
+            )
+            logger.warning("circuit_breaker_probe_failed", probe_pnl=str(pnl))
+
+        await self._save_snapshot(new_snap)
+
+    async def get_snapshot(self) -> CircuitBreakerSnapshot:
+        """Return the current persisted snapshot."""
+        return await self._load_snapshot()
+
+    async def reset_daily(self) -> None:
+        """Reset daily P&L counters at market open. Preserves OPEN/HALF_OPEN state."""
+        snapshot = await self._load_snapshot()
+        new_snap = CircuitBreakerSnapshot(
+            state=snapshot.state,
+            tripped_at=snapshot.tripped_at,
+            tripped_reason=snapshot.tripped_reason,
+            daily_pnl=Decimal("0"),
+            daily_loss_pct=0.0,
+            intraday_loss_30m=Decimal("0"),
+            consecutive_losses=snapshot.consecutive_losses,
+            recovery_attempts=snapshot.recovery_attempts,
+            last_updated=datetime.now(timezone.utc),
+        )
+        await self._save_snapshot(new_snap)
+
+    def _evaluate_triggers(
+        self,
+        current_daily_pnl: Decimal,
+        starting_capital: Decimal,
+        intraday_loss_30m: Decimal,
+        vix_current: float,
+        vix_1h_ago: float,
+        service_last_seen: dict[str, datetime],
+        now: datetime,
+    ) -> BlockReason | None:
+        """Pure function: evaluate all triggers. Returns BlockReason or None."""
+        # 1. Daily drawdown
+        if starting_capital > Decimal("0"):
+            daily_loss_pct = float(-current_daily_pnl / starting_capital)
+            if daily_loss_pct > MAX_DAILY_LOSS_PCT:
+                return BlockReason.DAILY_DRAWDOWN_EXCEEDED
+
+        # 2. 30-minute intraday loss
+        if starting_capital > Decimal("0"):
+            intraday_pct = float(-intraday_loss_30m / starting_capital)
+            if intraday_pct > MAX_INTRADAY_LOSS_30M_PCT:
+                return BlockReason.INTRADAY_LOSS_EXCEEDED
+
+        # 3. VIX spike
+        if vix_1h_ago > 0:
+            vix_change = (vix_current - vix_1h_ago) / vix_1h_ago
+            if vix_change > VIX_SPIKE_THRESHOLD_PCT:
+                return BlockReason.VIX_SPIKE
+
+        # 4. Critical service down
+        for _svc_id, last_seen in service_last_seen.items():
+            elapsed = (now - last_seen).total_seconds()
+            if elapsed > SERVICE_DOWN_SECONDS:
+                return BlockReason.SERVICE_DOWN
+
+        return None
+
+    async def _trip(
+        self,
+        snapshot: CircuitBreakerSnapshot,
+        reason: BlockReason,
+        daily_pnl: Decimal,
+        starting_capital: Decimal,
+    ) -> CircuitBreakerSnapshot:
+        """Trip the breaker to OPEN, persist snapshot, and return it."""
+        now = datetime.now(timezone.utc)
+        daily_loss_pct = (
+            float(-daily_pnl / starting_capital) if starting_capital > Decimal("0") else 0.0
+        )
+        new_snap = CircuitBreakerSnapshot(
+            state=CircuitBreakerState.OPEN,
+            tripped_at=now,
+            tripped_reason=reason,
+            daily_pnl=daily_pnl,
+            daily_loss_pct=daily_loss_pct,
+            intraday_loss_30m=snapshot.intraday_loss_30m,
+            consecutive_losses=snapshot.consecutive_losses + 1,
+            recovery_attempts=snapshot.recovery_attempts,
+            last_updated=now,
+        )
+        await self._save_snapshot(new_snap)
+        logger.warning("circuit_breaker_tripped", reason=reason.value)
+        return new_snap
+
+    async def _try_half_open(
+        self, snapshot: CircuitBreakerSnapshot, now: datetime
+    ) -> CircuitBreakerSnapshot:
+        """Transition OPEN -> HALF_OPEN if cooldown has elapsed."""
+        if snapshot.tripped_at is None:
+            return snapshot
+        cooldown = timedelta(minutes=HALF_OPEN_RECOVERY_MINUTES)
+        if now - snapshot.tripped_at >= cooldown:
+            new_snap = CircuitBreakerSnapshot(
+                state=CircuitBreakerState.HALF_OPEN,
+                tripped_at=snapshot.tripped_at,
+                tripped_reason=snapshot.tripped_reason,
+                daily_pnl=snapshot.daily_pnl,
+                daily_loss_pct=snapshot.daily_loss_pct,
+                intraday_loss_30m=snapshot.intraday_loss_30m,
+                consecutive_losses=snapshot.consecutive_losses,
+                recovery_attempts=snapshot.recovery_attempts + 1,
+                last_updated=now,
+            )
+            await self._save_snapshot(new_snap)
+            logger.info("circuit_breaker_half_open")
+            return new_snap
+        return snapshot
+
+    async def _load_snapshot(self) -> CircuitBreakerSnapshot:
+        """Load snapshot from Redis. Returns CLOSED default if not found."""
+        try:
+            raw = await self._redis.get(REDIS_CB_KEY)
+            if raw is None:
+                return CircuitBreakerSnapshot(state=CircuitBreakerState.CLOSED)
+            data = json.loads(raw)
+            return CircuitBreakerSnapshot.model_validate(data)
+        except Exception as exc:
+            logger.warning("cb_load_failed", error=str(exc))
+            return CircuitBreakerSnapshot(state=CircuitBreakerState.CLOSED)
+
+    async def _save_snapshot(self, snapshot: CircuitBreakerSnapshot) -> None:
+        """Persist snapshot to Redis with 24h TTL."""
+        try:
+            await self._redis.setex(
+                REDIS_CB_KEY,
+                REDIS_CB_TTL,
+                snapshot.model_dump_json(),
+            )
+        except Exception as exc:
+            logger.error("cb_save_failed", error=str(exc))

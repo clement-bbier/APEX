@@ -1,122 +1,142 @@
-"""Position-level risk rules for APEX Trading System - S05 Risk Manager.
-
-Validates a single :class:`~core.models.order.OrderCandidate` against
-portfolio-level thresholds defined in application settings.
 """
+Position Rules -- Per-Order Validation (Phase 6 rewrite).
 
+Each function validates one specific property of an OrderCandidate.
+All functions are pure: no Redis, no ZMQ, no I/O. No side effects.
+
+Rule pipeline:
+    1. check_stop_loss_present  -- structural: cannot trade without a valid stop
+    2. check_min_rr             -- structural: RR >= 1.5
+    3. check_max_risk_per_trade -- capital: max 0.5%% risk per trade
+    4. check_max_size           -- capital: 10%% position size ceiling
+    5. apply_crypto_multiplier  -- asset modifier: crypto x 0.70 (not a blocker)
+    6. apply_session_multiplier -- timing modifier: prime window x 1.10 (not a blocker)
+
+Reference:
+    Kelly, J.L. (1956). Bell System Technical Journal, 35(4), 917-926.
+    Vince, R. (1992). The Mathematics of Money Management. Wiley.
+    Tharp, V.K. (1998). Trade Your Way to Financial Freedom. McGraw-Hill.
+"""
 from __future__ import annotations
-
-from dataclasses import dataclass
 from decimal import Decimal
-
-from core.config import Settings
 from core.models.order import OrderCandidate
+from core.models.signal import Direction
+from core.models.tick import Session
+from services.s05_risk_manager.models import (
+    CRYPTO_SIZE_MULTIPLIER, MAX_POSITION_SIZE_PCT, MAX_RISK_PER_TRADE_PCT, MIN_RR_RATIO,
+    BlockReason, RuleResult,
+)
+
+_CRYPTO_SUFFIXES: frozenset[str] = frozenset({"USDT", "BTC", "ETH", "BNB"})
+_PRIME_SESSIONS: frozenset[Session] = frozenset({Session.US_PRIME})
+_SESSION_PRIME_MULTIPLIER: float = 1.10
 
 
-@dataclass
-class RuleResult:
-    """Result of a single position risk rule check."""
-
-    passed: bool
-    reason: str = ""
+def _is_crypto(symbol: str) -> bool:
+    return any(symbol.upper().endswith(sfx) for sfx in _CRYPTO_SUFFIXES)
 
 
-class PositionRules:
-    """Validate an order candidate against risk-management constraints.
+def check_stop_loss_present(order: OrderCandidate) -> RuleResult:
+    """Verify stop loss exists and is directionally correct.
 
-    All checks are applied sequentially.  The first failing check short-circuits
-    and returns ``(False, <reason>)``.
+    LONG: stop_loss < entry. SHORT: stop_loss > entry.
     """
-
-    def validate(
-        self,
-        candidate: OrderCandidate,
-        capital: Decimal,
-        settings: Settings,
-    ) -> tuple[bool, str]:
-        """Run all position-level risk checks.
-
-        Checks performed (in order):
-
-        1. **Capital at risk** - ``capital_at_risk ≤ capital × max_position_risk_pct / 100``.
-        2. **Stop loss exists** - ``candidate.stop_loss > 0``.
-        3. **Minimum R:R** - if a source signal is attached,
-           ``signal.risk_reward ≥ min_risk_reward``.
-        4. **Maximum position size** - ``size × entry ≤ capital × max_position_size_pct / 100``.
-
-        Args:
-            candidate: Order candidate to validate.
-            capital:   Total portfolio capital in quote currency.
-            settings:  Application settings containing threshold values.
-
-        Returns:
-            ``(True, "")`` if all checks pass;
-            ``(False, reason_string)`` on the first failure.
-        """
-        # 1. Capital at risk
-        max_risk = capital * Decimal(str(settings.max_position_risk_pct)) / Decimal("100")
-        if candidate.capital_at_risk > max_risk:
-            return (
-                False,
-                f"capital_at_risk {candidate.capital_at_risk} exceeds max "
-                f"{max_risk} ({settings.max_position_risk_pct}% of {capital})",
-            )
-
-        # 2. Stop loss must be positive
-        if candidate.stop_loss <= Decimal("0"):
-            return False, "stop_loss must be greater than zero"
-
-        # 3. Minimum risk/reward ratio
-        if candidate.source_signal is not None:
-            rr = candidate.source_signal.risk_reward
-            if rr is not None and rr < settings.min_risk_reward:
-                return (
-                    False,
-                    f"risk_reward {rr:.2f} below minimum {settings.min_risk_reward}",
-                )
-
-        # 4. Maximum position size
-        position_value = candidate.size * candidate.entry
-        max_size_value = capital * Decimal(str(settings.max_position_size_pct)) / Decimal("100")
-        if position_value > max_size_value:
-            return (
-                False,
-                f"position_value {position_value} exceeds max "
-                f"{max_size_value} ({settings.max_position_size_pct}% of {capital})",
-            )
-
-        return True, ""
-
-
-def check_max_risk_per_trade(order: object, capital: Decimal) -> RuleResult:
-    """Check that a single trade does not risk more than 0.5% of capital.
-
-    Used by integration tests and S05 pre-approval checks.
-
-    Args:
-        order: Object with entry_price, stop_loss, and size_total attributes.
-        capital: Total portfolio capital.
-
-    Returns:
-        RuleResult with passed=True if risk is within budget.
-    """
-    max_risk = capital * Decimal("0.005")
-    entry = Decimal(str(getattr(order, "entry_price", 0)))
-    stop = Decimal(str(getattr(order, "stop_loss", 0)))
-    size = Decimal(str(getattr(order, "size_total", 0)))
-
-    if entry <= 0 or stop <= 0 or size <= 0:
-        return RuleResult(passed=False, reason="invalid order fields (zero or negative)")
-
-    risk_per_unit = abs(entry - stop)
-    total_risk = risk_per_unit * size
-
-    if total_risk > max_risk:
-        return RuleResult(
-            passed=False,
-            reason=(
-                f"total_risk {total_risk:.4f} exceeds max {max_risk:.4f} "
-                f"(0.5% of capital {capital})"
-            ),
+    if order.stop_loss <= 0:
+        return RuleResult.fail(
+            rule_name="check_stop_loss_present",
+            block_reason=BlockReason.NO_STOP_LOSS,
+            reason="stop_loss must be > 0",
         )
-    return RuleResult(passed=True)
+    if order.direction == Direction.LONG and order.stop_loss >= order.entry:
+        return RuleResult.fail(
+            rule_name="check_stop_loss_present",
+            block_reason=BlockReason.NO_STOP_LOSS,
+            reason=f"LONG: stop_loss {order.stop_loss} must be < entry {order.entry}",
+        )
+    if order.direction == Direction.SHORT and order.stop_loss <= order.entry:
+        return RuleResult.fail(
+            rule_name="check_stop_loss_present",
+            block_reason=BlockReason.NO_STOP_LOSS,
+            reason=f"SHORT: stop_loss {order.stop_loss} must be > entry {order.entry}",
+        )
+    return RuleResult.ok(rule_name="check_stop_loss_present")
+
+
+def check_min_rr(order: OrderCandidate) -> RuleResult:
+    """Verify RR = |target_scalp - entry| / |entry - stop_loss| >= 1.5.
+
+    Reference:
+        Lopez de Prado (2018). AFML Ch. 11. Minimum RR for positive EV.
+    """
+    sl_distance = abs(order.entry - order.stop_loss)
+    if sl_distance == Decimal("0"):
+        return RuleResult.fail(
+            rule_name="check_min_rr",
+            block_reason=BlockReason.MIN_RR_NOT_MET,
+            reason="zero SL distance",
+        )
+    tp_distance = abs(order.target_scalp - order.entry)
+    rr = float(tp_distance / sl_distance)
+    if rr < MIN_RR_RATIO:
+        return RuleResult.fail(
+            rule_name="check_min_rr",
+            block_reason=BlockReason.MIN_RR_NOT_MET,
+            reason=f"RR {rr:.3f} < minimum {MIN_RR_RATIO}",
+            rr=rr,
+        )
+    return RuleResult.ok(rule_name="check_min_rr", reason=f"RR {rr:.3f}")
+
+
+def check_max_risk_per_trade(order: OrderCandidate, capital: Decimal) -> RuleResult:
+    """Verify |entry - stop_loss| x size <= capital x 0.005.
+
+    Reference:
+        Vince, R. (1992). Mathematics of Money Management. Wiley.
+    """
+    if capital <= Decimal("0"):
+        return RuleResult.ok(rule_name="check_max_risk_per_trade", reason="capital=0 skipped")
+    sl_distance = abs(order.entry - order.stop_loss)
+    monetary_risk = sl_distance * order.size
+    max_risk = capital * Decimal(str(MAX_RISK_PER_TRADE_PCT))
+    if monetary_risk > max_risk:
+        return RuleResult.fail(
+            rule_name="check_max_risk_per_trade",
+            block_reason=BlockReason.MAX_RISK_PER_TRADE,
+            reason=f"risk {monetary_risk:.4f} > max {max_risk:.4f}",
+            monetary_risk=float(monetary_risk),
+            max_risk=float(max_risk),
+        )
+    return RuleResult.ok(rule_name="check_max_risk_per_trade", reason=f"risk {monetary_risk:.4f}")
+
+
+def check_max_size(order: OrderCandidate, capital: Decimal) -> RuleResult:
+    """Verify size x entry <= capital x 0.10."""
+    if capital <= Decimal("0"):
+        return RuleResult.ok(rule_name="check_max_size", reason="capital=0 skipped")
+    notional = order.size * order.entry
+    max_notional = capital * Decimal(str(MAX_POSITION_SIZE_PCT))
+    if notional > max_notional:
+        return RuleResult.fail(
+            rule_name="check_max_size",
+            block_reason=BlockReason.MAX_SIZE_EXCEEDED,
+            reason=f"notional {notional:.2f} > max {max_notional:.2f}",
+            notional=float(notional),
+            max_notional=float(max_notional),
+        )
+    return RuleResult.ok(rule_name="check_max_size", reason=f"notional {notional:.2f}")
+
+
+def apply_crypto_multiplier(order: OrderCandidate) -> tuple[Decimal, RuleResult]:
+    """Apply CRYPTO_SIZE_MULTIPLIER (0.70) for crypto symbols."""
+    if _is_crypto(order.symbol):
+        adjusted = order.size * Decimal(str(CRYPTO_SIZE_MULTIPLIER))
+        return adjusted, RuleResult.ok(rule_name="apply_crypto_multiplier", reason=f"crypto x {CRYPTO_SIZE_MULTIPLIER}")
+    return order.size, RuleResult.ok(rule_name="apply_crypto_multiplier", reason="equity: no adjustment")
+
+
+def apply_session_multiplier(order: OrderCandidate, session: Session) -> tuple[Decimal, RuleResult]:
+    """Apply x1.10 bonus during prime sessions (US_PRIME)."""
+    if session in _PRIME_SESSIONS:
+        adjusted = order.size * Decimal(str(_SESSION_PRIME_MULTIPLIER))
+        return adjusted, RuleResult.ok(rule_name="apply_session_multiplier", reason=f"prime session x {_SESSION_PRIME_MULTIPLIER}")
+    return order.size, RuleResult.ok(rule_name="apply_session_multiplier", reason=f"{session}: no bonus")

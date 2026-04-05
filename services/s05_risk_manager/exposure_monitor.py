@@ -1,191 +1,175 @@
-"""Portfolio exposure monitor for APEX Trading System - S05 Risk Manager.
-
-Reads live position data from Redis and validates whether a new
-:class:`~core.models.order.OrderCandidate` would breach total-exposure
-or simultaneous-position limits.
 """
+Exposure Monitor -- Portfolio-Level Risk Controls (Phase 6).
 
+All functions are pure: they receive positions as a list, not via Redis.
+Redis reading happens in service.py before the chain starts.
+
+Rules enforced:
+    1. check_max_positions:      no more than MAX_POSITIONS (6) open simultaneously
+    2. check_total_exposure:     total notional <= MAX_TOTAL_EXPOSURE_PCT (20%) of capital
+    3. check_per_class_exposure: per-class (crypto/equity) <= MAX_CLASS_EXPOSURE_PCT (12%)
+    4. check_correlation:        rho > 0.75 with any open position -> block
+
+Reference:
+    Markowitz, H. (1952). Portfolio Selection. Journal of Finance, 7(1), 77-91.
+    Lopez de Prado, M. (2018). AFML, Ch. 16. Portfolio construction under constraints.
+"""
 from __future__ import annotations
-
 from decimal import Decimal
-from typing import Any
-
-import structlog
-
-from core.config import Settings
 from core.models.order import OrderCandidate
-from core.state import StateStore
+from services.s05_risk_manager.models import (
+    CORRELATION_BLOCK_THRESHOLD, MAX_CLASS_EXPOSURE_PCT, MAX_POSITIONS,
+    MAX_TOTAL_EXPOSURE_PCT, BlockReason, Position, RuleResult,
+)
 
-logger = structlog.get_logger(__name__)
-
-# ── Sector classification ─────────────────────────────────────────────────────
-
-SECTOR_MAP: dict[str, str] = {
-    "AAPL": "tech",
-    "MSFT": "tech",
-    "NVDA": "tech",
-    "GOOGL": "tech",
-    "META": "tech",
-    "AMZN": "tech",
-    "TSLA": "tech",
-    "JPM": "finance",
-    "BAC": "finance",
-    "GS": "finance",
-    "XOM": "energy",
-    "CVX": "energy",
-    "BTCUSDT": "crypto",
-    "ETHUSDT": "crypto",
-    "SPY": "index",
-    "QQQ": "index",
-}
-
-MAX_SECTOR_EXPOSURE_PCT = 0.25  # max 25% of capital in one sector
+_CRYPTO_SUFFIXES: frozenset[str] = frozenset({"USDT", "BTC", "ETH", "BNB"})
 
 
-class ExposureMonitor:
-    """Track and validate portfolio-level exposure limits.
+def _is_crypto(symbol: str) -> bool:
+    return any(symbol.upper().endswith(sfx) for sfx in _CRYPTO_SUFFIXES)
 
-    Open positions are stored in Redis under keys of the form
-    ``positions:{symbol}``.  Each key contains a JSON object with at
-    least ``size`` and ``entry`` numeric fields.
+
+def _asset_class(symbol: str) -> str:
+    return "crypto" if _is_crypto(symbol) else "equity"
+
+
+def check_max_positions(positions: list[Position]) -> RuleResult:
+    """Enforce maximum number of simultaneous open positions (MAX_POSITIONS = 6).
+
+    Args:
+        positions: Currently open positions.
+
+    Returns:
+        RuleResult.fail if len(positions) >= MAX_POSITIONS; ok otherwise.
     """
-
-    def __init__(self) -> None:
-        """Initialize the exposure monitor."""
-        self._position_cache: dict[str, dict[str, Any]] = {}
-
-    # ── Exposure queries ──────────────────────────────────────────────────────
-
-    async def get_total_exposure(
-        self,
-        state: StateStore,
-        capital: Decimal,
-    ) -> float:
-        """Compute total open exposure as a percentage of capital.
-
-        Scans all ``positions:*`` keys in Redis and sums
-        ``size × entry`` for each position.
-
-        Args:
-            state:   Connected :class:`~core.state.StateStore` instance.
-            capital: Portfolio capital in quote currency.
-
-        Returns:
-            Total exposure as a percentage of capital (e.g. ``15.0`` = 15 %).
-        """
-        if capital <= Decimal("0"):
-            return 0.0
-
-        r = state._ensure_connected()
-        keys = await r.keys("positions:*")
-        total_value = Decimal("0")
-        for key in keys:
-            raw = await state.get(key if isinstance(key, str) else key.decode())
-            if isinstance(raw, dict):
-                try:
-                    pos_size = Decimal(str(raw.get("size", 0)))
-                    pos_entry = Decimal(str(raw.get("entry", 0)))
-                    total_value += pos_size * pos_entry
-                except Exception as exc:
-                    logger.debug("position_parse_failed", error=str(exc))
-                    continue
-
-        return float(total_value / capital * Decimal("100"))
-
-    async def get_position_count(self, state: StateStore) -> int:
-        """Return the number of currently open positions.
-
-        Args:
-            state: Connected :class:`~core.state.StateStore` instance.
-
-        Returns:
-            Count of ``positions:*`` keys in Redis.
-        """
-        r = state._ensure_connected()
-        keys = await r.keys("positions:*")
-        return len(keys)
-
-    # ── Validation ─────────────────────────────────────────────────────────────
-
-    async def check_exposure(
-        self,
-        candidate: OrderCandidate,
-        state: StateStore,
-        capital: Decimal,
-        settings: Settings,
-    ) -> tuple[bool, str]:
-        """Check whether adding the candidate would breach exposure limits.
-
-        Checks:
-
-        1. ``total_exposure + new_value / capital ≤ max_total_exposure_pct / 100``.
-        2. ``current_position_count < max_simultaneous_positions``.
-
-        Args:
-            candidate: Proposed order candidate.
-            state:     Connected :class:`~core.state.StateStore` instance.
-            capital:   Portfolio capital in quote currency.
-            settings:  Application settings containing threshold values.
-
-        Returns:
-            ``(True, "")`` if both checks pass;
-            ``(False, reason)`` on failure.
-        """
-        new_value = candidate.size * candidate.entry
-        new_exposure_pct = (
-            float(new_value / capital * Decimal("100")) if capital > Decimal("0") else 0.0
+    if len(positions) >= MAX_POSITIONS:
+        return RuleResult.fail(
+            rule_name="check_max_positions",
+            block_reason=BlockReason.MAX_POSITIONS_EXCEEDED,
+            reason=f"open positions {len(positions)} >= max {MAX_POSITIONS}",
+            open_count=len(positions),
+            max_positions=MAX_POSITIONS,
         )
+    return RuleResult.ok(rule_name="check_max_positions", reason=f"{len(positions)}/{MAX_POSITIONS} positions")
 
-        current_exposure_pct = await self.get_total_exposure(state, capital)
-        combined = current_exposure_pct + new_exposure_pct
 
-        if combined > settings.max_total_exposure_pct:
-            return (
-                False,
-                f"total exposure {combined:.1f}% would exceed max "
-                f"{settings.max_total_exposure_pct}%",
-            )
+def check_total_exposure(
+    order: OrderCandidate, positions: list[Position], capital: Decimal
+) -> RuleResult:
+    """Verify total notional (existing + new) does not exceed 20% of capital.
 
-        position_count = await self.get_position_count(state)
-        if position_count >= settings.max_simultaneous_positions:
-            return (
-                False,
-                f"open positions {position_count} at max {settings.max_simultaneous_positions}",
-            )
+    Formula: (sum(pos_i.size x pos_i.entry) + order.size x order.entry) / capital <= 0.20
 
-        return True, ""
+    Args:
+        order:     Proposed order.
+        positions: Currently open positions.
+        capital:   Total portfolio capital.
 
-    def check_sector_exposure(
-        self,
-        positions: dict[str, Any],
-        new_order_symbol: str,
-        new_order_size_usd: float,
-        total_capital: float,
-    ) -> tuple[bool, str]:
-        """Ensure adding this position doesn't exceed 25% sector concentration.
+    Returns:
+        RuleResult.fail if combined exposure > MAX_TOTAL_EXPOSURE_PCT; ok otherwise.
+    """
+    if capital <= Decimal("0"):
+        return RuleResult.ok(rule_name="check_total_exposure", reason="capital=0 skipped")
 
-        Args:
-            positions: Current open positions dict {symbol: {"market_value_usd": ...}}.
-            new_order_symbol: Symbol being considered for entry.
-            new_order_size_usd: Notional USD value of the new order.
-            total_capital: Total portfolio capital in USD.
+    existing_notional = sum(p.size * p.entry_price for p in positions)
+    new_notional = order.size * order.entry
+    total_notional = existing_notional + new_notional
+    exposure_pct = float(total_notional / capital)
 
-        Returns:
-            (allowed, reason) — reason is empty string when allowed.
-        """
-        new_sector = SECTOR_MAP.get(new_order_symbol, "other")
-        max_allowed = total_capital * MAX_SECTOR_EXPOSURE_PCT
-
-        current_exposure = sum(
-            pos.get("market_value_usd", 0)
-            for sym, pos in positions.items()
-            if SECTOR_MAP.get(sym, "other") == new_sector
+    if exposure_pct > MAX_TOTAL_EXPOSURE_PCT:
+        return RuleResult.fail(
+            rule_name="check_total_exposure",
+            block_reason=BlockReason.MAX_TOTAL_EXPOSURE,
+            reason=f"total exposure {exposure_pct:.1%} > max {MAX_TOTAL_EXPOSURE_PCT:.0%}",
+            exposure_pct=exposure_pct,
+            max_exposure=MAX_TOTAL_EXPOSURE_PCT,
         )
+    return RuleResult.ok(rule_name="check_total_exposure", reason=f"{exposure_pct:.1%} of capital")
 
-        if current_exposure + new_order_size_usd > max_allowed:
-            return False, (
-                f"Sector {new_sector} exposure would reach "
-                f"${current_exposure + new_order_size_usd:.0f} "
-                f"(limit: ${max_allowed:.0f})"
+
+def check_per_class_exposure(
+    order: OrderCandidate, positions: list[Position], capital: Decimal
+) -> RuleResult:
+    """Verify per-asset-class exposure does not exceed 12% of capital.
+
+    Crypto: symbols ending in USDT/BTC/ETH/BNB. All others: equity.
+
+    Args:
+        order:     Proposed order.
+        positions: Currently open positions.
+        capital:   Total portfolio capital.
+
+    Returns:
+        RuleResult.fail if class exposure > MAX_CLASS_EXPOSURE_PCT; ok otherwise.
+    """
+    if capital <= Decimal("0"):
+        return RuleResult.ok(rule_name="check_per_class_exposure", reason="capital=0 skipped")
+
+    new_class = _asset_class(order.symbol)
+    class_notional = sum(
+        p.size * p.entry_price for p in positions if _asset_class(p.symbol) == new_class
+    )
+    class_notional += order.size * order.entry
+    class_pct = float(class_notional / capital)
+
+    if class_pct > MAX_CLASS_EXPOSURE_PCT:
+        return RuleResult.fail(
+            rule_name="check_per_class_exposure",
+            block_reason=BlockReason.MAX_CLASS_EXPOSURE,
+            reason=f"{new_class} exposure {class_pct:.1%} > max {MAX_CLASS_EXPOSURE_PCT:.0%}",
+            asset_class=new_class,
+            class_pct=class_pct,
+        )
+    return RuleResult.ok(
+        rule_name="check_per_class_exposure", reason=f"{new_class} {class_pct:.1%}"
+    )
+
+
+def check_correlation(
+    order: OrderCandidate,
+    positions: list[Position],
+    correlation_matrix: dict[tuple[str, str], float],
+) -> RuleResult:
+    """Block if new order has rho > 0.75 with any open position.
+
+    Falls through OK if the symbol pair is not in correlation_matrix
+    (fail-safe: missing data != block).
+
+    Args:
+        order:              Proposed order.
+        positions:          Currently open positions.
+        correlation_matrix: Symmetric dict (sym_a, sym_b) -> Pearson rho.
+
+    Returns:
+        RuleResult.fail if any pair exceeds CORRELATION_BLOCK_THRESHOLD; ok otherwise.
+
+    Reference:
+        Markowitz, H. (1952). Journal of Finance, 7(1), 77-91.
+    """
+    sym_new = order.symbol.upper()
+    for pos in positions:
+        sym_pos = pos.symbol.upper()
+        if sym_new == sym_pos:
+            # Same symbol -- trivially correlated (rho=1), always block
+            rho = 1.0
+        else:
+            key1 = (sym_new, sym_pos)
+            key2 = (sym_pos, sym_new)
+            if key1 in correlation_matrix:
+                rho = correlation_matrix[key1]
+            elif key2 in correlation_matrix:
+                rho = correlation_matrix[key2]
+            else:
+                continue  # Missing pair -> fail-safe: allow
+
+        if rho > CORRELATION_BLOCK_THRESHOLD:
+            return RuleResult.fail(
+                rule_name="check_correlation",
+                block_reason=BlockReason.HIGH_CORRELATION,
+                reason=f"rho({sym_new},{sym_pos})={rho:.3f} > {CORRELATION_BLOCK_THRESHOLD}",
+                rho=rho,
+                symbol_a=sym_new,
+                symbol_b=sym_pos,
             )
-        return True, ""
+
+    return RuleResult.ok(rule_name="check_correlation", reason="no high-correlation pair")

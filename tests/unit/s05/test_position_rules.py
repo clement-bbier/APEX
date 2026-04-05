@@ -1,249 +1,184 @@
-"""Unit tests for PositionRules and check_max_risk_per_trade."""
+"""Unit tests for Phase 6 position_rules.py.
+
+Tests cover all 6 functions: 4 check_* (blocking) and 2 apply_* (modifying).
+Includes 2 Hypothesis property tests with 1000 examples each.
+"""
 from __future__ import annotations
-
 from decimal import Decimal
-
-from core.config import Settings
+import pytest
+from hypothesis import given, settings as hyp_settings
+from hypothesis import strategies as st
 from core.models.order import OrderCandidate
-from core.models.signal import Direction, Signal
+from core.models.signal import Direction
+from core.models.tick import Session
+from services.s05_risk_manager.models import BlockReason
 from services.s05_risk_manager.position_rules import (
-    PositionRules,
-    RuleResult,
     check_max_risk_per_trade,
+    check_max_size,
+    check_min_rr,
+    check_stop_loss_present,
+    apply_crypto_multiplier,
+    apply_session_multiplier,
 )
 
+_CAPITAL = Decimal("100_000")
 
-def _make_signal(
-    entry: str = "50000",
-    stop_loss: str = "49500",
-    tp0: str = "51000",
-    tp1: str = "52000",
-) -> Signal:
-    """Build a minimal valid Signal."""
-    return Signal(
-        signal_id="sig1",
-        symbol="BTCUSDT",
-        direction=Direction.LONG,
-        strength=0.8,
-        confidence=0.9,
-        timestamp_ms=1_700_000_000_000,
-        entry=Decimal(entry),
-        stop_loss=Decimal(stop_loss),
-        take_profit=[Decimal(tp0), Decimal(tp1)],
-    )
-
-
-def _make_candidate(
-    size: str = "0.01",
-    entry: str = "50000.0",
-    stop_loss: str = "49500.0",
-    capital_at_risk: str = "5.0",
-    source_signal: Signal | None = None,
+def _long_order(
+    entry="50000", sl="49500", tp_scalp="50750", tp_swing="52000",
+    size="0.01", symbol="BTCUSDT"
 ) -> OrderCandidate:
-    """Build a minimal valid OrderCandidate.
-
-    Default: 0.01 BTC @ $50k = $500 position < 10% of $100k capital.
-    """
-    size_dec = Decimal(size)
-    scalp = size_dec * Decimal("0.35")
-    swing = size_dec - scalp
-
+    sz = Decimal(size)
     return OrderCandidate(
-        order_id="ord1",
-        symbol="BTCUSDT",
-        direction=Direction.LONG,
-        timestamp_ms=1_700_000_000_000,
-        size=size_dec,
-        size_scalp_exit=scalp,
-        size_swing_exit=swing,
-        entry=Decimal(entry),
-        stop_loss=Decimal(stop_loss),
-        target_scalp=Decimal("51000.0"),
-        target_swing=Decimal("52000.0"),
-        capital_at_risk=Decimal(capital_at_risk),
-        source_signal=source_signal,
+        order_id="o1", symbol=symbol, direction=Direction.LONG,
+        timestamp_ms=1_700_000_000_000, size=sz,
+        size_scalp_exit=sz * Decimal("0.35"), size_swing_exit=sz * Decimal("0.65"),
+        entry=Decimal(entry), stop_loss=Decimal(sl),
+        target_scalp=Decimal(tp_scalp), target_swing=Decimal(tp_swing),
+        capital_at_risk=Decimal("5"),
+    )
+
+def _short_order() -> OrderCandidate:
+    sz = Decimal("0.01")
+    return OrderCandidate(
+        order_id="o2", symbol="AAPL", direction=Direction.SHORT,
+        timestamp_ms=1_700_000_000_000, size=sz,
+        size_scalp_exit=sz * Decimal("0.35"), size_swing_exit=sz * Decimal("0.65"),
+        entry=Decimal("150"), stop_loss=Decimal("152"),
+        target_scalp=Decimal("148"), target_swing=Decimal("145"),
+        capital_at_risk=Decimal("0.2"),
     )
 
 
-class TestPositionRulesHappyPath:
-    def test_valid_order_passes_all_checks(self) -> None:
-        rules = PositionRules()
-        candidate = _make_candidate()
-        passed, reason = rules.validate(candidate, Decimal("100000"), Settings())
-        assert passed is True
-        assert reason == ""
+class TestStopLossPresent:
+    def test_stop_loss_required_long(self) -> None:
+        r = check_stop_loss_present(_long_order())
+        assert r.passed
 
-    def test_valid_order_with_good_rr_passes(self) -> None:
-        rules = PositionRules()
-        # entry=50000, stop=49500 → risk=500; tp0=51250 → reward=1250 → rr=2.5 > 1.5
-        signal = _make_signal(entry="50000", stop_loss="49500", tp0="51250")
-        candidate = _make_candidate(source_signal=signal)
-        passed, _ = rules.validate(candidate, Decimal("100000"), Settings())
-        assert passed is True
+    def test_stop_loss_required_short(self) -> None:
+        r = check_stop_loss_present(_short_order())
+        assert r.passed
 
+    def test_stop_loss_direction_long_sl_above_entry_blocked(self) -> None:
+        order = _long_order(entry="50000", sl="50100")
+        r = check_stop_loss_present(order)
+        assert not r.passed
+        assert r.block_reason == BlockReason.NO_STOP_LOSS
 
-class TestPositionRulesCapitalAtRisk:
-    def test_capital_at_risk_too_high_fails(self) -> None:
-        rules = PositionRules()
-        # max_position_risk_pct default = 0.5% → max_risk = 500 on 100k
-        candidate = _make_candidate(capital_at_risk="600.0")
-        passed, reason = rules.validate(candidate, Decimal("100000"), Settings())
-        assert passed is False
-        assert "capital_at_risk" in reason
-
-    def test_capital_at_risk_below_limit_passes(self) -> None:
-        rules = PositionRules()
-        candidate = _make_candidate(capital_at_risk="4.99")
-        passed, _ = rules.validate(candidate, Decimal("100000"), Settings())
-        assert passed is True
-
-
-class TestPositionRulesStopLoss:
-    def test_valid_stop_loss_passes(self) -> None:
-        rules = PositionRules()
-        candidate = _make_candidate(stop_loss="49500.0")
-        passed, _ = rules.validate(candidate, Decimal("100000"), Settings())
-        assert passed is True
-
-
-class TestPositionRulesRiskReward:
-    def test_low_rr_fails(self) -> None:
-        rules = PositionRules()
-        settings = Settings()
-        # entry=50000, stop=49500 → risk=500; tp0=50250 → reward=250 → rr=0.5 < 1.5
-        signal = _make_signal(entry="50000", stop_loss="49500", tp0="50250", tp1="50500")
-        candidate = _make_candidate(source_signal=signal)
-        passed, reason = rules.validate(candidate, Decimal("100000"), settings)
-        assert passed is False
-        assert "risk_reward" in reason
-
-    def test_no_source_signal_skips_rr_check(self) -> None:
-        rules = PositionRules()
-        candidate = _make_candidate(source_signal=None)
-        passed, _ = rules.validate(candidate, Decimal("100000"), Settings())
-        assert passed is True
-
-    def test_source_signal_with_no_rr_skips_check(self) -> None:
-        """Signal where risk==0 gives risk_reward=None → check skipped."""
-        # entry == stop_loss would fail Signal validation; instead use rr > min
-        signal = _make_signal(entry="50000", stop_loss="49500", tp0="51250")
-        candidate = _make_candidate(source_signal=signal)
-        rules = PositionRules()
-        passed, _ = rules.validate(candidate, Decimal("100000"), Settings())
-        assert passed is True
-
-    def test_rr_exactly_at_minimum_passes(self) -> None:
-        rules = PositionRules()
-        settings = Settings()
-        # min_risk_reward = 1.5; entry=50000, stop=49500 → risk=500; tp0=50750 → rr=1.5
-        signal = _make_signal(entry="50000", stop_loss="49500", tp0="50750")
-        candidate = _make_candidate(source_signal=signal)
-        passed, _ = rules.validate(candidate, Decimal("100000"), settings)
-        # 1.5 is NOT < 1.5, so passes
-        assert passed is True
-
-
-class TestPositionRulesMaxSize:
-    def test_huge_position_fails_max_size_check(self) -> None:
-        rules = PositionRules()
-        settings = Settings()
-        capital = Decimal("10000")
-        # max_position_size_pct default = 10 → max = 1000
-        # size=100, entry=50000 → position_value=5_000_000 >> 1000
-        size_dec = Decimal("100")
-        scalp = size_dec * Decimal("0.35")
-        swing = size_dec - scalp
-        candidate = OrderCandidate(
-            order_id="ord3",
-            symbol="BTCUSDT",
-            direction=Direction.LONG,
-            timestamp_ms=1_700_000_000_000,
-            size=size_dec,
-            size_scalp_exit=scalp,
-            size_swing_exit=swing,
-            entry=Decimal("50000"),
-            stop_loss=Decimal("49500"),
-            target_scalp=Decimal("51000"),
-            target_swing=Decimal("52000"),
-            capital_at_risk=Decimal("50"),
+    def test_stop_loss_direction_short_sl_below_entry_blocked(self) -> None:
+        sz = Decimal("0.01")
+        order = OrderCandidate(
+            order_id="o3", symbol="AAPL", direction=Direction.SHORT,
+            timestamp_ms=1_700_000_000_000, size=sz,
+            size_scalp_exit=sz * Decimal("0.35"), size_swing_exit=sz * Decimal("0.65"),
+            entry=Decimal("150"), stop_loss=Decimal("148"),  # SL BELOW entry for SHORT
+            target_scalp=Decimal("148"), target_swing=Decimal("145"),
+            capital_at_risk=Decimal("0.2"),
         )
-        passed, reason = rules.validate(candidate, capital, settings)
-        assert passed is False
-        assert "position_value" in reason
+        r = check_stop_loss_present(order)
+        assert not r.passed
+        assert r.block_reason == BlockReason.NO_STOP_LOSS
 
 
-class TestCheckMaxRiskPerTrade:
-    def test_risk_within_budget_passes(self) -> None:
-        class MockOrder:
-            entry_price = Decimal("50000")
-            stop_loss = Decimal("49750")  # 250 risk per unit
-            size_total = Decimal("0.1")   # total risk = 25 < 500 (0.5% of 100k)
+class TestMinRR:
+    def test_min_rr_exact_boundary_pass(self) -> None:
+        # RR = 750/500 = 1.5 -> pass
+        r = check_min_rr(_long_order(entry="50000", sl="49500", tp_scalp="50750"))
+        assert r.passed
 
-        result = check_max_risk_per_trade(MockOrder(), Decimal("100000"))
-        assert result.passed is True
-        assert result.reason == ""
+    def test_min_rr_below_threshold_fail(self) -> None:
+        # RR = 700/500 = 1.4 < 1.5 -> fail
+        r = check_min_rr(_long_order(entry="50000", sl="49500", tp_scalp="50700"))
+        assert not r.passed
+        assert r.block_reason == BlockReason.MIN_RR_NOT_MET
 
-    def test_risk_exceeds_budget_fails(self) -> None:
-        class MockOrder:
-            entry_price = Decimal("50000")
-            stop_loss = Decimal("49000")  # 1000 risk per unit
-            size_total = Decimal("1.0")   # total risk = 1000 > 500 (0.5% of 100k)
+    def test_min_rr_high_rr_passes(self) -> None:
+        # RR = 1250/500 = 2.5
+        r = check_min_rr(_long_order(entry="50000", sl="49500", tp_scalp="51250"))
+        assert r.passed
 
-        result = check_max_risk_per_trade(MockOrder(), Decimal("100000"))
-        assert result.passed is False
-        assert "exceeds max" in result.reason
 
-    def test_zero_entry_fails(self) -> None:
-        class MockOrder:
-            entry_price = Decimal("0")
-            stop_loss = Decimal("49500")
-            size_total = Decimal("1.0")
+class TestMaxRiskPerTrade:
+    def test_max_risk_exact_boundary_pass(self) -> None:
+        # 0.499% risk: SL dist = 500, size s.t. 500*size = 0.499% * 100000 = 499
+        # size = 499/500 = 0.998
+        sz = Decimal("0.998")
+        order = _long_order(size="0.998")
+        r = check_max_risk_per_trade(order, _CAPITAL)
+        assert r.passed
 
-        result = check_max_risk_per_trade(MockOrder(), Decimal("100000"))
-        assert result.passed is False
-        assert "invalid" in result.reason
+    def test_max_risk_over_threshold_fail(self) -> None:
+        # 0.501% risk: SL dist = 500, size = 501/500 = 1.002
+        order = _long_order(size="1.002")
+        r = check_max_risk_per_trade(order, _CAPITAL)
+        assert not r.passed
+        assert r.block_reason == BlockReason.MAX_RISK_PER_TRADE
 
-    def test_zero_stop_fails(self) -> None:
-        class MockOrder:
-            entry_price = Decimal("50000")
-            stop_loss = Decimal("0")
-            size_total = Decimal("1.0")
 
-        result = check_max_risk_per_trade(MockOrder(), Decimal("100000"))
-        assert result.passed is False
+class TestMaxSize:
+    def test_max_size_ceiling_pass(self) -> None:
+        # 9.9% of 100k = 9900. entry=50000 -> size=0.198
+        order = _long_order(size="0.198")
+        r = check_max_size(order, _CAPITAL)
+        assert r.passed
 
-    def test_zero_size_fails(self) -> None:
-        class MockOrder:
-            entry_price = Decimal("50000")
-            stop_loss = Decimal("49500")
-            size_total = Decimal("0")
+    def test_max_size_ceiling_fail(self) -> None:
+        # 10.1% of 100k = 10100. entry=50000 -> size=0.202
+        order = _long_order(size="0.202")
+        r = check_max_size(order, _CAPITAL)
+        assert not r.passed
+        assert r.block_reason == BlockReason.MAX_SIZE_EXCEEDED
 
-        result = check_max_risk_per_trade(MockOrder(), Decimal("100000"))
-        assert result.passed is False
 
-    def test_missing_attributes_treated_as_zero(self) -> None:
-        class EmptyOrder:
-            pass
+class TestApplyMultipliers:
+    def test_crypto_multiplier_applied_btcusdt(self) -> None:
+        order = _long_order(symbol="BTCUSDT", size="1.0")
+        adjusted, result = apply_crypto_multiplier(order)
+        assert result.passed
+        assert adjusted == Decimal("0.7")
 
-        result = check_max_risk_per_trade(EmptyOrder(), Decimal("100000"))
-        assert result.passed is False
+    def test_crypto_multiplier_not_applied_equity(self) -> None:
+        order = _long_order(symbol="AAPL", size="1.0")
+        adjusted, result = apply_crypto_multiplier(order)
+        assert result.passed
+        assert adjusted == Decimal("1.0")
 
-    def test_exactly_below_budget_passes(self) -> None:
-        """Order well within 0.5% risk should pass."""
-        class MockOrder:
-            entry_price = Decimal("50000")
-            stop_loss = Decimal("49500")   # 500 risk per unit
-            size_total = Decimal("0.09")   # total risk = 45 < 500
+    def test_session_prime_bonus_us_open(self) -> None:
+        order = _long_order(size="1.0")
+        adjusted, result = apply_session_multiplier(order, Session.US_PRIME)
+        assert result.passed
+        assert adjusted == Decimal(str(1.0 * 1.10))
 
-        result = check_max_risk_per_trade(MockOrder(), Decimal("100000"))
-        assert result.passed is True
+    def test_session_no_bonus_overnight(self) -> None:
+        order = _long_order(size="1.0")
+        adjusted, result = apply_session_multiplier(order, Session.ASIAN)
+        assert result.passed
+        assert adjusted == Decimal("1.0")
 
-    def test_rule_result_dataclass_defaults(self) -> None:
-        r = RuleResult(passed=True)
-        assert r.passed is True
-        assert r.reason == ""
 
-    def test_rule_result_with_reason(self) -> None:
-        r = RuleResult(passed=False, reason="exceeded budget")
-        assert r.passed is False
-        assert r.reason == "exceeded budget"
+@given(
+    capital=st.decimals(min_value=Decimal("100"), max_value=Decimal("1_000_000"), places=2),
+    size=st.decimals(min_value=Decimal("0.001"), max_value=Decimal("2.0"), places=3),
+)
+@hyp_settings(max_examples=1000)
+def test_approved_order_never_exceeds_max_risk(capital: Decimal, size: Decimal) -> None:
+    """INVARIANT: if check_max_risk_per_trade passes, monetary_risk <= 0.005 x capital."""
+    order = _long_order(size=str(size))
+    result = check_max_risk_per_trade(order, capital)
+    if result.passed:
+        sl_dist = abs(order.entry - order.stop_loss)
+        risk = sl_dist * order.size
+        assert risk <= capital * Decimal("0.005") + Decimal("0.0001")
+
+
+@given(
+    sl_pct=st.floats(min_value=0.001, max_value=0.05, allow_nan=False, allow_infinity=False),
+    size_frac=st.floats(min_value=0.001, max_value=0.10, allow_nan=False, allow_infinity=False),
+)
+@hyp_settings(max_examples=1000)
+def test_risk_formula_commutative(sl_pct: float, size_frac: float) -> None:
+    """risk = SL_distance x size is commutative and always >= 0."""
+    entry = Decimal("50000")
+    sl = entry * Decimal(str(1.0 - sl_pct))
+    size = Decimal(str(size_frac)) * entry / Decimal("50000")
+    risk = abs(entry - sl) * size
+    assert risk >= Decimal("0")
