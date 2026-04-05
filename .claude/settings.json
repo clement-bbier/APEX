@@ -21,7 +21,15 @@
       "Bash(.venv/Scripts/python -m pytest tests/unit/ --cov=services --cov=core --cov-report=term-missing --cov-fail-under=85 -q --tb=short)",
       "Bash(.venv/Scripts/python -m pytest tests/unit/s09/test_drift_detector.py::TestOutcomeCorrelation -v --tb=long)",
       "Bash(.venv/Scripts/python -m pytest tests/unit/ --cov=services --cov=core --cov-fail-under=85 -q --tb=short)",
-      "Bash(.venv/Scripts/python -m ruff check . --output-format=concise)"
+      "Bash(.venv/Scripts/python -m ruff check . --output-format=concise)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m ruff check core/math/labeling.py tests/unit/core/test_labeling.py)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m pytest tests/unit/ --cov=services --cov=core --cov=backtesting --cov-report=term-missing -q)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m mypy backtesting/metrics.py --strict)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m ruff check . --fix)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m ruff check .)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m mypy . --strict)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m pytest tests/unit/s02/test_vpin.py tests/unit/core/test_fractional_diff.py -v --tb=short)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m pytest tests/unit/s02/test_vpin.py tests/unit/core/test_fractional_diff.py --cov=services/s02_signal_engine/vpin --cov=core/math/fractional_diff --cov-report=term-missing -q)"
     ]
   }
 }

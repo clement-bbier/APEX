@@ -18,6 +18,7 @@ from decimal import Decimal
 from typing import Any
 
 import numpy as np
+from scipy import stats as scipy_stats
 
 from core.models.order import TradeRecord
 
@@ -261,6 +262,211 @@ def _group_stats(groups: dict[str, list[TradeRecord]]) -> dict[str, dict[str, An
             "total_pnl": sum(pnls),
         }
     return result
+
+
+# ---------------------------------------------------------------------------
+# Institutional-grade validation metrics (López de Prado)
+# ---------------------------------------------------------------------------
+# PSR, DSR, PBO, MinTRL replace classical Sharpe as the primary performance
+# gate.  A Sharpe=2.0 with negative skewness + fat tails can have PSR < 0.5.
+# A strategy found after N=1000 parameter tests has DSR << PSR.
+#
+# References:
+#   Bailey & López de Prado (2012). Journal of Risk 15(2).
+#   Bailey & López de Prado (2014). Journal of Portfolio Management 40(5).
+#   Bailey, Borwein, López de Prado & Zhu (2015). J. Computational Finance 20(4).
+#   López de Prado (2018). AFML. Wiley. Chapter 8.
+# ---------------------------------------------------------------------------
+
+
+def probabilistic_sharpe_ratio(
+    returns: list[float],
+    benchmark_sharpe: float = 0.0,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
+) -> float:
+    """PSR(SR*) = Φ[(SR̂ - SR*) × √(T-1) / √(1 - γ₃×SR̂ + (γ₄-1)/4×SR̂²)]
+
+    Corrects for non-normality (skewness + kurtosis) so that a strategy with
+    fat-tailed losses cannot fake a high Sharpe.
+
+    PSR > 0.95 → deploy.  PSR < 0.50 → do not deploy.
+
+    Reference:
+        Bailey & López de Prado (2012). "The Sharpe Ratio Efficient Frontier."
+        Journal of Risk 15(2). Propositions 1-2.
+
+    Args:
+        returns: Period returns (e.g. daily fractions).
+        benchmark_sharpe: Annualised SR* threshold (default 0).
+        annual_factor: √(periods per year) — √252 for daily.
+
+    Returns:
+        PSR in [0, 1].
+    """
+    if len(returns) < 4:
+        return 0.0
+    arr = np.asarray(returns, dtype=float)
+    n = len(arr)
+    mean_r = float(np.mean(arr))
+    std_r = float(np.std(arr, ddof=1))
+    # Guard against near-zero std (numpy may return ~1e-19 for constant arrays).
+    # scipy.skew/kurtosis on near-constant data raises RuntimeWarning (catastrophic
+    # cancellation), which pytest treats as an error via filterwarnings="error".
+    if std_r < 1e-10:
+        if mean_r > 1e-10:
+            return 1.0
+        if mean_r < -1e-10:
+            return 0.0
+        return 0.5  # zero mean, zero vol → truly indeterminate
+    sr_raw = mean_r / std_r
+    skew = float(scipy_stats.skew(arr, bias=False))
+    kurt = float(scipy_stats.kurtosis(arr, bias=False))
+    var_sr = (1.0 - skew * sr_raw + (kurt + 2.0) / 4.0 * sr_raw**2) / (n - 1)
+    if var_sr <= 0:
+        return 0.5
+    z = (sr_raw - benchmark_sharpe / annual_factor) / math.sqrt(var_sr)
+    return float(scipy_stats.norm.cdf(z))
+
+
+def deflated_sharpe_ratio(
+    returns: list[float],
+    n_trials: int,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
+    benchmark_sharpe: float = 0.0,
+) -> float:
+    """DSR — PSR corrected for selection bias across N independent trials.
+
+    Expected maximum Sharpe under the null (no edge, N parameter sets tested):
+
+        SR* = σ(SR̂) × [(1-γ) × Φ⁻¹(1-1/N) + γ × Φ⁻¹(1-1/Ne)]
+
+    where γ = 0.5772156649 (Euler-Mascheroni constant).
+
+    DSR answers: "given that we tried N strategies and kept the best,
+    how likely is our observed SR to reflect genuine alpha?"
+
+    Reference:
+        Bailey & López de Prado (2014). "The Deflated Sharpe Ratio."
+        Journal of Portfolio Management 40(5). Equation 2.
+
+    Args:
+        returns: Period returns.
+        n_trials: Number of independently tested parameter sets / strategies.
+        annual_factor: √(periods per year).
+        benchmark_sharpe: Hard-floor SR* (annualised). Final SR* = max(this, DSR SR*).
+
+    Returns:
+        DSR in [0, 1]. Always ≤ PSR for the same returns.
+    """
+    if len(returns) < 4 or n_trials < 1:
+        return probabilistic_sharpe_ratio(returns, benchmark_sharpe, annual_factor)
+    arr = np.asarray(returns, dtype=float)
+    n = len(arr)
+    std_r = float(np.std(arr, ddof=1))
+    mean_r = float(np.mean(arr))
+    if std_r < 1e-10:
+        if mean_r > 1e-10:
+            return 1.0
+        if mean_r < -1e-10:
+            return 0.0
+        return 0.5
+    sr_raw = mean_r / std_r
+    skew = float(scipy_stats.skew(arr, bias=False))
+    kurt = float(scipy_stats.kurtosis(arr, bias=False))
+    var_sr = max(
+        1e-10,
+        (1.0 - skew * sr_raw + (kurt + 2.0) / 4.0 * sr_raw**2) / (n - 1),
+    )
+    std_sr = math.sqrt(var_sr)
+    gamma = 0.5772156649  # Euler-Mascheroni constant
+    n_f = float(n_trials)
+    if n_f > 1:
+        z1 = float(scipy_stats.norm.ppf(1.0 - 1.0 / n_f))
+        z2 = float(scipy_stats.norm.ppf(1.0 - 1.0 / (n_f * math.e)))
+        sr_max = std_sr * ((1.0 - gamma) * z1 + gamma * z2)
+    else:
+        sr_max = 0.0
+    sr_star = max(benchmark_sharpe / annual_factor, sr_max)
+    z = (sr_raw - sr_star) / math.sqrt(var_sr)
+    return float(scipy_stats.norm.cdf(z))
+
+
+def minimum_track_record_length(
+    target_sharpe: float,
+    benchmark_sharpe: float = 0.0,
+    confidence: float = 0.95,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
+    skewness: float = 0.0,
+    excess_kurtosis: float = 0.0,
+) -> int:
+    """T* = 1 + V[SR̂] × (Φ⁻¹(α) / (SR̂ - SR*))²
+
+    Minimum number of observations for PSR ≥ confidence.
+
+    Interpretation: "how many months of live data do we need before we can
+    claim this strategy has SR ≥ benchmark_sharpe with confidence α?"
+
+    Reference:
+        Bailey & López de Prado (2012). "The Sharpe Ratio Efficient Frontier."
+        Journal of Risk 15(2). Proposition 3.
+
+    Args:
+        target_sharpe: Annualised SR the strategy is expected to achieve.
+        benchmark_sharpe: Annualised SR* threshold.
+        confidence: Required PSR threshold (default 0.95).
+        annual_factor: √(periods per year).
+        skewness: Return distribution skewness (0 = normal).
+        excess_kurtosis: Return distribution excess kurtosis (0 = normal).
+
+    Returns:
+        Minimum number of return observations needed. Returns int(1e9) when
+        target_sharpe ≤ benchmark_sharpe (impossible to achieve).
+    """
+    if target_sharpe <= benchmark_sharpe:
+        return 1_000_000_000
+    sr_raw = target_sharpe / annual_factor
+    sr_star = benchmark_sharpe / annual_factor
+    z = float(scipy_stats.norm.ppf(confidence))
+    var_f = 1.0 - skewness * sr_raw + (excess_kurtosis + 2.0) / 4.0 * sr_raw**2
+    return max(1, math.ceil(1.0 + var_f * (z / (sr_raw - sr_star)) ** 2))
+
+
+def backtest_overfitting_probability(
+    in_sample_sharpe: float,
+    out_of_sample_sharpe: float,
+    n_trials: int,
+) -> float:
+    """PBO — Estimated probability that the backtest is overfit.
+
+    PBO > 0.5 → overfit → DO NOT DEPLOY.
+    PBO < 0.1 → strong evidence of genuine edge.
+
+    Derived from the rank-based PBO estimator (Bailey et al. 2015, Eq. 11):
+    when IS Sharpe degrades significantly OOS, and the strategy was selected
+    from N candidates, the probability of overfitting rises with both
+    the degradation ratio d and log(N).
+
+    Reference:
+        Bailey, Borwein, López de Prado & Zhu (2015).
+        "The Probability of Backtest Overfitting."
+        Journal of Computational Finance 20(4). Equation 11.
+
+    Args:
+        in_sample_sharpe: Sharpe ratio measured in-sample.
+        out_of_sample_sharpe: Sharpe ratio measured out-of-sample.
+        n_trials: Number of strategies / parameter combinations tested.
+
+    Returns:
+        PBO in [0, 1].
+    """
+    if n_trials <= 1:
+        return 0.0
+    if in_sample_sharpe <= 0:
+        return 1.0
+    d = (in_sample_sharpe - out_of_sample_sharpe) / abs(in_sample_sharpe)
+    d = max(-1.0, min(1.0, d))
+    log_f = math.log(max(1, n_trials)) / math.log(100)
+    return max(0.0, min(1.0, 0.5 * (1 + d) * (0.5 + 0.5 * log_f)))
 
 
 def full_report(
