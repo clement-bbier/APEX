@@ -10,6 +10,8 @@ from core.base_service import BaseService
 from services.s07_quant_analytics.market_stats import MarketStats
 from services.s07_quant_analytics.microstructure_adv import AdvancedMicrostructure
 from services.s07_quant_analytics.performance import PerformanceAnalyzer
+from services.s07_quant_analytics.realized_vol import RealizedVolEstimator
+from services.s07_quant_analytics.rough_vol import RoughVolAnalyzer
 
 
 class QuantAnalyticsService(BaseService):
@@ -23,6 +25,8 @@ class QuantAnalyticsService(BaseService):
         self._market_stats = MarketStats()
         self._microstructure = AdvancedMicrostructure()
         self._performance = PerformanceAnalyzer()
+        self._rv_estimator = RealizedVolEstimator()
+        self._rough_vol = RoughVolAnalyzer()
 
     async def on_message(self, topic: str, data: Any) -> None:  # noqa: ANN401
         """No-op message handler (service reads from Redis directly).
@@ -74,6 +78,26 @@ class QuantAnalyticsService(BaseService):
             results["garch_vol"] = self._market_stats.garch_volatility(returns)
         if returns and volumes:
             results["amihud"] = self._microstructure.amihud_ratio(returns, volumes)
+
+        # Jump detection and rough vol via new academic modules
+        if len(returns) >= 5:
+            import time as _time
+            metrics = self._rv_estimator.jump_detection(returns)
+            if metrics.has_significant_jump:
+                await self.state.set("analytics:jump_detected", {
+                    "jump_ratio": metrics.jump_ratio,
+                    "jump_component": metrics.jump_component,
+                    "timestamp_ms": int(_time.time() * 1000),
+                })
+            results["rv_annualized_vol"] = metrics.annualized_vol
+            results["jump_ratio"] = metrics.jump_ratio
+            results["has_significant_jump"] = metrics.has_significant_jump
+
+        if len(prices) >= 30:
+            rough_sig = self._rough_vol.estimate_hurst_from_vol(prices)
+            results["hurst_exponent"] = rough_sig.hurst_exponent
+            results["vol_regime_rough"] = rough_sig.vol_regime
+            results["scalping_edge_score"] = rough_sig.scalping_edge_score
 
         if results:
             await self.state.set("analytics:fast", json.dumps(results))

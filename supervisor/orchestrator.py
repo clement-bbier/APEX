@@ -125,7 +125,7 @@ class Orchestrator:
             True if Redis responds to ping.
         """
         try:
-            r: Any = aioredis.from_url(self._settings.redis_url, decode_responses=True)
+            r: Any = aioredis.from_url(self._settings.redis_url, decode_responses=True)  # type: ignore[no-untyped-call]
             await cast(Awaitable[bool], r.ping())
             await cast(Awaitable[None], r.aclose())
             return True

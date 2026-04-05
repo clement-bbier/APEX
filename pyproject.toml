@@ -15,6 +15,8 @@ allowed-confusables = ["\u00d7","\u2212","\u03b1","\u03b2","\u03b3","\u03bc","\u
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["ANN","S"]
+# Dashboard contains a large HTML template string with long lines (unavoidable)
+"services/s10_monitor/dashboard.py" = ["E501", "S104"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -62,7 +64,7 @@ addopts = [
     "--cov=core",
     "--cov=backtesting",
     "--cov-report=term-missing",
-    "--cov-fail-under=75",
+    "--cov-fail-under=85",
     "--timeout=30",
     "-v",
 ]
@@ -71,6 +73,8 @@ filterwarnings = [
     "ignore::DeprecationWarning:pandas_ta",
     "ignore::DeprecationWarning:binance",
     "ignore::DeprecationWarning:pydantic",
+    "ignore::DeprecationWarning:hypothesis",
+    "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
 [tool.coverage.run]
@@ -100,10 +104,6 @@ omit = [
     "services/s03_regime_detector/cb_calendar.py",
     "services/s05_risk_manager/cb_event_guard.py",
     "services/s05_risk_manager/exposure_monitor.py",
-    # Fusion engine modules (integration-level)
-    "services/s04_fusion_engine/fusion.py",
-    "services/s04_fusion_engine/hedge_trigger.py",
-    "services/s04_fusion_engine/strategy.py",
     # Heavy analytics (Monte Carlo, GARCH) - require special deps
     "services/s07_quant_analytics/monte_carlo.py",
     "services/s07_quant_analytics/performance.py",
@@ -111,8 +111,6 @@ omit = [
     # Macro intel - geopolitical and sector rotation (data-source dependent)
     "services/s08_macro_intelligence/geopolitical.py",
     "services/s08_macro_intelligence/sector_rotation.py",
-    # Signal quality (not yet implemented)
-    "services/s09_feedback_loop/signal_quality.py",
     "services/s10_monitor/*",
 ]
 branch = true

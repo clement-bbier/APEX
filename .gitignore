@@ -23,4 +23,6 @@ rust/target/
 rust/Cargo.lock
 *.whl
 .hypothesis/
-repomix-output.xml
+repomix-output*.xml
+.env
+prompt_phase*.md
