@@ -26,3 +26,4 @@ rust/Cargo.lock
 repomix-output*.xml
 .env
 prompt_phase*.md
+EXTENSIONS.md
