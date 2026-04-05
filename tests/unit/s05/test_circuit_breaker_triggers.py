@@ -4,7 +4,7 @@ Tests verify each trigger in isolation. No real Redis, no network I/O.
 """
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import fakeredis.aioredis
@@ -17,7 +17,7 @@ from services.s05_risk_manager.models import (
 )
 
 _CAPITAL = Decimal("100_000")
-_NOW = datetime.now(timezone.utc)
+_NOW = datetime.now(UTC)
 
 
 def _make_cb() -> CircuitBreaker:
@@ -47,7 +47,7 @@ async def test_intraday_loss_30m_trips() -> None:
 async def test_service_down_trips() -> None:
     """s01 last seen 61 seconds ago -- exceeds 60s threshold."""
     cb = _make_cb()
-    stale_time = datetime.now(timezone.utc) - timedelta(seconds=61)
+    stale_time = datetime.now(UTC) - timedelta(seconds=61)
     result = await cb.check(
         current_daily_pnl=Decimal("0"),
         starting_capital=_CAPITAL,
@@ -64,7 +64,7 @@ async def test_service_down_trips() -> None:
 async def test_service_down_under_threshold_passes() -> None:
     """s01 last seen 59 seconds ago -- below 60s threshold."""
     cb = _make_cb()
-    recent = datetime.now(timezone.utc) - timedelta(seconds=59)
+    recent = datetime.now(UTC) - timedelta(seconds=59)
     result = await cb.check(
         current_daily_pnl=Decimal("0"),
         starting_capital=_CAPITAL,

@@ -15,21 +15,16 @@ References:
 from __future__ import annotations
 
 import asyncio
-import json
-from datetime import datetime, timezone
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from services.s04_fusion_engine.meta_labeler import (
     MetaFeatures,
-    MetaLabelDecision,
     MetaLabeler,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

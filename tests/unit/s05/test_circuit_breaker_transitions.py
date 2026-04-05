@@ -5,8 +5,7 @@ No real Redis, no network I/O.
 """
 from __future__ import annotations
 
-import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import fakeredis.aioredis
@@ -125,7 +124,7 @@ async def test_probe_success_transitions_to_closed() -> None:
     )
 
     old = await cb.get_snapshot()
-    past = datetime.now(timezone.utc) - timedelta(minutes=HALF_OPEN_RECOVERY_MINUTES + 1)
+    past = datetime.now(UTC) - timedelta(minutes=HALF_OPEN_RECOVERY_MINUTES + 1)
     patched = CircuitBreakerSnapshot(
         state=CircuitBreakerState.OPEN,
         tripped_at=past,
@@ -175,7 +174,7 @@ async def test_probe_failure_stays_open() -> None:
         CircuitBreakerSnapshot,
     )
 
-    past = datetime.now(timezone.utc) - timedelta(minutes=HALF_OPEN_RECOVERY_MINUTES + 1)
+    past = datetime.now(UTC) - timedelta(minutes=HALF_OPEN_RECOVERY_MINUTES + 1)
     patched = CircuitBreakerSnapshot(
         state=CircuitBreakerState.HALF_OPEN,
         tripped_at=past,

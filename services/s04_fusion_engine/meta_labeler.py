@@ -1,3 +1,5 @@
+import typing
+
 """Meta-Labeling for APEX — S04 Fusion Engine.
 
 Meta-labeling (López de Prado 2018, Chapter 3) separates two concerns:
@@ -111,7 +113,7 @@ class MetaLabeler:
 
     TRADE_THRESHOLD: float = 0.15
 
-    WEIGHTS: dict[str, float] = {
+    WEIGHTS: typing.ClassVar[dict[str, float]] = {
         "signal_strength": 0.25,
         "confluence": 0.20,
         "hurst": 0.15,

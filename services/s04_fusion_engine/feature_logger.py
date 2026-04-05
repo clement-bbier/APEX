@@ -43,7 +43,7 @@ References:
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 import structlog
@@ -98,7 +98,7 @@ class MetaFeatureLogger:
             decision: MetaLabeler output (TRADE or NO-TRADE).
             ts:       Decision timestamp; defaults to ``datetime.now(UTC)``.
         """
-        ts = ts or datetime.now(timezone.utc)
+        ts = ts or datetime.now(UTC)
 
         payload: dict[str, Any] = {
             "ts_utc": ts.isoformat(),

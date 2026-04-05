@@ -602,8 +602,8 @@ class DashboardServer:
             get_recent_alerts,
             get_recent_signals,
             get_regime,
-            get_system_status,
             get_risk_status,
+            get_system_status,
         )
         state = self._state
         payload: dict[str, Any] = {}

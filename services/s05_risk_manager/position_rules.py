@@ -18,13 +18,19 @@ Reference:
     Tharp, V.K. (1998). Trade Your Way to Financial Freedom. McGraw-Hill.
 """
 from __future__ import annotations
+
 from decimal import Decimal
+
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from core.models.tick import Session
 from services.s05_risk_manager.models import (
-    CRYPTO_SIZE_MULTIPLIER, MAX_POSITION_SIZE_PCT, MAX_RISK_PER_TRADE_PCT, MIN_RR_RATIO,
-    BlockReason, RuleResult,
+    CRYPTO_SIZE_MULTIPLIER,
+    MAX_POSITION_SIZE_PCT,
+    MAX_RISK_PER_TRADE_PCT,
+    MIN_RR_RATIO,
+    BlockReason,
+    RuleResult,
 )
 
 _CRYPTO_SUFFIXES: frozenset[str] = frozenset({"USDT", "BTC", "ETH", "BNB"})

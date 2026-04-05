@@ -3,14 +3,18 @@
 All functions are pure -- no Redis, no async, no I/O.
 """
 from __future__ import annotations
+
 from decimal import Decimal
-import pytest
+
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
-from services.s05_risk_manager.models import BlockReason, Position
 from services.s05_risk_manager.exposure_monitor import (
-    check_max_positions, check_total_exposure, check_per_class_exposure, check_correlation,
+    check_correlation,
+    check_max_positions,
+    check_per_class_exposure,
+    check_total_exposure,
 )
+from services.s05_risk_manager.models import BlockReason, Position
 
 _CAPITAL = Decimal("100_000")
 

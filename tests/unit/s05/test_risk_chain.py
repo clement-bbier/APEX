@@ -9,7 +9,7 @@ Helper: build_service() creates a wired RiskManagerService backed by fakeredis.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import fakeredis.aioredis
@@ -24,14 +24,12 @@ from services.s05_risk_manager.cb_event_guard import CBEventGuard
 from services.s05_risk_manager.circuit_breaker import CircuitBreaker
 from services.s05_risk_manager.meta_label_gate import MetaLabelGate
 from services.s05_risk_manager.models import (
-    HALF_OPEN_RECOVERY_MINUTES,
+    REDIS_CB_KEY,
     BlockReason,
     CircuitBreakerSnapshot,
     CircuitBreakerState,
-    REDIS_CB_KEY,
 )
 from services.s05_risk_manager.service import RiskManagerService
-
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -51,8 +49,9 @@ def _make_service(redis: fakeredis.aioredis.FakeRedis) -> RiskManagerService:
     """Build a wired RiskManagerService backed by fakeredis."""
     svc = _TestableRiskManagerService.__new__(_TestableRiskManagerService)
     # Minimal BaseService init without real ZMQ/Redis connections
+    from unittest.mock import AsyncMock, MagicMock
+
     from core.logger import get_logger
-    from unittest.mock import MagicMock, AsyncMock
 
     svc.logger = get_logger("s05_test")
     svc.service_id = "s05_risk_manager"
@@ -123,7 +122,7 @@ async def test_chain_blocked_step1_cb_event() -> None:
     """STEP 1: CB event 30min away -> CB_EVENT_BLOCK."""
     redis = _make_redis()
     svc = _make_service(redis)
-    event_time = datetime.now(timezone.utc) + timedelta(minutes=30)
+    event_time = datetime.now(UTC) + timedelta(minutes=30)
     await redis.set("macro:cb_events", json.dumps([event_time.isoformat()]))
     decision = await svc.process_order_candidate(_order())
     assert not decision.approved
@@ -137,7 +136,7 @@ async def test_chain_blocked_step2_circuit_breaker() -> None:
     svc = _make_service(redis)
     snap = CircuitBreakerSnapshot(
         state=CircuitBreakerState.OPEN,
-        tripped_at=datetime.now(timezone.utc),
+        tripped_at=datetime.now(UTC),
         tripped_reason=BlockReason.DAILY_DRAWDOWN_EXCEEDED,
         daily_pnl=Decimal("-3100"),
     )
@@ -277,7 +276,7 @@ async def test_post_event_scalp_size_halved() -> None:
     svc = _make_service(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     # Place event 7min in the past (inside 15min post-event scalp window)
-    past_event = datetime.now(timezone.utc) - timedelta(minutes=7)
+    past_event = datetime.now(UTC) - timedelta(minutes=7)
     await redis.set("macro:cb_events", json.dumps([past_event.isoformat()]))
     base_order = _order(size="0.01", kelly=0.25)
     decision = await svc.process_order_candidate(base_order)
@@ -318,9 +317,7 @@ def test_approved_order_risk_never_exceeds_max(
     This test uses synchronous pure function checks to verify the invariant
     holds across all inputs without running the async chain.
     """
-    import asyncio
     from services.s05_risk_manager.position_rules import check_max_risk_per_trade
-    from services.s05_risk_manager.meta_label_gate import MetaLabelGate
 
     sz = Decimal("0.01")
     order = OrderCandidate(

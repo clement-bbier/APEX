@@ -4,21 +4,24 @@ Tests cover all 6 functions: 4 check_* (blocking) and 2 apply_* (modifying).
 Includes 2 Hypothesis property tests with 1000 examples each.
 """
 from __future__ import annotations
+
 from decimal import Decimal
-import pytest
-from hypothesis import given, settings as hyp_settings
+
+from hypothesis import given
+from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
+
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from core.models.tick import Session
 from services.s05_risk_manager.models import BlockReason
 from services.s05_risk_manager.position_rules import (
+    apply_crypto_multiplier,
+    apply_session_multiplier,
     check_max_risk_per_trade,
     check_max_size,
     check_min_rr,
     check_stop_loss_present,
-    apply_crypto_multiplier,
-    apply_session_multiplier,
 )
 
 _CAPITAL = Decimal("100_000")

@@ -22,13 +22,19 @@ Reference:
     Analysis, 42(1), 133-167.
 """
 from __future__ import annotations
+
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+
 import structlog
 from redis.asyncio import Redis
+
 from services.s05_risk_manager.models import (
-    CB_BLOCK_MINUTES_BEFORE, CB_SCALP_MINUTES_AFTER, CB_SCALP_SIZE_MULTIPLIER,
-    BlockReason, RuleResult,
+    CB_BLOCK_MINUTES_BEFORE,
+    CB_SCALP_MINUTES_AFTER,
+    CB_SCALP_SIZE_MULTIPLIER,
+    BlockReason,
+    RuleResult,
 )
 
 _CB_REDIS_KEY = "macro:cb_events"
@@ -60,7 +66,7 @@ class CBEventGuard:
             RuleResult.fail during pre-event block window (45min before event).
             RuleResult.ok during post-event scalp window or outside any window.
         """
-        now = utc_now if utc_now is not None else datetime.now(timezone.utc)
+        now = utc_now if utc_now is not None else datetime.now(UTC)
         events = await self._load_events(now)
 
         for event_dt in events:
@@ -95,7 +101,7 @@ class CBEventGuard:
         Returns:
             True if within CB_SCALP_MINUTES_AFTER of any recent CB event.
         """
-        now = utc_now if utc_now is not None else datetime.now(timezone.utc)
+        now = utc_now if utc_now is not None else datetime.now(UTC)
         events = await self._load_events(now)
         for event_dt in events:
             scalp_end = event_dt + timedelta(minutes=CB_SCALP_MINUTES_AFTER)
@@ -142,7 +148,7 @@ class CBEventGuard:
                         continue
                     # Ensure UTC
                     if dt.tzinfo is None:
-                        dt = dt.replace(tzinfo=timezone.utc)
+                        dt = dt.replace(tzinfo=UTC)
                     # Only include events in [now - 15min, now + 24h] to handle scalp window
                     lower_bound = now - timedelta(minutes=CB_SCALP_MINUTES_AFTER)
                     if lower_bound <= dt <= cutoff_future:

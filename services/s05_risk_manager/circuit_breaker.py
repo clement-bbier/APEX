@@ -27,7 +27,7 @@ Reference:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import structlog
@@ -87,7 +87,7 @@ class CircuitBreaker:
             RuleResult.fail with appropriate BlockReason otherwise.
         """
         snapshot = await self._load_snapshot()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         if snapshot.state == CircuitBreakerState.OPEN:
             snapshot = await self._try_half_open(snapshot, now)
@@ -140,7 +140,7 @@ class CircuitBreaker:
         if snapshot.state != CircuitBreakerState.HALF_OPEN:
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if pnl >= Decimal("0"):
             new_snap = CircuitBreakerSnapshot(
                 state=CircuitBreakerState.CLOSED,
@@ -186,7 +186,7 @@ class CircuitBreaker:
             intraday_loss_30m=Decimal("0"),
             consecutive_losses=snapshot.consecutive_losses,
             recovery_attempts=snapshot.recovery_attempts,
-            last_updated=datetime.now(timezone.utc),
+            last_updated=datetime.now(UTC),
         )
         await self._save_snapshot(new_snap)
 
@@ -235,7 +235,7 @@ class CircuitBreaker:
         starting_capital: Decimal,
     ) -> CircuitBreakerSnapshot:
         """Trip the breaker to OPEN, persist snapshot, and return it."""
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         daily_loss_pct = (
             float(-daily_pnl / starting_capital) if starting_capital > Decimal("0") else 0.0
         )

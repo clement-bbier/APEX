@@ -509,6 +509,7 @@ async def get_recent_alerts(state: StateStore) -> list[AlertEntry]:
         return []
 import json
 
+
 async def get_risk_status(state: StateStore) -> dict[str, Any]:
     """
     Risk Manager real-time status for S10 Dashboard.

@@ -15,11 +15,18 @@ Reference:
     Lopez de Prado, M. (2018). AFML, Ch. 16. Portfolio construction under constraints.
 """
 from __future__ import annotations
+
 from decimal import Decimal
+
 from core.models.order import OrderCandidate
 from services.s05_risk_manager.models import (
-    CORRELATION_BLOCK_THRESHOLD, MAX_CLASS_EXPOSURE_PCT, MAX_POSITIONS,
-    MAX_TOTAL_EXPOSURE_PCT, BlockReason, Position, RuleResult,
+    CORRELATION_BLOCK_THRESHOLD,
+    MAX_CLASS_EXPOSURE_PCT,
+    MAX_POSITIONS,
+    MAX_TOTAL_EXPOSURE_PCT,
+    BlockReason,
+    Position,
+    RuleResult,
 )
 
 _CRYPTO_SUFFIXES: frozenset[str] = frozenset({"USDT", "BTC", "ETH", "BNB"})
