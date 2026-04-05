@@ -145,6 +145,76 @@ class TestRollingLossCheck:
         assert cb.check_rolling_loss([2.5]) is True
 
 
+class TestConvenienceAPI:
+    """Tests for the high-level update_* and allows_new_orders helpers."""
+
+    def test_allows_new_orders_true_when_closed(self) -> None:
+        cb = _make_cb()
+        assert cb.allows_new_orders() is True
+
+    def test_allows_new_orders_false_when_open(self) -> None:
+        cb = _make_cb()
+        cb.trip("test")
+        assert cb.allows_new_orders() is False
+
+    def test_reset_clears_state(self) -> None:
+        cb = _make_cb()
+        cb.trip("some reason")
+        cb.reset()
+        assert cb.is_closed
+        assert cb.trip_reason == ""
+
+    def test_update_daily_pnl_trips_on_large_loss(self) -> None:
+        cb = _make_cb()
+        cb.update_daily_pnl(-0.04)  # -4% → exceeds 3% threshold
+        assert cb.is_open
+
+    def test_update_daily_pnl_no_trip_on_small_loss(self) -> None:
+        cb = _make_cb()
+        cb.update_daily_pnl(-0.01)  # -1% → safe
+        assert cb.is_closed
+
+    def test_update_30min_pnl_trips_on_large_loss(self) -> None:
+        cb = _make_cb()
+        cb.update_30min_pnl(-0.03)  # 3% rolling loss > 2%
+        assert cb.is_open
+
+    def test_update_30min_pnl_no_trip_on_small_loss(self) -> None:
+        cb = _make_cb()
+        cb.update_30min_pnl(-0.005)  # 0.5% rolling loss
+        assert cb.is_closed
+
+    def test_update_vix_change_trips_on_spike(self) -> None:
+        cb = _make_cb()
+        cb.update_vix_change(0.25)  # 25% spike > 20% threshold
+        assert cb.is_open
+
+    def test_update_vix_change_no_trip_on_normal(self) -> None:
+        cb = _make_cb()
+        cb.update_vix_change(0.05)  # 5% change
+        assert cb.is_closed
+
+    def test_notify_service_down_trips_on_long_outage(self) -> None:
+        cb = _make_cb()
+        cb.notify_service_down("s01", seconds_down=600)  # > default 300s
+        assert cb.is_open
+
+    def test_notify_service_down_no_trip_on_brief_outage(self) -> None:
+        cb = _make_cb()
+        cb.notify_service_down("s01", seconds_down=60)
+        assert cb.is_closed
+
+    def test_update_price_gap_trips_on_large_gap(self) -> None:
+        cb = _make_cb()
+        cb.update_price_gap(0.07)  # 7% gap > 5% threshold
+        assert cb.is_open
+
+    def test_update_price_gap_no_trip_on_small_gap(self) -> None:
+        cb = _make_cb()
+        cb.update_price_gap(0.02)  # 2% gap
+        assert cb.is_closed
+
+
 class TestAttemptReset:
     def test_state_remains_open_immediately_after_trip(self) -> None:
         cb = _make_cb()

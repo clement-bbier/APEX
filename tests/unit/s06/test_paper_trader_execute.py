@@ -210,3 +210,88 @@ class TestExecuteReturnType:
         tick = _make_tick(price="50000", volume="100", spread_bps="5")
         executed = await trader.execute(order, tick)
         assert executed.fill_size == order.adjusted_size
+
+
+class TestComputeSlippage:
+    """Unit tests for PaperTrader.compute_slippage."""
+
+    def test_fallback_without_adv(self) -> None:
+        trader = PaperTrader()
+        result = trader.compute_slippage(
+            spread_bps=10.0,
+            kyle_lambda=0.0,
+            size=Decimal("1"),
+            price=Decimal("50000"),
+            adv=0.0,
+        )
+        assert result == pytest.approx(5.0)  # spread/2 = 10/2
+
+    def test_adv_path_uses_impact_model(self) -> None:
+        trader = PaperTrader()
+        result = trader.compute_slippage(
+            spread_bps=5.0,
+            kyle_lambda=1e-5,
+            size=Decimal("100"),
+            price=Decimal("50000"),
+            adv=1_000_000.0,
+            daily_vol=0.20,
+        )
+        assert result > 0.0
+
+    def test_adv_path_larger_order_more_slippage(self) -> None:
+        trader = PaperTrader()
+        small = trader.compute_slippage(
+            spread_bps=5.0, kyle_lambda=1e-5,
+            size=Decimal("10"), price=Decimal("50000"),
+            adv=1_000_000.0,
+        )
+        large = trader.compute_slippage(
+            spread_bps=5.0, kyle_lambda=1e-5,
+            size=Decimal("10000"), price=Decimal("50000"),
+            adv=1_000_000.0,
+        )
+        assert large > small
+
+    def test_fallback_never_negative(self) -> None:
+        trader = PaperTrader()
+        result = trader.compute_slippage(
+            spread_bps=0.0, kyle_lambda=0.0,
+            size=Decimal("0"), price=Decimal("100"),
+        )
+        assert result >= 0.0
+
+
+class TestExecuteExit:
+    @pytest.mark.asyncio
+    async def test_exit_returns_dict_with_required_keys(self) -> None:
+        trader = PaperTrader()
+        position = {"symbol": "BTCUSDT", "entry": "50000"}
+        result = await trader.execute_exit(
+            position=position,
+            exit_price=Decimal("51000"),
+            size=Decimal("0.1"),
+        )
+        for key in ("symbol", "entry", "exit_price", "size", "commission", "is_paper"):
+            assert key in result
+
+    @pytest.mark.asyncio
+    async def test_exit_is_paper_true(self) -> None:
+        trader = PaperTrader()
+        result = await trader.execute_exit(
+            position={"symbol": "BTCUSDT", "entry": "50000"},
+            exit_price=Decimal("51000"),
+            size=Decimal("0.05"),
+        )
+        assert result["is_paper"] is True
+
+    @pytest.mark.asyncio
+    async def test_exit_price_below_quoted_due_to_slippage(self) -> None:
+        """Exit simulated price should be lower than the quoted exit_price."""
+        trader = PaperTrader()
+        exit_p = Decimal("51000")
+        result = await trader.execute_exit(
+            position={"symbol": "BTCUSDT", "entry": "50000"},
+            exit_price=exit_p,
+            size=Decimal("0.1"),
+        )
+        assert Decimal(result["exit_price"]) < exit_p

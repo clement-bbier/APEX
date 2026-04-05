@@ -14,6 +14,7 @@ from typing import Any
 
 from core.models.order import ApprovedOrder, ExecutedOrder
 from core.models.tick import NormalizedTick
+from services.s06_execution.optimal_execution import MarketImpactModel
 
 _rng = secrets.SystemRandom()
 
@@ -30,9 +31,14 @@ _LIQUIDITY_MULTIPLIER = 10
 class PaperTrader:
     """Simulate order execution with realistic market microstructure effects.
 
-    Slippage is modelled as half-spread plus a Kyle-lambda market-impact term.
+    Slippage is modelled using the Bouchaud et al. (2018) square-root impact law
+    for large orders, and the Kyle (1985) linear model for small orders.
     Latency is sampled uniformly from ``[5 ms, 50 ms]`` to mimic network delays.
     """
+
+    def __init__(self) -> None:
+        """Initialise with the market impact model."""
+        self._impact_model = MarketImpactModel()
 
     def compute_slippage(
         self,
@@ -40,21 +46,37 @@ class PaperTrader:
         kyle_lambda: float,
         size: Decimal,
         price: Decimal,
+        adv: float = 0.0,
+        daily_vol: float = 0.20,
     ) -> float:
         """Compute expected slippage in basis points.
 
-        Formula: half_spread_bps + kyle_lambda * size
+        Uses Bouchaud et al. (2018) square-root impact law for large orders
+        (participation > 1% ADV) and Kyle (1985) linear model for small orders.
+        Falls back to half-spread + linear when ADV is unknown.
 
         Args:
             spread_bps:  Bid-ask spread in basis points.
             kyle_lambda: Price-impact coefficient (higher = more illiquid).
             size:        Order size in base currency units.
-            price:       Current market price (reserved for future scaling).
+            price:       Current market price.
+            adv:         Average daily volume (0 = unknown, use fallback).
+            daily_vol:   Annualized daily volatility (default 20%).
 
         Returns:
             Slippage in basis points (>= 0).
         """
-        _ = price  # reserved for future price-impact scaling
+        if adv > 0:
+            estimate = self._impact_model.best_impact_estimate(
+                quantity=float(size),
+                adv=adv,
+                daily_vol=daily_vol,
+                price=float(price),
+                kyle_lambda=kyle_lambda,
+                spread_bps=spread_bps,
+            )
+            return estimate.total_slippage_bps
+        # Fallback to original model when ADV unknown
         return max(0.0, spread_bps / 2.0 + kyle_lambda * float(size))
 
     async def execute(

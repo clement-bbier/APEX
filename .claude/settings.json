@@ -7,7 +7,21 @@
       "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pip show redis structlog)",
       "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pip install \"pytest>=8.3.0,<9.0.0\" \"pytest-asyncio>=0.24.0,<1.0.0\" \"fakeredis>=2.26.0\" \"redis[asyncio]>=5.2.0\" \"structlog>=24.4.0\" \"pytest-timeout>=2.3.0\" \"pytest-cov>=6.0.0\" --quiet)",
       "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pytest tests/unit/s07/test_regime_ml.py tests/unit/s05/test_position_rules.py tests/unit/s03/test_regime_engine_legacy.py -v --no-header --tb=short --override-ini=\"asyncio_mode=auto\")",
-      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pytest tests/unit/s05/test_position_rules.py -v --no-header --tb=short --override-ini=\"asyncio_mode=auto\" --no-cov)"
+      "Bash(C:/Users/cleme/AppData/Local/Programs/Python/Python312/python.exe -m pytest tests/unit/s05/test_position_rules.py -v --no-header --tb=short --override-ini=\"asyncio_mode=auto\" --no-cov)",
+      "Bash(.venv/Scripts/python.exe -m ruff check services/s10_monitor/command_api.py services/s10_monitor/dashboard.py --no-fix)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/s10/test_command_api.py -v --no-header --tb=short --override-ini=\"addopts=\")",
+      "Bash(.venv/Scripts/python.exe -m ruff check services/s10_monitor/command_api.py --no-fix)",
+      "Bash(.venv/Scripts/python.exe -m ruff check services/s06_execution/paper_trader.py services/s07_quant_analytics/service.py --no-fix)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/s06/ -v --no-header --tb=short --override-ini=\"addopts=\")",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/ -q --no-header --tb=short --override-ini=\"addopts=\")",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/ --cov=services --cov=core --cov=backtesting --cov-report=term-missing --cov-fail-under=85 -q --override-ini=\"addopts=\")",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/ --cov=services --cov=core --cov=backtesting --cov-report=term-missing -q --override-ini=\"addopts=\")",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/s09/test_drift_detector.py --cov=services/s09_feedback_loop/drift_detector --cov-report=term-missing -q --override-ini=\"addopts=\")",
+      "Bash(python -m pytest tests/unit/ --cov=services --cov=core --cov-report=term-missing --cov-fail-under=85 -q --tb=short)",
+      "Bash(.venv/Scripts/python -m pytest tests/unit/ --cov=services --cov=core --cov-report=term-missing --cov-fail-under=85 -q --tb=short)",
+      "Bash(.venv/Scripts/python -m pytest tests/unit/s09/test_drift_detector.py::TestOutcomeCorrelation -v --tb=long)",
+      "Bash(.venv/Scripts/python -m pytest tests/unit/ --cov=services --cov=core --cov-fail-under=85 -q --tb=short)",
+      "Bash(.venv/Scripts/python -m ruff check . --output-format=concise)"
     ]
   }
 }
