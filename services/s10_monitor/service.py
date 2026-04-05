@@ -120,3 +120,22 @@ class MonitorService(BaseService):
                 logger.error("Periodic check error", error=str(exc))
 
             await asyncio.sleep(15)
+
+if __name__ == '__main__':
+    import sys
+    from pathlib import Path
+    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+    async def main() -> None:
+        service = MonitorService()
+        try:
+            await service.start()
+            while service._running:
+                await asyncio.sleep(1.0)
+        except KeyboardInterrupt:
+            logger.info('Interrupted by user...')
+        finally:
+            await service.stop()
+
+    asyncio.run(main())
+
