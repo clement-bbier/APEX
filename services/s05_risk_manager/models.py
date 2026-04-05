@@ -17,15 +17,15 @@ Reference:
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from enum import Enum
+from enum import StrEnum
 from typing import Final
 
 from pydantic import BaseModel, Field, model_validator
 
 
-class CircuitBreakerState(str, Enum):
+class CircuitBreakerState(StrEnum):
     """States of the circuit breaker state machine."""
 
     CLOSED = "CLOSED"        # Normal — trading allowed
@@ -33,7 +33,7 @@ class CircuitBreakerState(str, Enum):
     OPEN = "OPEN"            # Tripped — all trading blocked
 
 
-class BlockReason(str, Enum):
+class BlockReason(StrEnum):
     """Canonical reason codes for blocked orders. Used in audit trail and dashboard."""
 
     CIRCUIT_BREAKER_OPEN = "circuit_breaker_open"
@@ -72,7 +72,7 @@ class RuleResult(BaseModel):
     meta: dict[str, str | int | float | bool] = Field(default_factory=dict)
 
     @classmethod
-    def ok(cls, rule_name: str, reason: str = "passed") -> "RuleResult":
+    def ok(cls, rule_name: str, reason: str = "passed") -> RuleResult:
         return cls(rule_name=rule_name, passed=True, reason=reason)
 
     @classmethod
@@ -82,7 +82,7 @@ class RuleResult(BaseModel):
         block_reason: BlockReason,
         reason: str,
         **meta: str | int | float | bool,
-    ) -> "RuleResult":
+    ) -> RuleResult:
         return cls(
             rule_name=rule_name,
             passed=False,
@@ -106,7 +106,7 @@ class RiskDecision(BaseModel):
 
     order_id: str
     symbol: str
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     approved: bool
     rule_results: list[RuleResult]
     first_failure: BlockReason | None = None
@@ -117,7 +117,7 @@ class RiskDecision(BaseModel):
     rationale: list[str]                # Human-readable decision trail
 
     @model_validator(mode="after")
-    def validate_consistency(self) -> "RiskDecision":
+    def validate_consistency(self) -> RiskDecision:
         if self.approved and self.final_size <= Decimal("0"):
             raise ValueError("Approved order must have final_size > 0")
         if not self.approved and self.first_failure is None:
@@ -138,7 +138,7 @@ class CircuitBreakerSnapshot(BaseModel):
     intraday_loss_30m: Decimal = Decimal("0")
     consecutive_losses: int = 0
     recovery_attempts: int = 0
-    last_updated: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
 class Position(BaseModel):

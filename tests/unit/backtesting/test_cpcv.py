@@ -21,7 +21,6 @@ from hypothesis import strategies as st
 
 from backtesting.walk_forward import CombinatorialPurgedCV, CPCVResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -39,7 +38,7 @@ def _simple_sharpe(returns: list[float]) -> float:
 def _const_sharpe(value: float) -> float:
     """Return a fixed Sharpe regardless of input — used for PBO control."""
 
-    def _fn(returns: list[float]) -> float:  # noqa: ARG001
+    def _fn(returns: list[float]) -> float:
         return value
 
     return _fn  # type: ignore[return-value]
@@ -157,7 +156,7 @@ class TestCPCVRun:
 
         call_count = [0]
 
-        def sharpe_fn(returns: list[float]) -> float:  # noqa: ARG001
+        def sharpe_fn(returns: list[float]) -> float:
             call_count[0] += 1
             return 0.5 if call_count[0] % 2 == 1 else 2.0  # IS=0.5, OOS=2.0
 
@@ -172,7 +171,7 @@ class TestCPCVRun:
 
         counter = [0]
 
-        def fn(returns: list[float]) -> float:  # noqa: ARG001
+        def fn(returns: list[float]) -> float:
             counter[0] += 1
             return 0.3 if counter[0] % 2 == 1 else 2.0
 
@@ -189,7 +188,7 @@ class TestCPCVRun:
         # First 4/15 OOS will be below IS median → pbo = 4/15 ≈ 0.27
         below_count = [0]
 
-        def fn(returns: list[float]) -> float:  # noqa: ARG001
+        def fn(returns: list[float]) -> float:
             counter[0] += 1
             is_oos = counter[0] % 2 == 0
             if is_oos:

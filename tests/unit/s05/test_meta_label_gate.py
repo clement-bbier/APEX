@@ -3,10 +3,13 @@
 Covers hard gate, Kelly modulation, fallback, and 2 Hypothesis property tests.
 """
 from __future__ import annotations
-import pytest
+
 import fakeredis.aioredis
-from hypothesis import given, settings as hyp_settings
+import pytest
+from hypothesis import given
+from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
+
 from services.s05_risk_manager.meta_label_gate import MetaLabelGate
 from services.s05_risk_manager.models import BlockReason
 

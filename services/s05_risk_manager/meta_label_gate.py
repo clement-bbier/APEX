@@ -28,12 +28,17 @@ Reference:
     Journal of Risk, 15(2), 3-44.
 """
 from __future__ import annotations
+
 import json
+
 import structlog
 from redis.asyncio import Redis
+
 from services.s05_risk_manager.models import (
-    MIN_KELLY_FRACTION, MIN_META_CONFIDENCE_TO_TRADE,
-    BlockReason, RuleResult,
+    MIN_KELLY_FRACTION,
+    MIN_META_CONFIDENCE_TO_TRADE,
+    BlockReason,
+    RuleResult,
 )
 
 _STARTUP_FALLBACK_CONFIDENCE: float = 0.52  # Conservative startup default
