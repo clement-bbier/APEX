@@ -44,8 +44,9 @@ class Topics:
     # ── Service health (all services → supervisor) ────────────────────────────
     SERVICE_HEALTH: str = "service.health"  # e.g. service.health.s01_data_ingestion
 
-    # ── Analytics (S07) ──────────────────────────────────────────────────────
+    # ── Analytics (S07, S04) ─────────────────────────────────────────────────
     ANALYTICS_UPDATE: str = "analytics.update"
+    ANALYTICS_META_FEATURES: str = "analytics.meta_features"  # MetaLabeler decisions (S04)
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 

@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from decimal import Decimal
+from itertools import combinations as _combinations
 from typing import Any
 
 import numpy as np
@@ -336,4 +337,207 @@ class TickBasedWalkForwardValidator:
             aggregate_report=aggregate,
             mean_sharpe=mean_s,
             std_sharpe=math.sqrt(variance),
+        )
+
+
+# ---------------------------------------------------------------------------
+# CPCV — Combinatorial Purged Cross-Validation
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class CPCVResult:
+    """Results from Combinatorial Purged Cross-Validation.
+
+    Contains the full distribution of OOS Sharpe ratios (one per C(N,k)
+    combination) and the Probability of Backtest Overfitting (PBO).
+
+    Attributes:
+        oos_sharpes:       OOS Sharpe for each combination path.
+        is_sharpes:        IS Sharpe for each combination's training set.
+        is_sharpe_median:  Median IS Sharpe (the comparison baseline for PBO).
+        oos_sharpe_mean:   Mean of the OOS Sharpe distribution.
+        oos_sharpe_std:    Std of the OOS Sharpe distribution.
+        oos_sharpe_median: Median OOS Sharpe (used for DEPLOY gate).
+        pbo:               P(OOS Sharpe < IS median) ∈ [0, 1].
+        n_combinations:    Number of C(N, k) paths evaluated.
+        recommendation:    "DEPLOY" | "INVESTIGATE" | "DISCARD".
+    """
+
+    oos_sharpes: list[float]
+    is_sharpes: list[float]
+    is_sharpe_median: float
+    oos_sharpe_mean: float
+    oos_sharpe_std: float
+    oos_sharpe_median: float
+    pbo: float
+    n_combinations: int
+    recommendation: str = field(default="INVESTIGATE")
+
+
+class CombinatorialPurgedCV:
+    """Combinatorial Purged Cross-Validation (CPCV).
+
+    Generates C(n_splits, n_test_splits) train/test paths to build a
+    DISTRIBUTION of OOS Sharpe ratios rather than a single point estimate.
+
+    Key difference from standard walk-forward:
+    - Walk-forward → one sequential OOS estimate (high variance)
+    - CPCV → C(N,k) independent OOS paths → PBO estimate (distribution)
+
+    PBO (Probability of Backtest Overfitting) = fraction of OOS paths with
+    Sharpe below the median IS Sharpe. Bailey et al. (2015), Eq.11.
+
+    Deployment gates:
+        DEPLOY:      pbo < 0.25  AND  oos_sharpe_median > 0.5
+        INVESTIGATE: pbo < 0.50  (possible edge, more data needed)
+        DISCARD:     pbo >= 0.50 (overfit signal — do not deploy)
+
+    References:
+        Bailey, Borwein, López de Prado & Zhu (2015).
+            The Probability of Backtest Overfitting.
+            Journal of Computational Finance 20(4). UC Davis + AHL Man Group.
+        López de Prado, M. (2018). Advances in Financial Machine Learning.
+            Wiley. Chapter 12: Cross-Validation in Finance.
+
+    Args:
+        n_splits:      Total number of equal-size data groups.
+        n_test_splits: Groups used as test in each combination (k).
+        embargo_pct:   Post-test embargo as fraction of total samples.
+    """
+
+    def __init__(
+        self,
+        n_splits: int = 6,
+        n_test_splits: int = 2,
+        embargo_pct: float = 0.01,
+    ) -> None:
+        if n_splits < 2:
+            raise ValueError("n_splits must be >= 2")
+        if n_test_splits < 1 or n_test_splits >= n_splits:
+            raise ValueError("n_test_splits must be in [1, n_splits-1]")
+        if not (0.0 <= embargo_pct < 0.5):
+            raise ValueError("embargo_pct must be in [0, 0.5)")
+        self.n_splits = n_splits
+        self.n_test_splits = n_test_splits
+        self.embargo_pct = embargo_pct
+
+    def split(self, n_samples: int) -> list[tuple[list[int], list[int]]]:
+        """Generate purged (train, test) index pairs for each C(N,k) path.
+
+        Purging removes train samples inside the test window.
+        Embargo removes train samples within embargo_pct of total length
+        immediately after each test window.
+
+        Args:
+            n_samples: Total number of samples in the dataset.
+
+        Returns:
+            List of (train_indices, test_indices) pairs — one per combination.
+        """
+        if n_samples < self.n_splits * 2:
+            raise ValueError(
+                f"n_samples ({n_samples}) too small for {self.n_splits} splits"
+            )
+        group_size = n_samples // self.n_splits
+        embargo_size = int(n_samples * self.embargo_pct)
+
+        group_bounds: list[tuple[int, int]] = []
+        for g in range(self.n_splits):
+            start = g * group_size
+            end = start + group_size if g < self.n_splits - 1 else n_samples
+            group_bounds.append((start, end))
+
+        splits: list[tuple[list[int], list[int]]] = []
+
+        for test_groups in _combinations(range(self.n_splits), self.n_test_splits):
+            test_set = set(test_groups)
+            train_groups = [g for g in range(self.n_splits) if g not in test_set]
+
+            # Collect test indices and build O(1) lookup set
+            test_idx: list[int] = []
+            for g in sorted(test_groups):
+                s, e = group_bounds[g]
+                test_idx.extend(range(s, e))
+            test_idx_set: set[int] = set(test_idx)
+
+            # Embargo zones: samples immediately after each test group boundary.
+            # Applied per-group (not global min-max) to avoid incorrectly
+            # excluding train groups that sit between non-contiguous test groups.
+            embargo_zones: set[int] = set()
+            if embargo_size > 0:
+                for g in sorted(test_groups):
+                    _, e = group_bounds[g]
+                    for j in range(e, min(n_samples, e + embargo_size)):
+                        embargo_zones.add(j)
+
+            # Collect train indices: by construction train groups are disjoint
+            # from test groups, so test_idx_set check always passes.
+            # We only need to skip embargo-zone samples.
+            train_idx: list[int] = []
+            for g in train_groups:
+                s, e = group_bounds[g]
+                for i in range(s, e):
+                    if i not in embargo_zones:
+                        train_idx.append(i)
+
+            if train_idx and test_idx:
+                splits.append((train_idx, test_idx))
+
+        return splits
+
+    def run(
+        self,
+        returns: list[float],
+        sharpe_fn: Callable[[list[float]], float],
+    ) -> CPCVResult:
+        """Evaluate sharpe_fn on every C(N,k) combination and compute PBO.
+
+        Args:
+            returns:   Full return series (e.g. daily or per-trade returns).
+            sharpe_fn: Callable(returns) → annualised Sharpe ratio.
+                       Called on both training and test sets independently.
+
+        Returns:
+            :class:`CPCVResult` with PBO and deployment recommendation.
+        """
+        n = len(returns)
+        splits = self.split(n)
+
+        oos_sharpes: list[float] = []
+        is_sharpes: list[float] = []
+
+        for train_idx, test_idx in splits:
+            train_r = [returns[i] for i in sorted(train_idx)]
+            test_r = [returns[i] for i in sorted(test_idx)]
+            is_sharpes.append(sharpe_fn(train_r))
+            oos_sharpes.append(sharpe_fn(test_r))
+
+        is_median = float(np.median(is_sharpes)) if is_sharpes else 0.0
+        oos_arr = np.asarray(oos_sharpes, dtype=float) if oos_sharpes else np.array([0.0])
+
+        pbo = (
+            float(np.sum(oos_arr < is_median)) / len(oos_sharpes)
+            if oos_sharpes
+            else 1.0
+        )
+        oos_median = float(np.median(oos_arr))
+
+        if pbo < 0.25 and oos_median > 0.5:
+            rec = "DEPLOY"
+        elif pbo < 0.50:
+            rec = "INVESTIGATE"
+        else:
+            rec = "DISCARD"
+
+        return CPCVResult(
+            oos_sharpes=oos_sharpes,
+            is_sharpes=is_sharpes,
+            is_sharpe_median=is_median,
+            oos_sharpe_mean=float(np.mean(oos_arr)),
+            oos_sharpe_std=float(np.std(oos_arr)),
+            oos_sharpe_median=oos_median,
+            pbo=pbo,
+            n_combinations=len(splits),
+            recommendation=rec,
         )

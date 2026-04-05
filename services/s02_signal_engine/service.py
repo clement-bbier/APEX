@@ -30,6 +30,7 @@ from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
 from services.s02_signal_engine.mtf_aligner import MTFAligner
 from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
 from services.s02_signal_engine.technical import TechnicalAnalyzer
+from services.s02_signal_engine.vpin import VPINCalculator
 
 logger = get_logger("s02_signal_engine.service")
 
@@ -53,6 +54,9 @@ _FALLBACK_SL_PCT: Decimal = Decimal("0.001")
 
 # Number of triggers needed for full confidence (confidence = triggers / N).
 _MAX_TRIGGERS_FOR_CONFIDENCE: float = 4.0
+
+# How many ticks between ADV refreshes from Redis (≈5 min at 1 tick/s).
+_ADV_REFRESH_EVERY: int = 300
 
 
 class SignalEngineService(BaseService):
@@ -87,6 +91,10 @@ class SignalEngineService(BaseService):
 
         # Confluence scorer - aggregates all signal components.
         self._scorer = SignalScorer(min_components=2, min_strength=0.20)
+
+        # Per-symbol VPIN calculators and ADV refresh counters.
+        self._vpin: dict[str, VPINCalculator] = {}
+        self._adv_counter: dict[str, int] = {}
 
         # Previous EMA values per symbol - needed for cross detection.
         self._prev_ema_8: dict[str, Decimal | None] = {}
@@ -143,12 +151,54 @@ class SignalEngineService(BaseService):
             self._micro[symbol] = MicrostructureAnalyzer(symbol)
         if symbol not in self._tech:
             self._tech[symbol] = TechnicalAnalyzer(symbol)
+        if symbol not in self._vpin:
+            self._vpin[symbol] = VPINCalculator(default_bucket_size=1000.0)
+            self._adv_counter[symbol] = 0
 
         micro = self._micro[symbol]
         tech = self._tech[symbol]
 
         micro.update(tick)
         tech.update(tick)
+
+        # ── VPIN: refresh ADV from S07 every N ticks, then update + gate ─────
+        self._adv_counter[symbol] += 1
+        if self._adv_counter[symbol] >= _ADV_REFRESH_EVERY:
+            self._adv_counter[symbol] = 0
+            try:
+                adv_data = await self.state.get(f"analytics:adv:{symbol}")
+                if isinstance(adv_data, dict):
+                    adv_val = float(adv_data.get("adv_1d", 0) or 0)
+                    if adv_val > 0:
+                        self._vpin[symbol].update_adv(adv_val)
+            except Exception as exc:
+                self.logger.debug(
+                    "ADV refresh failed, keeping default bucket_size",
+                    symbol=symbol,
+                    error=str(exc),
+                )
+
+        self._vpin[symbol].update(tick)
+        vpin_metrics = self._vpin[symbol].compute()
+
+        await self.state.set(
+            f"vpin:{symbol}",
+            {
+                "vpin": vpin_metrics.vpin,
+                "toxicity_level": vpin_metrics.toxicity_level,
+                "size_multiplier": vpin_metrics.size_multiplier,
+                "effective_bucket_size": vpin_metrics.effective_bucket_size,
+                "adv_source": vpin_metrics.adv_source,
+                "buy_volume_pct": vpin_metrics.buy_volume_pct,
+            },
+            ttl=60,
+        )
+
+        if vpin_metrics.toxicity_level == "extreme":
+            self.logger.warning(
+                "vpin_extreme_block", symbol=symbol, vpin=vpin_metrics.vpin
+            )
+            return  # Signal abandoned — flow too toxic
 
         # ── Compute indicators ────────────────────────────────────────────────
         ofi_val = micro.ofi()
