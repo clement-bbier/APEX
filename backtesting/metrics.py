@@ -251,10 +251,12 @@ def daily_equity_returns(
         current_equity += day_pnl.get(day, 0.0)
         daily_equities.append(current_equity)
 
+    from itertools import pairwise
+
     return [
-        (daily_equities[i] - daily_equities[i - 1]) / daily_equities[i - 1]
-        for i in range(1, len(daily_equities))
-        if daily_equities[i - 1] > 0
+        (curr - prev) / prev
+        for prev, curr in pairwise(daily_equities)
+        if prev > 0
     ]
 
 

@@ -317,7 +317,7 @@ class BacktestEngine:
                 state.capital += pnl
                 pos.scalp_pnl = pnl
                 pos.size = pos.size_swing  # remaining size
-                # Trail stop to breakeven so the swing portion cannot lose
+                # Move stop to breakeven so the swing portion cannot lose
                 pos.stop_loss = pos.entry_price
                 return
             if pos.direction == Direction.SHORT and price <= pos.target_scalp:
@@ -326,7 +326,7 @@ class BacktestEngine:
                 state.capital += pnl
                 pos.scalp_pnl = pnl
                 pos.size = pos.size_swing
-                # Trail stop to breakeven so the swing portion cannot lose
+                # Move stop to breakeven so the swing portion cannot lose
                 pos.stop_loss = pos.entry_price
                 return
 
