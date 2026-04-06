@@ -129,6 +129,7 @@ if __name__ == '__main__':
     async def main() -> None:
         service = MonitorService()
         try:
+            print("Waiting for other services...")
             await service.start()
             while service._running:
                 await asyncio.sleep(1.0)
