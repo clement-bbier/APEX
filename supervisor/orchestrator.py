@@ -51,6 +51,8 @@ class Orchestrator:
         self._settings = get_settings()
         self._state = StateStore("orchestrator")
         self._started: list[str] = []
+        self._processes: dict[str, asyncio.subprocess.Process] = {}
+        self._processes: dict[str, asyncio.subprocess.Process] = {}
 
     async def startup(self) -> None:
         """Start all services in dependency order.
@@ -78,8 +80,29 @@ class Orchestrator:
                 continue
 
             logger.info("Starting service", service=service_id)
-            # Phase 2: actually spawn subprocess here
-            # For now, log the intent
+
+            python_exe = sys.executable
+            # Ensure we use .venv/Scripts/python if available
+            cmd = [python_exe, "-m", f"services.{service_id}.service"]
+
+            process = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT
+            )
+            self._processes[service_id] = process
+
+            async def log_output(proc, name):
+                if proc.stdout is None:
+                    return
+                for _ in range(10):
+                    line = await proc.stdout.readline()
+                    if not line:
+                        break
+                    print(f"[{name}] {line.decode('utf-8', errors='ignore').rstrip()}")
+            
+            asyncio.create_task(log_output(process, service_id))
+
             healthy = await self.health_gate(service_id, timeout_s=30.0)
             if healthy:
                 self._started.append(service_id)
@@ -94,8 +117,14 @@ class Orchestrator:
         logger.info("Shutting down APEX Trading System")
         for service_id in reversed(self._started):
             logger.info("Stopping service", service=service_id)
-            # Phase 2: send SIGTERM to subprocess
+            process = self._processes.get(service_id)
+            if process:
+                try:
+                    process.terminate()
+                except ProcessLookupError:
+                    pass
         self._started.clear()
+        self._processes.clear()
         await self._state.disconnect()
         logger.info("Shutdown complete")
 

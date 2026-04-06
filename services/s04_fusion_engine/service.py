@@ -231,3 +231,47 @@ class FusionEngineService(BaseService):
                 exc_info=exc,
             )
             return None
+
+
+import sys
+import os
+import asyncio
+from pathlib import Path
+
+# Fix sys.path for direct module runs
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+if __name__ == '__main__':
+    import importlib
+    
+    # We expect the class name to be XxxService (e.g. DataIngestionService, SignalEngineService...)
+    # But to make it generic without inspecting the AST, we can just find subclasses of BaseService
+    from core.base_service import BaseService
+    import inspect
+    
+    module_name = 'services.' + Path(__file__).parent.name + '.service'
+    module = importlib.import_module(module_name)
+    
+    service_class = None
+    for name, obj in inspect.getmembers(module, inspect.isclass):
+        if issubclass(obj, BaseService) and obj is not BaseService:
+            service_class = obj
+            break
+            
+    if not service_class:
+        print(f'Error: Could not find a BaseService subclass in {module_name}')
+        sys.exit(1)
+        
+    async def main():
+        service = service_class()
+        try:
+            await service.start()
+            while service._running:
+                await asyncio.sleep(1.0)
+        except KeyboardInterrupt:
+            print('Interrupted by user...')
+        finally:
+            await service.stop()
+
+    asyncio.run(main())
+

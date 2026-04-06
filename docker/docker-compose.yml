@@ -5,6 +5,9 @@ x-svc: &svc
     context: ..
     dockerfile: docker/Dockerfile.service
   env_file: ../.env
+  environment:
+    REDIS_URL: redis://redis:6379/0
+    ZMQ_HOST: broker
   networks: [apex]
   restart: unless-stopped
   depends_on:

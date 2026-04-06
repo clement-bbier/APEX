@@ -12,9 +12,13 @@ All services inherit from BaseService which provides:
 from __future__ import annotations
 
 import asyncio
+import sys
 import time
 from abc import ABC, abstractmethod
 from typing import Any
+
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from core.bus import MessageBus
 from core.config import get_settings
@@ -91,6 +95,7 @@ class BaseService(ABC):
             )
             raise
 
+        self.bus.init_publisher()
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 
         try:
@@ -141,6 +146,7 @@ class BaseService(ABC):
         }
         try:
             await self.bus.publish(f"{HEALTH_TOPIC_PREFIX}{self.service_id}", status)
+            await self.state.set(f"service_health:{self.service_id}", status, ttl=15)
         except Exception as exc:
             self.logger.warning(
                 "Heartbeat publish failed",
