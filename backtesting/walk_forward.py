@@ -454,12 +454,11 @@ class CombinatorialPurgedCV:
             test_set = set(test_groups)
             train_groups = [g for g in range(self.n_splits) if g not in test_set]
 
-            # Collect test indices and build O(1) lookup set
+            # Collect test indices.
             test_idx: list[int] = []
             for g in sorted(test_groups):
                 s, e = group_bounds[g]
                 test_idx.extend(range(s, e))
-            test_idx_set: set[int] = set(test_idx)
 
             # Embargo zones: samples immediately after each test group boundary.
             # Applied per-group (not global min-max) to avoid incorrectly
@@ -472,8 +471,7 @@ class CombinatorialPurgedCV:
                         embargo_zones.add(j)
 
             # Collect train indices: by construction train groups are disjoint
-            # from test groups, so test_idx_set check always passes.
-            # We only need to skip embargo-zone samples.
+            # from test groups. We only need to skip embargo-zone samples.
             train_idx: list[int] = []
             for g in train_groups:
                 s, e = group_bounds[g]

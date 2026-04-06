@@ -104,7 +104,6 @@ class TestMaxRiskPerTrade:
     def test_max_risk_exact_boundary_pass(self) -> None:
         # 0.499% risk: SL dist = 500, size s.t. 500*size = 0.499% * 100000 = 499
         # size = 499/500 = 0.998
-        sz = Decimal("0.998")
         order = _long_order(size="0.998")
         r = check_max_risk_per_trade(order, _CAPITAL)
         assert r.passed

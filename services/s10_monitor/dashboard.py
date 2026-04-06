@@ -158,7 +158,7 @@ _DASHBOARD_HTML = """<!DOCTYPE html>
       <div style="flex: 1;">
         <div style="font-size:11px;color:var(--text2);margin-bottom:4px">Total Exposure (<span id="exp-text">0.0%</span>/20%)</div>
         <div class="bar-track"><div id="exp-bar" class="bar-fill" style="width:0%"></div></div>
-        
+
         <div style="font-size:11px;color:var(--text2);margin-bottom:4px;margin-top:10px">Approval Rate (Last 100) <span id="ar-text">0.0%</span></div>
         <div class="bar-track"><div id="ar-bar" class="bar-fill" style="width:0%; background:var(--blue)"></div></div>
       </div>
@@ -315,23 +315,23 @@ function render(d) {
     const d100 = r.decisions_last_100 || {};
     const kelly = r.kelly_stats || {};
     const expPct = (r.portfolio.total_exposure_pct || 0) * 100;
-    
+
     if (document.getElementById('exp-text')) {
       document.getElementById('exp-text').textContent = expPct.toFixed(1) + '%';
       const expBar = document.getElementById('exp-bar');
       expBar.style.width = Math.min(expPct / 20 * 100, 100) + '%';
       expBar.style.background = expPct > 15 ? 'var(--red)' : '';
-      
+
       document.getElementById('ar-text').textContent = (d100.approval_rate_pct || 0).toFixed(1) + '%';
       document.getElementById('ar-bar').style.width = (d100.approval_rate_pct || 0) + '%';
-      
+
       const spark = document.getElementById('kelly-spark');
       if (kelly.sparkline && kelly.sparkline.length) {
-        spark.innerHTML = kelly.sparkline.map(v => 
+        spark.innerHTML = kelly.sparkline.map(v =>
           '<div style="flex:1;background:var(--purple);height:'+ (v*100) +'%">%</div>'
         ).join('');
       }
-      
+
       const br = r.block_reasons || {};
       const brList = Object.entries(br).sort((a,b)=>b[1]-a[1]).map(x => '<div style="margin-bottom:2px">'+x[0]+': '+x[1]+'</div>').join('');
       document.getElementById('block-reasons-list').innerHTML = brList || 'none';

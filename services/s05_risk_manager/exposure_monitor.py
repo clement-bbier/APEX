@@ -57,7 +57,10 @@ def check_max_positions(positions: list[Position]) -> RuleResult:
             open_count=len(positions),
             max_positions=MAX_POSITIONS,
         )
-    return RuleResult.ok(rule_name="check_max_positions", reason=f"{len(positions)}/{MAX_POSITIONS} positions")
+    return RuleResult.ok(
+        rule_name="check_max_positions",
+        reason=f"{len(positions)}/{MAX_POSITIONS} positions",
+    )
 
 
 def check_total_exposure(

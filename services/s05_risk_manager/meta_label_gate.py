@@ -159,7 +159,11 @@ class MetaLabelGate:
         try:
             raw = await self._redis.get(key)
             if raw is None:
-                logger.debug("meta_label_not_found", symbol=symbol, fallback=_STARTUP_FALLBACK_CONFIDENCE)
+                logger.debug(
+                    "meta_label_not_found",
+                    symbol=symbol,
+                    fallback=_STARTUP_FALLBACK_CONFIDENCE,
+                )
                 return _STARTUP_FALLBACK_CONFIDENCE
             if isinstance(raw, (int, float)):
                 confidence = float(raw)

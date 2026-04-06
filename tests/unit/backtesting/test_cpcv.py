@@ -183,7 +183,7 @@ class TestCPCVRun:
         """0.25 <= pbo < 0.50 → INVESTIGATE."""
         cv = CombinatorialPurgedCV(n_splits=6, n_test_splits=2, embargo_pct=0.0)
         counter = [0]
-        n_combos = len(list(combinations(range(6), 2)))  # 15
+        # 15 combinations (C(6,2)) - used as reference in test comment below
 
         # First 4/15 OOS will be below IS median → pbo = 4/15 ≈ 0.27
         below_count = [0]

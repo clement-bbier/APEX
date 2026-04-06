@@ -86,7 +86,8 @@ class TestHardBlocks:
         d = self.ml.score(_blocked_macro())
         assert not d.should_trade
         assert d.adjusted_size_mult == 0.0
-        assert "macro_mult" in (d.blocking_reason or "").lower() or "crisis" in (d.blocking_reason or "").lower()
+        reason = (d.blocking_reason or "").lower()
+        assert "macro_mult" in reason or "crisis" in reason
 
     def test_wide_spread_blocks_trade(self) -> None:
         d = self.ml.score(_blocked_spread())
@@ -235,7 +236,7 @@ class TestMetaFeatureLogger:
         return MetaFeatureLogger(bus, state), bus, state
 
     def test_log_calls_zmq_publish(self) -> None:
-        logger, bus, state = self._make_logger()
+        logger, bus, _state = self._make_logger()
         decision = MetaLabeler().score(_good_features())
         asyncio.run(
             logger.log("BTCUSDT", _good_features(), decision)
@@ -243,7 +244,7 @@ class TestMetaFeatureLogger:
         bus.publish.assert_called_once()
 
     def test_log_calls_redis_lpush(self) -> None:
-        logger, bus, state = self._make_logger()
+        logger, _bus, state = self._make_logger()
         decision = MetaLabeler().score(_good_features())
         asyncio.run(
             logger.log("BTCUSDT", _good_features(), decision)

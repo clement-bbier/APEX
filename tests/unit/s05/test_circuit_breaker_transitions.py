@@ -136,7 +136,7 @@ async def test_probe_success_transitions_to_closed() -> None:
     await redis.setex(REDIS_CB_KEY, 86400, patched.model_dump_json())
 
     # Now probe with no new triggers -> transitions to HALF_OPEN then check passes
-    result = await cb.check(
+    await cb.check(
         current_daily_pnl=Decimal("-3100"),
         starting_capital=_CAPITAL,
         intraday_loss_30m=Decimal("0"),

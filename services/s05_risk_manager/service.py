@@ -231,7 +231,8 @@ class RiskManagerService(BaseService):
             )
 
         return await self._build_approved(
-            candidate, rule_results, rationale, kelly_raw, kelly_final, meta_confidence, current_size
+            candidate, rule_results, rationale,
+            kelly_raw, kelly_final, meta_confidence, current_size,
         )
 
     async def _build_approved(
@@ -319,7 +320,7 @@ class RiskManagerService(BaseService):
         except Exception:
             results = [None] * 8
 
-        def _safe(v: Any, default: Any = None) -> Any:
+        def _safe(v: Any, default: Any = None) -> Any:  # noqa: ANN401
             return v if not isinstance(v, Exception) and v is not None else default
 
         cap_raw = _safe(results[0], {})
@@ -341,8 +342,8 @@ class RiskManagerService(BaseService):
             for p in raw_pos:
                 try:
                     positions.append(Position.model_validate(p))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    self.logger.debug("position_parse_error", error=str(exc))
 
         corr_raw = _safe(results[6], {})
         corr: dict[tuple[str, str], float] = {}
@@ -352,8 +353,8 @@ class RiskManagerService(BaseService):
                     parts = str(k).split(":")
                     if len(parts) == 2:
                         corr[(parts[0], parts[1])] = float(v)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    self.logger.debug("corr_parse_error", error=str(exc))
 
         session_raw = _safe(results[7], "us_normal")
         try:

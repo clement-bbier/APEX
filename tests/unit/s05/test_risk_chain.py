@@ -293,7 +293,7 @@ async def test_audit_written_to_redis() -> None:
     svc = _make_service(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     order = _order()
-    decision = await svc.process_order_candidate(order)
+    await svc.process_order_candidate(order)
     raw = await redis.get(f"risk:audit:{order.order_id}")
     assert raw is not None
     data = json.loads(raw)

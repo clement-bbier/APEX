@@ -1,6 +1,3 @@
-from __future__ import annotations
-import typing
-
 """Meta-Labeling for APEX — S04 Fusion Engine.
 
 Meta-labeling (López de Prado 2018, Chapter 3) separates two concerns:
@@ -44,9 +41,9 @@ References:
         Multiple-Testing Crisis in Financial Research.
         Journal of Financial Data Science 1(1), 94-110. AQR Capital.
 """
+from __future__ import annotations
 
-
-
+import typing
 from dataclasses import dataclass
 from typing import Any
 

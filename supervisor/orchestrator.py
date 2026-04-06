@@ -1,11 +1,15 @@
-from __future__ import annotations
-
 """Orchestrator for APEX Trading System.
 
 Controls ordered startup and graceful shutdown of all services.
 Implements health gate between service starts.
 """
 
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import asyncio
 from collections.abc import Awaitable
@@ -13,9 +17,6 @@ from typing import Any, cast
 
 from redis import asyncio as aioredis
 
-import sys
-from pathlib import Path
-sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.config import get_settings
 from core.logger import get_logger
 from core.state import StateStore

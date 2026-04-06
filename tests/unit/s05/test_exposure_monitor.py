@@ -54,7 +54,9 @@ class TestTotalExposure:
     def test_exact_boundary_pass(self) -> None:
         # 19.9% existing: 19900 notional, new order adds 0, so 19900/100000 = 19.9%
         positions = [_pos("AAPL", "199", "100")]  # 199 * 100 = 19900
-        r = check_total_exposure(_order(symbol="MSFT", size="0.001", entry="10"), positions, _CAPITAL)
+        r = check_total_exposure(
+            _order(symbol="MSFT", size="0.001", entry="10"), positions, _CAPITAL
+        )
         assert r.passed  # total = 19910/100000 = 19.91%
 
     def test_exact_boundary_fail(self) -> None:

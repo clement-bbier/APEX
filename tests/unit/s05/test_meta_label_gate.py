@@ -25,7 +25,7 @@ def _gate() -> tuple[MetaLabelGate, fakeredis.aioredis.FakeRedis]:
 async def test_confidence_below_threshold_blocks() -> None:
     gate, redis = _gate()
     await redis.set(f"meta_label:latest:{_SYMBOL}", "0.51")
-    result, conf, kf = await gate.check(_SYMBOL, kelly_raw=0.1)
+    result, _conf, _kf = await gate.check(_SYMBOL, kelly_raw=0.1)
     assert not result.passed
     assert result.block_reason == BlockReason.META_LABEL_CONFIDENCE_TOO_LOW
 
@@ -36,7 +36,7 @@ async def test_confidence_at_threshold_passes() -> None:
     await redis.set(f"meta_label:latest:{_SYMBOL}", "0.52")
     # kelly_raw must be high enough: kelly_final = raw * weight(0.52) = raw * 0.04 >= 0.01
     # So raw >= 0.25. Use 0.30 to test that gate 1 passes (confidence check only).
-    result, conf, kf = await gate.check(_SYMBOL, kelly_raw=0.30)
+    result, _conf, _kf = await gate.check(_SYMBOL, kelly_raw=0.30)
     assert result.passed
 
 
@@ -64,7 +64,7 @@ async def test_modulated_kelly_below_minimum_blocks() -> None:
     # kelly_raw=0.1 -> kelly_final = 0.1 * 0.04 = 0.004 < 0.01 -> block
     gate, redis = _gate()
     await redis.set(f"meta_label:latest:{_SYMBOL}", "0.52")
-    result, conf, kf = await gate.check(_SYMBOL, kelly_raw=0.1)
+    result, _conf, _kf = await gate.check(_SYMBOL, kelly_raw=0.1)
     assert not result.passed
     assert result.block_reason == BlockReason.KELLY_FRACTION_TOO_SMALL
 
@@ -73,7 +73,7 @@ async def test_modulated_kelly_below_minimum_blocks() -> None:
 async def test_no_redis_data_uses_fallback_confidence() -> None:
     gate, _ = _gate()
     # No key set -> fallback = 0.52
-    result, conf, kf = await gate.check(_SYMBOL, kelly_raw=0.5)
+    _result, conf, _kf = await gate.check(_SYMBOL, kelly_raw=0.5)
     assert abs(conf - 0.52) < 1e-6
 
 
@@ -81,7 +81,7 @@ async def test_no_redis_data_uses_fallback_confidence() -> None:
 async def test_corrupted_redis_data_uses_fallback() -> None:
     gate, redis = _gate()
     await redis.set(f"meta_label:latest:{_SYMBOL}", "not_a_number")
-    result, conf, kf = await gate.check(_SYMBOL, kelly_raw=0.5)
+    _result, conf, _kf = await gate.check(_SYMBOL, kelly_raw=0.5)
     assert abs(conf - 0.52) < 1e-6
 
 
@@ -89,7 +89,7 @@ async def test_corrupted_redis_data_uses_fallback() -> None:
 async def test_confidence_clamped_to_0_1() -> None:
     gate, redis = _gate()
     await redis.set(f"meta_label:latest:{_SYMBOL}", "1.5")
-    result, conf, kf = await gate.check(_SYMBOL, kelly_raw=0.2)
+    _result, conf, _kf = await gate.check(_SYMBOL, kelly_raw=0.2)
     assert conf <= 1.0
 
 
