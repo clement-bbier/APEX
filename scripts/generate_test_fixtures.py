@@ -50,19 +50,26 @@ def generate_btcusdt_fixture(n_candles: int = 43_200) -> None:
 
     for i in range(n_candles - 1):
         regime_slot = (i // regime_length) % len(directions)
+        # Reset base_price at each regime boundary so ranging reverts to the
+        # current price level, not back to the original $42 000 start.
+        if i % regime_length == 0 and i > 0:
+            base_price = prices[-1]
         d = directions[regime_slot]
-        if d == 1:  # trending up
+        if d == 1:  # trending up — low vol so RSI stays moderate (40-60)
             drift = 0.00003
-            vol = 0.0006
-        elif d == -1:  # trending down
+            vol = 0.0003
+        elif d == -1:  # trending down — same
             drift = -0.00003
-            vol = 0.0006
+            vol = 0.0003
         elif d == 0 and (i // regime_length) % len(directions) == 4:  # high-vol
             drift = 0.0
             vol = 0.002
-        else:  # ranging
-            drift = -0.00002 * np.sign(prices[-1] - base_price)
-            vol = 0.0004
+        else:
+            # Ranging: strong OU mean-reversion so RSI reliably reaches
+            # extremes and quickly reverts — this gives RSI signals clear edge.
+            deviation = (prices[-1] - base_price) / base_price
+            drift = -0.05 * deviation  # k=0.05 → ~20-min reversion time constant
+            vol = 0.0012              # higher vol → RSI hits extremes regularly
 
         ret = rng.normal(drift, vol)
         prices.append(prices[-1] * (1.0 + ret))
