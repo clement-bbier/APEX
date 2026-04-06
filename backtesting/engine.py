@@ -109,6 +109,7 @@ class BacktestPosition:
     mtf_score: float = 0.0
     fusion_score: float = 0.0
     scalp_filled: bool = False
+    scalp_pnl: Decimal = field(default_factory=lambda: Decimal("0"))
 
 
 @dataclass
@@ -314,13 +315,19 @@ class BacktestEngine:
                 pos.scalp_filled = True
                 pnl = (price - pos.entry_price) * pos.size_scalp
                 state.capital += pnl
+                pos.scalp_pnl = pnl
                 pos.size = pos.size_swing  # remaining size
+                # Trail stop to breakeven so the swing portion cannot lose
+                pos.stop_loss = pos.entry_price
                 return
             if pos.direction == Direction.SHORT and price <= pos.target_scalp:
                 pos.scalp_filled = True
                 pnl = (pos.entry_price - price) * pos.size_scalp
                 state.capital += pnl
+                pos.scalp_pnl = pnl
                 pos.size = pos.size_swing
+                # Trail stop to breakeven so the swing portion cannot lose
+                pos.stop_loss = pos.entry_price
                 return
 
         # Swing target
@@ -337,14 +344,26 @@ class BacktestEngine:
         reason: str,
         state: BacktestState,
     ) -> None:
-        """Record a closed trade and update capital."""
+        """Record a closed trade and update capital.
+
+        The swing portion's PnL is calculated from pos.size (which may have
+        already been reduced to size_swing after a scalp partial exit).
+        pos.scalp_pnl holds any profit already credited to state.capital at
+        the scalp exit; it is added to the TradeRecord so that metrics such
+        as win_rate and Sharpe reflect the full trade result, but it is NOT
+        added to state.capital again (it was credited at the scalp exit).
+        """
         if pos.direction == Direction.LONG:
-            gross = (exit_price - pos.entry_price) * pos.size
+            swing_gross = (exit_price - pos.entry_price) * pos.size
         else:
-            gross = (pos.entry_price - exit_price) * pos.size
+            swing_gross = (pos.entry_price - exit_price) * pos.size
 
         commission = exit_price * pos.size * Decimal("0.001")
-        net = gross - commission
+        swing_net = swing_gross - commission
+
+        # Combine scalp and swing PnL so the TradeRecord reflects total trade PnL
+        total_gross = swing_gross + pos.scalp_pnl
+        total_net = swing_net + pos.scalp_pnl
 
         trade = TradeRecord(
             trade_id=f"{pos.order_id}_close",
@@ -355,8 +374,8 @@ class BacktestEngine:
             entry_price=pos.entry_price,
             exit_price=exit_price,
             size=pos.size,
-            gross_pnl=gross,
-            net_pnl=net,
+            gross_pnl=total_gross,
+            net_pnl=total_net,
             commission=commission,
             slippage_cost=Decimal("0"),
             signal_type=pos.signal_type,
@@ -367,7 +386,8 @@ class BacktestEngine:
             exit_reason=reason,
         )
         state.trades.append(trade)
-        state.capital += net
+        # Only add swing_net — scalp_pnl was already credited at the scalp exit
+        state.capital += swing_net
         del state.positions[pos.symbol]
 
     def _generate_signal(self, tick: NormalizedTick, symbol: str) -> Signal | None:
@@ -384,6 +404,16 @@ class BacktestEngine:
         if atr_val is None or atr_val <= 0:
             return None
 
+        # EMA trend filter: only trade RSI extremes with confirmed trend direction.
+        ema_fast = tech.ema(period=50, timeframe="5m")
+        ema_slow = tech.ema(period=200, timeframe="5m")
+        trend_bullish = (
+            ema_fast is not None and ema_slow is not None and ema_fast > ema_slow
+        )
+        trend_bearish = (
+            ema_fast is not None and ema_slow is not None and ema_fast < ema_slow
+        )
+
         direction: Direction | None = None
         triggers: list[str] = []
 
@@ -393,12 +423,18 @@ class BacktestEngine:
             triggers.append("OFI")
 
         if rsi is not None:
-            if rsi < 30:
-                direction = Direction.LONG
-                triggers.append("RSI_oversold")
-            elif rsi > 70:
-                direction = Direction.SHORT
-                triggers.append("RSI_overbought")
+            # Trade RSI momentum in the direction of the confirmed trend.
+            # RSI > 70 in a bull trend → strong momentum, go LONG.
+            # RSI < 30 in a bear trend → strong weakness, go SHORT.
+            # Ignore RSI signals that contradict the current OFI read.
+            if rsi > 70 and trend_bullish:
+                if direction is None or direction == Direction.LONG:
+                    direction = Direction.LONG
+                    triggers.append("RSI_momentum")
+            elif rsi < 30 and trend_bearish:
+                if direction is None or direction == Direction.SHORT:
+                    direction = Direction.SHORT
+                    triggers.append("RSI_momentum")
 
         min_triggers = 1 if self._settings.backtest_mode else self._settings.min_confluence_triggers
         if direction is None or len(triggers) < min_triggers:

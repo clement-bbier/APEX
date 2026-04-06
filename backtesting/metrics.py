@@ -205,6 +205,59 @@ def equity_curve_from_trades(initial_capital: float, trades: list[TradeRecord]) 
     return curve
 
 
+_MS_PER_DAY: int = 86_400_000
+
+
+def daily_equity_returns(
+    trades: list[TradeRecord],
+    initial_capital: float,
+) -> list[float]:
+    """Compute per-calendar-day fractional equity returns from trade records.
+
+    Trade PnL is bucketed by UTC calendar day using ``exit_timestamp_ms``.
+    Days with no trades carry forward the previous day's equity so that the
+    series covers every calendar day between the first and last trade.
+
+    Using daily returns (rather than per-trade returns) gives a Sharpe ratio
+    that is correctly annualised with √252 and is not sensitive to trade
+    frequency — following the same convention as the López de Prado PSR/DSR
+    functions above.
+
+    Args:
+        trades: Completed trade records.
+        initial_capital: Starting portfolio capital.
+
+    Returns:
+        List of per-day fractional returns (empty when fewer than 2 days).
+    """
+    if not trades:
+        return []
+
+    sorted_trades = sorted(trades, key=lambda t: t.exit_timestamp_ms)
+
+    # Aggregate PnL per calendar day
+    day_pnl: dict[int, float] = {}
+    for trade in sorted_trades:
+        day = trade.exit_timestamp_ms // _MS_PER_DAY
+        day_pnl[day] = day_pnl.get(day, 0.0) + _to_float(trade.net_pnl)
+
+    min_day = min(day_pnl)
+    max_day = max(day_pnl)
+
+    # Build a daily equity series, filling gaps by carrying forward
+    daily_equities: list[float] = [initial_capital]
+    current_equity = initial_capital
+    for day in range(min_day, max_day + 1):
+        current_equity += day_pnl.get(day, 0.0)
+        daily_equities.append(current_equity)
+
+    return [
+        (daily_equities[i] - daily_equities[i - 1]) / daily_equities[i - 1]
+        for i in range(1, len(daily_equities))
+        if daily_equities[i - 1] > 0
+    ]
+
+
 def by_session_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
     """Group trades by session and compute stats per group.
 
@@ -476,6 +529,12 @@ def full_report(
 ) -> dict[str, Any]:
     """Generate a complete performance report from trade records.
 
+    Sharpe and Sortino are computed on **daily** equity returns (bucketed by
+    calendar day) rather than per-trade returns.  Using a consistent daily
+    period makes the annualised figures comparable regardless of trade
+    frequency and matches the √252 annual factor convention used by the PSR
+    and DSR functions.
+
     Args:
         trades: All completed trade records.
         initial_capital: Starting portfolio capital.
@@ -490,9 +549,16 @@ def full_report(
         return {"error": "no trades"}
 
     curve = equity_curve_from_trades(initial_capital, trades)
-    period_returns = [
-        (curve[i] - curve[i - 1]) / curve[i - 1] for i in range(1, len(curve)) if curve[i - 1] > 0
+
+    # Daily returns for Sharpe/Sortino: correct annualisation with √252.
+    day_returns = daily_equity_returns(trades, initial_capital)
+    # Fall back to per-trade returns if fewer than 2 calendar days of data.
+    returns_for_risk = day_returns if len(day_returns) >= 2 else [
+        (curve[i] - curve[i - 1]) / curve[i - 1]
+        for i in range(1, len(curve))
+        if curve[i - 1] > 0
     ]
+
     final_equity = curve[-1]
     annual_return = final_equity / initial_capital - 1  # simplified single-period
 
@@ -500,8 +566,8 @@ def full_report(
     avg_w, avg_l = avg_win_loss(trades)
 
     return {
-        "sharpe": sharpe_ratio(period_returns, risk_free_rate),
-        "sortino": sortino_ratio(period_returns, risk_free_rate),
+        "sharpe": sharpe_ratio(returns_for_risk, risk_free_rate),
+        "sortino": sortino_ratio(returns_for_risk, risk_free_rate),
         "calmar": calmar_ratio(annual_return, dd),
         "max_drawdown": dd,
         "max_drawdown_duration_bars": dd_dur,
