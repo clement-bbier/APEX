@@ -5,13 +5,14 @@ Tests the safety invariant: once open, NO orders can be submitted.
 
 from __future__ import annotations
 
-from core.config import Settings
+import fakeredis.aioredis
+
 from services.s05_risk_manager.circuit_breaker import CircuitBreaker, CircuitState
 
 
 def make_cb() -> CircuitBreaker:
-    """Return a fresh CircuitBreaker with default Settings."""
-    return CircuitBreaker(Settings())
+    """Return a fresh CircuitBreaker backed by fakeredis."""
+    return CircuitBreaker(fakeredis.aioredis.FakeRedis())
 
 
 class TestCircuitBreakerIntegration:
