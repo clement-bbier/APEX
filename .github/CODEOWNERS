@@ -1,0 +1,15 @@
+# APEX — Code ownership and required reviewers.
+# Any change to a path listed here requires the listed owner's review.
+
+# Human-only critical paths
+/core/models/                 @clement-bbier
+/services/s05_risk_manager/   @clement-bbier
+/services/s06_execution/      @clement-bbier
+/rust/                        @clement-bbier
+/.github/CODEOWNERS           @clement-bbier
+/.github/agents/              @clement-bbier
+/AI_RULES.md                  @clement-bbier
+/CLAUDE.md                    @clement-bbier
+/MANIFEST.md                  @clement-bbier
+/.env.example                 @clement-bbier
+/docs/adr/                    @clement-bbier
