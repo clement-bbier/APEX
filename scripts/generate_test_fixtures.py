@@ -1,4 +1,5 @@
 """Generate a mean-reverting BTCUSDT 1-min fixture for backtest regression gate."""
+
 from __future__ import annotations
 
 from pathlib import Path
