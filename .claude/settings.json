@@ -55,7 +55,8 @@
       "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -q -r core supervisor services backtesting -c pyproject.toml -f json -o C:/Users/cleme/AppData/Local/Temp/bandit_final2.json)",
       "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit_final2.json'\\)\\); print\\('issues:', len\\(d['results']\\)\\)\")",
       "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -q -r core supervisor services backtesting -c pyproject.toml -f json -o C:/Users/cleme/AppData/Local/Temp/bandit_final3.json)",
-      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit_final3.json'\\)\\); print\\('issues:', len\\(d['results']\\)\\)\")"
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit_final3.json'\\)\\); print\\('issues:', len\\(d['results']\\)\\)\")",
+      "Bash(.venv/Scripts/python.exe -c \"import sys; sys.path.insert\\(0,'.'\\); import asyncio; from redis.asyncio import from_url; r = from_url\\('redis://127.0.0.1:6379/0'\\); print\\(asyncio.run\\(r.ping\\(\\)\\)\\)\")"
     ]
   }
 }
