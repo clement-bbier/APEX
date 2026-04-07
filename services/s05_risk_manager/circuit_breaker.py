@@ -48,6 +48,9 @@ from services.s05_risk_manager.models import (
     RuleResult,
 )
 
+# Alias for backwards-compatibility with integration tests
+CircuitState = CircuitBreakerState
+
 logger = structlog.get_logger(__name__)
 
 

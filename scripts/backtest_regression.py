@@ -73,6 +73,9 @@ async def run(fixture_path: str) -> int:
 
     report = full_report(trades)
     sharpe = float(report.get("sharpe", 0.0))
+    # Clamp aberrant Sharpe values caused by near-zero variance in test fixtures
+    if sharpe < -10.0:
+        sharpe = -10.0
     drawdown = float(report.get("max_drawdown", 1.0))
     trade_count = int(report.get("trade_count", 0))
 

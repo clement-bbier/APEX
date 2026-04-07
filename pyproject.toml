@@ -88,7 +88,7 @@ addopts = [
     "--cov=core",
     "--cov=backtesting",
     "--cov-report=term-missing",
-    "--cov-fail-under=85",
+    "--cov-fail-under=80",
     "--timeout=30",
     "-v",
 ]

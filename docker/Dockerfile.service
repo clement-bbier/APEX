@@ -48,7 +48,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
     PATH=/home/apex/.local/bin:/usr/local/bin:/usr/bin:/bin
-RUN groupadd --gid 1000 apex \
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends passwd \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --gid 1000 apex \
  && useradd --uid 1000 --gid apex --create-home apex
 WORKDIR /app
 # Site-packages installed under --user end up in /root/.local; the apex
