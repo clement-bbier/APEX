@@ -6,63 +6,54 @@ on:
   pull_request:
     branches: [main, develop]
 
-# Make ``import core`` / ``import services`` work in every job without
-# needing to repeat ``PYTHONPATH=.`` on each command line.
 env:
   PYTHONPATH: ${{ github.workspace }}
   PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   quality:
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dev tools and runtime deps
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-      - name: Ruff lint
-        run: ruff check .
-      - name: Ruff format check
-        run: ruff format --check .
-      - name: Mypy (project config — strict, with overrides)
-        run: mypy .
-      - name: Bandit security scan
-        run: bandit -r core supervisor services backtesting -c pyproject.toml
+      - run: pip install -r requirements.txt bandit
+      - run: ruff check .
+      - run: ruff format --check .
+      - run: mypy . --strict
+      - run: bandit -r core supervisor services backtesting -c pyproject.toml
 
   rust:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust
       - working-directory: rust
-        run: cargo test --workspace
-      - name: Build and install Rust wheels
-        shell: bash
+        run: cargo test --workspace --locked
+      - name: Build Rust wheels
         run: |
-          set -euo pipefail
           python -m pip install "maturin>=1.9.4"
-          (cd rust/apex_mc   && maturin build --release)
+          (cd rust/apex_mc && maturin build --release)
           (cd rust/apex_risk && maturin build --release)
-          ls -la ./rust/target/wheels/
-          python -m pip install ./rust/target/wheels/*.whl
-          python -c "from apex_mc import run_mc_batch, compute_var, compute_cvar; print('apex_mc OK')"
-          python -c "from apex_risk import compute_exposure; print('apex_risk OK')"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rust-wheels
+          path: rust/target/wheels/*.whl
+          retention-days: 1
 
   unit-tests:
     needs: [quality, rust]
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     services:
       redis:
         image: redis:7-alpine
@@ -73,77 +64,67 @@ jobs:
           --health-interval 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - name: Install dependencies
-        shell: bash
+      - uses: actions/download-artifact@v4
+        with:
+          name: rust-wheels
+          path: ./wheels
+      - name: Install deps
         run: |
-          set -euo pipefail
-          python -m pip install -r requirements.txt
-          python -m pip install "maturin>=1.9.4" pytest-asyncio fakeredis
-          (cd rust/apex_mc   && maturin build --release)
-          (cd rust/apex_risk && maturin build --release)
-          ls -la ./rust/target/wheels/
-          python -m pip install ./rust/target/wheels/*.whl
-      - name: Run unit tests
+          pip install -r requirements.txt pytest-asyncio fakeredis
+          pip install ./wheels/*.whl
+      - name: Unit tests with coverage gate
+        env:
+          REDIS_URL: "redis://localhost:6379/0"
+          APEX_REDIS_TTL_SECONDS: "60"
         run: |
           pytest tests/unit/ -v \
             --cov=services --cov=core --cov=backtesting \
-            --cov-report=xml --cov-fail-under=40
-        env:
-          REDIS_URL: "redis://localhost:6379/0"
-          # StateStore uses the keyword ``ttl=`` (renamed from
-          # ``expire_seconds``); the unit tests assert this contract.
-          APEX_REDIS_TTL_SECONDS: "60"
-      - uses: codecov/codecov-action@v4
+            --cov-report=xml --cov-report=term-missing \
+            --cov-fail-under=40 --timeout=30
+      - uses: codecov/codecov-action@v5
         with:
-          file: ./coverage.xml
+          files: ./coverage.xml
+          fail_ci_if_error: false
 
   integration-tests:
     needs: [unit-tests]
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
-      - run: docker compose -f docker/docker-compose.test.yml up -d
       - run: pip install -r requirements.txt pytest-asyncio fakeredis
-      - run: pytest tests/integration/ -v --timeout=60
+      - run: docker compose -f docker/docker-compose.test.yml up -d --wait
+      - name: Integration tests (no coverage gate)
+        run: pytest tests/integration/ -v --timeout=60 -p no:cacheprovider
       - if: always()
         run: docker compose -f docker/docker-compose.test.yml down -v
 
   backtest-gate:
     needs: [unit-tests]
     runs-on: ubuntu-latest
-    env:
-      PYTHONPATH: ${{ github.workspace }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           lfs: true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
-      - name: Generate fixture if missing
-        run: |
-          if [ ! -f "tests/fixtures/30d_btcusdt_1m.parquet" ]; then
-            python scripts/generate_test_fixtures.py
-          fi
-      - name: Run backtest regression gate
-        run: |
-          python scripts/generate_test_fixtures.py
-          python scripts/backtest_regression.py \
-            --fixture tests/fixtures/30d_btcusdt_1m.parquet
+      - name: Generate fixture
+        run: python scripts/generate_test_fixtures.py
+      - name: Backtest regression gate
         env:
           BACKTEST_MIN_SHARPE: "0.5"
           BACKTEST_MAX_DD: "0.12"
+        run: |
+          python scripts/backtest_regression.py \
+            --fixture tests/fixtures/30d_btcusdt_1m.parquet
