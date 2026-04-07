@@ -13,7 +13,8 @@ from __future__ import annotations
 from decimal import Decimal
 from unittest.mock import MagicMock
 
-from core.config import Settings
+import fakeredis.aioredis
+
 from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
 from services.s03_regime_detector.regime_engine import RegimeEngine
 from services.s04_fusion_engine.kelly_sizer import KellySizer
@@ -62,12 +63,12 @@ class TestFullPipelinePaper:
         max_risk = capital * Decimal("0.005")  # 0.5% = $50
 
         order = MagicMock()
-        order.entry_price = Decimal("50000")
+        order.entry = Decimal("50000")
         order.stop_loss = Decimal("49000")  # $1000 risk per BTC
-        order.size_total = Decimal("0.5")  # 0.5 BTC = $500 risk -- exceeds limit
+        order.size = Decimal("0.5")  # 0.5 BTC = $500 risk -- exceeds limit
 
-        risk_per_unit = order.entry_price - order.stop_loss
-        total_risk = risk_per_unit * order.size_total
+        risk_per_unit = order.entry - order.stop_loss
+        total_risk = risk_per_unit * order.size
         assert total_risk > max_risk  # confirms it's over the limit
 
         result = check_max_risk_per_trade(order, capital)
@@ -93,12 +94,30 @@ class TestFullPipelinePaper:
         assert slippage_wide > slippage_tight
         assert slippage_tight >= 0.0
 
-    def test_circuit_breaker_halts_on_drawdown(self) -> None:
+    async def test_circuit_breaker_halts_on_drawdown(self) -> None:
         """3% daily drawdown must open circuit breaker and block all orders."""
-        cb = CircuitBreaker(Settings())
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        cb = CircuitBreaker(fakeredis.aioredis.FakeRedis())
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitState.CLOSED
 
-        cb.update_daily_pnl(pnl_pct=-0.031)  # -3.1% > 3% threshold
-        assert cb.state == CircuitState.OPEN
-        assert cb.allows_new_orders() is False
+        result = await cb.check(
+            current_daily_pnl=Decimal("0"),
+            starting_capital=Decimal("100000"),
+            intraday_loss_30m=Decimal("0"),
+            vix_current=20.0,
+            vix_1h_ago=20.0,
+            service_last_seen={},
+        )
+        assert result.passed is True
+
+        result = await cb.check(
+            current_daily_pnl=Decimal("-3100"),  # -3.1% > 3% threshold
+            starting_capital=Decimal("100000"),
+            intraday_loss_30m=Decimal("0"),
+            vix_current=20.0,
+            vix_1h_ago=20.0,
+            service_last_seen={},
+        )
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitState.OPEN
+        assert result.passed is False

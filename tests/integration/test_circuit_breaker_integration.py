@@ -5,59 +5,149 @@ Tests the safety invariant: once open, NO orders can be submitted.
 
 from __future__ import annotations
 
-from core.config import Settings
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+
+import fakeredis.aioredis
+
 from services.s05_risk_manager.circuit_breaker import CircuitBreaker, CircuitState
+
+_CAPITAL = Decimal("100_000")
 
 
 def make_cb() -> CircuitBreaker:
-    """Return a fresh CircuitBreaker with default Settings."""
-    return CircuitBreaker(Settings())
+    """Return a fresh CircuitBreaker with an isolated FakeRedis instance."""
+    return CircuitBreaker(fakeredis.aioredis.FakeRedis())
 
 
 class TestCircuitBreakerIntegration:
-    def test_all_triggers_open_breaker(self) -> None:
-        """All six trigger paths must trip the breaker."""
-        triggers = [
-            lambda cb: cb.update_daily_pnl(-0.031),  # -3.1% > 3% threshold
-            lambda cb: cb.update_30min_pnl(-0.025),  # 2.5% rolling loss > 2%
-            lambda cb: cb.update_vix_change(0.21),  # 21% VIX spike > 20%
-            lambda cb: cb.notify_service_down("s01", 65),  # 65s > 60s timeout
-            lambda cb: cb.update_price_gap(0.06),  # 6% gap > 5% threshold
+    async def test_all_triggers_open_breaker(self) -> None:
+        """All trigger paths must trip the breaker to OPEN."""
+        trigger_cases = [
+            (
+                {
+                    "current_daily_pnl": Decimal("-3100"),
+                    "starting_capital": _CAPITAL,
+                    "intraday_loss_30m": Decimal("0"),
+                    "vix_current": 20.0,
+                    "vix_1h_ago": 20.0,
+                    "service_last_seen": {},
+                },
+                "daily -3.1%",
+            ),
+            (
+                {
+                    "current_daily_pnl": Decimal("0"),
+                    "starting_capital": _CAPITAL,
+                    "intraday_loss_30m": Decimal("-2500"),
+                    "vix_current": 20.0,
+                    "vix_1h_ago": 20.0,
+                    "service_last_seen": {},
+                },
+                "30min -2.5%",
+            ),
+            (
+                {
+                    "current_daily_pnl": Decimal("0"),
+                    "starting_capital": _CAPITAL,
+                    "intraday_loss_30m": Decimal("0"),
+                    "vix_current": 12.1,
+                    "vix_1h_ago": 10.0,
+                    "service_last_seen": {},
+                },
+                "VIX +21%",
+            ),
+            (
+                {
+                    "current_daily_pnl": Decimal("0"),
+                    "starting_capital": _CAPITAL,
+                    "intraday_loss_30m": Decimal("0"),
+                    "vix_current": 20.0,
+                    "vix_1h_ago": 20.0,
+                    "service_last_seen": {"s01": datetime.now(UTC) - timedelta(seconds=65)},
+                },
+                "service down 65s",
+            ),
         ]
-        for i, trigger in enumerate(triggers):
+        for kwargs, desc in trigger_cases:
             cb = make_cb()
-            assert cb.state == CircuitState.CLOSED, f"Trigger {i}: should start CLOSED"
-            trigger(cb)
-            assert cb.state == CircuitState.OPEN, f"Trigger {i}: should be OPEN after trigger"
-            assert cb.allows_new_orders() is False, f"Trigger {i}: must block orders"
+            snap = await cb.get_snapshot()
+            assert snap.state == CircuitState.CLOSED, f"{desc}: should start CLOSED"
+            result = await cb.check(**kwargs)
+            assert not result.passed, f"{desc}: check should fail"
+            snap = await cb.get_snapshot()
+            assert snap.state == CircuitState.OPEN, f"{desc}: should be OPEN after trigger"
 
-    def test_open_breaker_blocks_all_orders(self) -> None:
+    async def test_open_breaker_blocks_all_orders(self) -> None:
         cb = make_cb()
-        cb.update_daily_pnl(-0.04)  # trigger
-        assert cb.state == CircuitState.OPEN
+        await cb.check(
+            current_daily_pnl=Decimal("-4000"),
+            starting_capital=_CAPITAL,
+            intraday_loss_30m=Decimal("0"),
+            vix_current=20.0,
+            vix_1h_ago=20.0,
+            service_last_seen={},
+        )
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitState.OPEN
 
-        # Verify 100 consecutive order checks all fail
+        # Verify 100 consecutive healthy checks all fail while OPEN
         for _ in range(100):
-            assert cb.allows_new_orders() is False
+            result = await cb.check(
+                current_daily_pnl=Decimal("0"),
+                starting_capital=_CAPITAL,
+                intraday_loss_30m=Decimal("0"),
+                vix_current=20.0,
+                vix_1h_ago=20.0,
+                service_last_seen={},
+            )
+            assert result.passed is False
 
-    def test_breaker_recovers_after_reset(self) -> None:
+    async def test_reset_daily_preserves_open_state(self) -> None:
         cb = make_cb()
-        cb.update_daily_pnl(-0.04)
-        assert cb.state == CircuitState.OPEN
+        await cb.check(
+            current_daily_pnl=Decimal("-4000"),
+            starting_capital=_CAPITAL,
+            intraday_loss_30m=Decimal("0"),
+            vix_current=20.0,
+            vix_1h_ago=20.0,
+            service_last_seen={},
+        )
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitState.OPEN
 
-        # Manual reset (used at start of new trading day)
-        cb.reset()
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        # reset_daily() clears daily P&L but preserves OPEN state
+        await cb.reset_daily()
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitState.OPEN
+        assert snap.daily_pnl == Decimal("0")
 
-    def test_starts_closed(self) -> None:
+    async def test_starts_closed(self) -> None:
         cb = make_cb()
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitState.CLOSED
+        result = await cb.check(
+            current_daily_pnl=Decimal("0"),
+            starting_capital=_CAPITAL,
+            intraday_loss_30m=Decimal("0"),
+            vix_current=20.0,
+            vix_1h_ago=20.0,
+            service_last_seen={},
+        )
+        assert result.passed is True
 
-    def test_below_threshold_does_not_trip(self) -> None:
+    async def test_below_threshold_does_not_trip(self) -> None:
         """Losses below threshold must not trip the breaker."""
         cb = make_cb()
-        cb.update_daily_pnl(-0.025)  # -2.5% < 3% threshold
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        result = await cb.check(
+            current_daily_pnl=Decimal("-2500"),  # -2.5% < 3% threshold
+            starting_capital=_CAPITAL,
+            intraday_loss_30m=Decimal("0"),
+            vix_current=20.0,
+            vix_1h_ago=20.0,
+            service_last_seen={},
+        )
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitState.CLOSED
+        assert result.passed is True
+

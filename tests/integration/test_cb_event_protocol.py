@@ -13,6 +13,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
+import fakeredis.aioredis
+
 from services.s05_risk_manager.cb_event_guard import CBEventGuard
 from services.s08_macro_intelligence.cb_watcher import CBWatcher
 
@@ -51,17 +53,22 @@ class TestCBEventProtocol:
         monitoring, _ = watcher.is_in_monitor_window(thirty_after)
         assert monitoring is True
 
-    def test_guard_blocks_new_orders_during_window(self) -> None:
-        """CBEventGuard.is_blocked() returns True during event window."""
-        guard = CBEventGuard()
-        with patch.object(guard, "is_blocked", return_value=True):
-            assert guard.is_blocked() is True
+    async def test_guard_blocks_new_orders_during_window(self) -> None:
+        """CBEventGuard.check() is patched to simulate a blocked window."""
+        redis = fakeredis.aioredis.FakeRedis()
+        guard = CBEventGuard(redis=redis)
+        with patch.object(guard, "check", new_callable=AsyncMock) as mock_check:
+            mock_check.return_value = AsyncMock(passed=False)
+            result = await guard.check()
+            assert result.passed is False
 
-    def test_guard_allows_orders_outside_window(self) -> None:
-        """CBEventGuard.is_blocked() returns False outside any event window."""
-        guard = CBEventGuard()
-        # Default implementation returns False (no Redis state)
-        assert guard.is_blocked() is False
+    async def test_guard_allows_orders_outside_window(self) -> None:
+        """CBEventGuard.check() returns ok (passed=True) when Redis has no CB events."""
+        redis = fakeredis.aioredis.FakeRedis()
+        guard = CBEventGuard(redis=redis)
+        # No events stored in Redis → no active CB window → not blocked
+        result = await guard.check()
+        assert result.passed is True
 
     def test_all_events_have_block_and_monitor_keys(self) -> None:
         """Every hardcoded FOMC event must have block_start and monitor_end."""

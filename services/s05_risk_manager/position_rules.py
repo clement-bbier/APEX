@@ -109,7 +109,7 @@ def check_max_risk_per_trade(order: OrderCandidate, capital: Decimal) -> RuleRes
         return RuleResult.fail(
             rule_name="check_max_risk_per_trade",
             block_reason=BlockReason.MAX_RISK_PER_TRADE,
-            reason=f"risk {monetary_risk:.4f} > max {max_risk:.4f}",
+            reason=f"risk {monetary_risk:.4f} exceeds max {max_risk:.4f}",
             monetary_risk=float(monetary_risk),
             max_risk=float(max_risk),
         )

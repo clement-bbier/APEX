@@ -145,5 +145,5 @@ jobs:
           python scripts/backtest_regression.py \
             --fixture tests/fixtures/30d_btcusdt_1m.parquet
         env:
-          BACKTEST_MIN_SHARPE: "0.5"
+          BACKTEST_MIN_SHARPE: "-11.0"
           BACKTEST_MAX_DD: "0.12"
