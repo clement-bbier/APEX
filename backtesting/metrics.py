@@ -57,8 +57,8 @@ def sharpe_ratio(
     rf_per_period = risk_free_rate / (annual_factor**2)
     excess = arr - rf_per_period
     std = float(np.std(excess, ddof=1))
-    if std == 0:
-        return 0.0
+    if std < 1e-9:
+        return 0.0  # zero variance != bad strategy
     return float(np.mean(excess)) / std * annual_factor
 
 
