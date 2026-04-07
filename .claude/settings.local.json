@@ -35,7 +35,12 @@
       "Bash(git commit:*)",
       "Bash(.venv/Scripts/python.exe -m ruff check . --fix --unsafe-fixes)",
       "Bash(.venv/Scripts/python.exe -m ruff format .)",
-      "Bash(.venv/Scripts/python.exe -m ruff check .)"
+      "Bash(.venv/Scripts/python.exe -m ruff check .)",
+      "Bash(.venv/Scripts/python.exe -m mypy . --strict)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/ --cov=services --cov=core --cov=backtesting --cov-fail-under=40 --timeout=30 -q)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/test_backtest_metrics.py -k \"TestSharpeRatio\" --no-cov)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/integration/ --timeout=60 -q --no-cov)",
+      "Bash(.venv/Scripts/python.exe scripts/generate_test_fixtures.py)"
     ]
   }
 }
