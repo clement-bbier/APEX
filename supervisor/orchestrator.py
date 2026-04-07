@@ -5,9 +5,9 @@ Implements a health gate between service starts.
 
 Startup order rationale
 -----------------------
-The XSUB/XPUB broker (``core.zmq_broker``) is launched **first** as an
-in-process asyncio task — it is the only thing that BINDs ZMQ ports, and
-every service must be able to CONNECT to it before it boots.
+The XSUB/XPUB broker (``core.zmq_broker``) is launched **first** as its
+own subprocess — it is the only thing that BINDs ZMQ ports, and every
+service must be able to CONNECT to it before it boots.
 
 S01 then comes first among the application services because it produces
 ticks the rest of the chain consumes.
@@ -15,6 +15,17 @@ ticks the rest of the chain consumes.
 S10 must come last because it subscribes to the firehose of every topic
 (``""``) and is the most invasive observer. Launching it last ensures
 it has something useful to observe right after start.
+
+Windows event-loop note
+-----------------------
+The orchestrator MUST stay on the default ``WindowsProactorEventLoopPolicy``
+on Windows because ``asyncio.create_subprocess_exec`` is only implemented
+on the proactor loop. Each child service (and the broker subprocess)
+re-installs ``WindowsSelectorEventLoopPolicy`` for itself at import-time
+so pyzmq's asyncio integration keeps working inside the children. The
+orchestrator therefore deliberately avoids importing
+``core.zmq_broker`` / ``core.bus`` / ``core.base_service`` — any of those
+would flip the policy here and break subprocess spawning.
 """
 
 from __future__ import annotations
@@ -27,9 +38,6 @@ from collections.abc import Awaitable
 from pathlib import Path
 from typing import Any, cast
 
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-
 # Make ``core`` and ``services`` importable when launched directly
 # (``python supervisor/orchestrator.py``).
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -39,7 +47,11 @@ from redis import asyncio as aioredis
 from core.config import get_settings
 from core.logger import get_logger
 from core.state import StateStore
-from core.zmq_broker import BROKER_SERVICE_ID, ZmqBroker
+
+#: Service identifier the broker reports under in Redis. Hard-coded here
+#: instead of imported from ``core.zmq_broker`` to avoid pulling in pyzmq
+#: (which would force the SelectorEventLoop and break subprocess spawning).
+BROKER_SERVICE_ID = "zmq_broker"
 
 logger = get_logger("supervisor.orchestrator")
 
@@ -60,6 +72,13 @@ STARTUP_ORDER: list[str] = [
 ]
 
 
+def _module_for(service_id: str) -> str:
+    """Return the ``-m`` Python module path used to launch *service_id*."""
+    if service_id == "zmq_broker":
+        return "core.zmq_broker"
+    return f"services.{service_id}.service"
+
+
 class Orchestrator:
     """Manages ordered startup and shutdown of all APEX services.
 
@@ -74,7 +93,6 @@ class Orchestrator:
         self._state = StateStore("orchestrator")
         self._started: list[str] = []
         self._processes: dict[str, asyncio.subprocess.Process] = {}
-        self._broker: ZmqBroker | None = None
         # Hold strong references to background tasks so they are not
         # garbage-collected (RUF006).
         self._bg_tasks: set[asyncio.Task[None]] = set()
@@ -105,18 +123,14 @@ class Orchestrator:
                         f"(pub={self._settings.zmq_pub_port}, "
                         f"sub={self._settings.zmq_sub_port})"
                     )
-                self._broker = ZmqBroker()
-                await self._broker.start()
-                if not await self.health_gate(BROKER_SERVICE_ID, timeout_s=10.0):
-                    raise RuntimeError("ZMQ broker failed health gate")
-                self._started.append(BROKER_SERVICE_ID)
-                logger.info("zmq_broker_started_and_healthy")
-                continue
+                # Fall through to the generic spawn path below — the
+                # broker is launched as ``python -m core.zmq_broker``
+                # exactly like any other service.
 
             logger.info("Starting service", service=service_id)
 
             python_exe = sys.executable
-            cmd = [python_exe, "-m", f"services.{service_id}.service"]
+            cmd = [python_exe, "-m", _module_for(service_id)]
 
             # Force PYTHONPATH so child interpreters can ``import core`` and
             # ``import services`` regardless of how the orchestrator itself
@@ -179,16 +193,30 @@ class Orchestrator:
             logger.debug("child_output_stream_error", service=name, error=str(exc))
 
     async def shutdown(self) -> None:
-        """Shutdown services in reverse startup order then stop the broker."""
+        """Shutdown services in reverse startup order.
+
+        The broker is just another subprocess in ``self._started`` and is
+        terminated after every child it serves so the children get a clean
+        EOF on their PUB/SUB sockets.
+        """
         logger.info("Shutting down APEX Trading System")
+        # ``reversed(self._started)`` puts the broker LAST naturally
+        # because it was started first.
         for service_id in reversed(self._started):
-            if service_id == BROKER_SERVICE_ID:
-                continue  # broker stops below, after the children
             logger.info("Stopping service", service=service_id)
             process = self._processes.get(service_id)
-            if process:
+            if process is None:
+                continue
+            try:
+                process.terminate()
+            except ProcessLookupError:
+                pass
+            try:
+                await asyncio.wait_for(process.wait(), timeout=5.0)
+            except TimeoutError:
+                logger.warning("service_terminate_timeout", service=service_id)
                 try:
-                    process.terminate()
+                    process.kill()
                 except ProcessLookupError:
                     pass
 
@@ -203,13 +231,6 @@ class Orchestrator:
             except Exception as exc:
                 logger.debug("bg_task_shutdown_error", error=str(exc))
         self._bg_tasks.clear()
-
-        if self._broker is not None:
-            try:
-                await self._broker.stop()
-            except Exception as exc:
-                logger.warning("broker_stop_failed", error=str(exc))
-            self._broker = None
 
         self._started.clear()
         self._processes.clear()
