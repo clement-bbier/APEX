@@ -13,6 +13,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
+import fakeredis.aioredis
+
 from services.s05_risk_manager.cb_event_guard import CBEventGuard
 from services.s08_macro_intelligence.cb_watcher import CBWatcher
 
@@ -53,13 +55,13 @@ class TestCBEventProtocol:
 
     def test_guard_blocks_new_orders_during_window(self) -> None:
         """CBEventGuard.is_blocked() returns True during event window."""
-        guard = CBEventGuard()
+        guard = CBEventGuard(redis=fakeredis.aioredis.FakeRedis())
         with patch.object(guard, "is_blocked", return_value=True):
             assert guard.is_blocked() is True
 
     def test_guard_allows_orders_outside_window(self) -> None:
         """CBEventGuard.is_blocked() returns False outside any event window."""
-        guard = CBEventGuard()
+        guard = CBEventGuard(redis=fakeredis.aioredis.FakeRedis())
         # Default implementation returns False (no Redis state)
         assert guard.is_blocked() is False
 
