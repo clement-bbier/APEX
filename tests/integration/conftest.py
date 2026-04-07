@@ -3,6 +3,7 @@ Integration test configuration.
 All integration tests require Docker Redis to be running.
 Run: docker compose -f docker/docker-compose.test.yml up -d
 """
+
 from __future__ import annotations
 
 import asyncio

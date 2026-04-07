@@ -2,6 +2,7 @@
 
 All functions are pure -- no Redis, no async, no I/O.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -18,17 +19,25 @@ from services.s05_risk_manager.models import BlockReason, Position
 
 _CAPITAL = Decimal("100_000")
 
+
 def _pos(symbol: str, size: str, price: str) -> Position:
     return Position(symbol=symbol, size=Decimal(size), entry_price=Decimal(price))
+
 
 def _order(symbol: str = "BTCUSDT", size: str = "0.01", entry: str = "50000") -> OrderCandidate:
     sz = Decimal(size)
     return OrderCandidate(
-        order_id="o1", symbol=symbol, direction=Direction.LONG,
-        timestamp_ms=1_700_000_000_000, size=sz,
-        size_scalp_exit=sz * Decimal("0.35"), size_swing_exit=sz * Decimal("0.65"),
-        entry=Decimal(entry), stop_loss=Decimal("49500"),
-        target_scalp=Decimal("50750"), target_swing=Decimal("51500"),
+        order_id="o1",
+        symbol=symbol,
+        direction=Direction.LONG,
+        timestamp_ms=1_700_000_000_000,
+        size=sz,
+        size_scalp_exit=sz * Decimal("0.35"),
+        size_swing_exit=sz * Decimal("0.65"),
+        entry=Decimal(entry),
+        stop_loss=Decimal("49500"),
+        target_scalp=Decimal("50750"),
+        target_swing=Decimal("51500"),
         capital_at_risk=Decimal("5"),
     )
 
@@ -54,7 +63,9 @@ class TestTotalExposure:
     def test_exact_boundary_pass(self) -> None:
         # 19.9% existing: 19900 notional, new order adds 0, so 19900/100000 = 19.9%
         positions = [_pos("AAPL", "199", "100")]  # 199 * 100 = 19900
-        r = check_total_exposure(_order(symbol="MSFT", size="0.001", entry="10"), positions, _CAPITAL)
+        r = check_total_exposure(
+            _order(symbol="MSFT", size="0.001", entry="10"), positions, _CAPITAL
+        )
         assert r.passed  # total = 19910/100000 = 19.91%
 
     def test_exact_boundary_fail(self) -> None:

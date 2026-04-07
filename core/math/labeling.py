@@ -29,6 +29,7 @@ Reference:
     López de Prado, M. (2018). Advances in Financial Machine Learning.
     Wiley. Chapter 3, Sections 3.1-3.4.
 """
+
 from __future__ import annotations
 
 import math

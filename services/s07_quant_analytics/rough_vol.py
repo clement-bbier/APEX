@@ -20,6 +20,7 @@ References:
         stylized facts and statistical issues.
         Quantitative Finance, 1(2), 223-236.
 """
+
 from __future__ import annotations
 
 import math
@@ -32,23 +33,23 @@ import numpy as np
 class RoughVolSignal:
     """Output of rough volatility analysis."""
 
-    hurst_exponent: float     # H ∈ (0, 0.5) for rough vol; closer to 0 = rougher
-    is_rough: bool            # H < 0.3 → strong rough vol regime
+    hurst_exponent: float  # H ∈ (0, 0.5) for rough vol; closer to 0 = rougher
+    is_rough: bool  # H < 0.3 → strong rough vol regime
     scalping_edge_score: float  # [0, 1]: higher = more predictable short-term vol
-    vol_regime: str           # "rough" | "semi_rough" | "classical"
-    size_adjustment: float    # Multiplicative adjustment for position sizing
+    vol_regime: str  # "rough" | "semi_rough" | "classical"
+    size_adjustment: float  # Multiplicative adjustment for position sizing
 
 
 @dataclass
 class VarianceRatioResult:
     """Output of Lo-MacKinlay Variance Ratio Test."""
 
-    vr_q: float             # VR(q) = Var(r_t + ... + r_{t+q}) / (q × Var(r_t))
-    q: int                  # Aggregation period
-    z_statistic: float      # Standardized test statistic
-    signal: str             # "momentum" | "mean_reversion" | "random_walk"
+    vr_q: float  # VR(q) = Var(r_t + ... + r_{t+q}) / (q × Var(r_t))
+    q: int  # Aggregation period
+    z_statistic: float  # Standardized test statistic
+    signal: str  # "momentum" | "mean_reversion" | "random_walk"
     signal_strength: float  # |VR(q) - 1| normalized ∈ [0, 1]
-    is_significant: bool    # |z| > 1.96 at 95% confidence
+    is_significant: bool  # |z| > 1.96 at 95% confidence
 
 
 class RoughVolAnalyzer:
@@ -84,9 +85,13 @@ class RoughVolAnalyzer:
             RoughVolSignal with regime classification and sizing adjustment.
         """
         if len(realized_vols) < n_lags + 5:
-            return RoughVolSignal(hurst_exponent=0.5, is_rough=False,
-                                  scalping_edge_score=0.0, vol_regime="classical",
-                                  size_adjustment=1.0)
+            return RoughVolSignal(
+                hurst_exponent=0.5,
+                is_rough=False,
+                scalping_edge_score=0.0,
+                vol_regime="classical",
+                size_adjustment=1.0,
+            )
 
         log_vols = np.log(np.maximum(np.asarray(realized_vols, dtype=float), 1e-10))
         log_vols -= np.mean(log_vols)
@@ -98,17 +103,21 @@ class RoughVolAnalyzer:
         for lag in range(1, n_lags + 1):
             if n - lag < 5:
                 break
-            c = float(np.mean(log_vols[:n-lag] * log_vols[lag:]))
+            c = float(np.mean(log_vols[: n - lag] * log_vols[lag:]))
             c0 = float(np.var(log_vols))
             autocorrs.append(max(1e-10, abs(c / c0) if c0 > 0 else 1e-10))
 
         if len(autocorrs) < 3:
-            return RoughVolSignal(hurst_exponent=0.5, is_rough=False,
-                                  scalping_edge_score=0.0, vol_regime="classical",
-                                  size_adjustment=1.0)
+            return RoughVolSignal(
+                hurst_exponent=0.5,
+                is_rough=False,
+                scalping_edge_score=0.0,
+                vol_regime="classical",
+                size_adjustment=1.0,
+            )
 
         # Log-log regression: log C(τ) = 2H × log(τ) + const
-        log_lags = np.log(lags[:len(autocorrs)])
+        log_lags = np.log(lags[: len(autocorrs)])
         log_corrs = np.log(np.array(autocorrs))
         try:
             slope, _ = np.polyfit(log_lags, log_corrs, 1)
@@ -132,9 +141,13 @@ class RoughVolAnalyzer:
             regime = "classical"
             size_adj = 1.0
 
-        return RoughVolSignal(hurst_exponent=h, is_rough=is_rough,
-                              scalping_edge_score=edge_score,
-                              vol_regime=regime, size_adjustment=size_adj)
+        return RoughVolSignal(
+            hurst_exponent=h,
+            is_rough=is_rough,
+            scalping_edge_score=edge_score,
+            vol_regime=regime,
+            size_adjustment=size_adj,
+        )
 
     def variance_ratio_test(
         self,
@@ -166,9 +179,14 @@ class RoughVolAnalyzer:
         r = np.asarray(log_returns, dtype=float)
         n = len(r)
         if n < 2 * q:
-            return VarianceRatioResult(vr_q=1.0, q=q, z_statistic=0.0,
-                                       signal="random_walk", signal_strength=0.0,
-                                       is_significant=False)
+            return VarianceRatioResult(
+                vr_q=1.0,
+                q=q,
+                z_statistic=0.0,
+                signal="random_walk",
+                signal_strength=0.0,
+                is_significant=False,
+            )
 
         # Variance of single-period returns (demean)
         mu = np.mean(r)
@@ -176,12 +194,17 @@ class RoughVolAnalyzer:
         var1 = float(np.var(r_dm, ddof=1))
 
         if var1 == 0:
-            return VarianceRatioResult(vr_q=1.0, q=q, z_statistic=0.0,
-                                       signal="random_walk", signal_strength=0.0,
-                                       is_significant=False)
+            return VarianceRatioResult(
+                vr_q=1.0,
+                q=q,
+                z_statistic=0.0,
+                signal="random_walk",
+                signal_strength=0.0,
+                is_significant=False,
+            )
 
         # Variance of q-period returns
-        r_q = np.array([np.sum(r[i:i+q]) for i in range(n - q + 1)])
+        r_q = np.array([np.sum(r[i : i + q]) for i in range(n - q + 1)])
         mu_q = np.mean(r_q)
         var_q = float(np.var(r_q - mu_q, ddof=1))
 
@@ -190,7 +213,7 @@ class RoughVolAnalyzer:
         # Heteroskedasticity-consistent standard error (Lo-MacKinlay 1988)
         theta = 0.0
         for k in range(1, q):
-            delta_k = float(np.sum(r_dm[:-k] ** 2 * r_dm[k:] ** 2)) / (var1 ** 2 * n) ** 2
+            delta_k = float(np.sum(r_dm[:-k] ** 2 * r_dm[k:] ** 2)) / (var1**2 * n) ** 2
             theta += (2.0 * (q - k) / q) ** 2 * delta_k
 
         se = math.sqrt(max(theta, 1.0 / n) / n)
@@ -205,6 +228,11 @@ class RoughVolAnalyzer:
 
         strength = min(1.0, abs(vr - 1.0) / 0.5)
 
-        return VarianceRatioResult(vr_q=vr, q=q, z_statistic=z,
-                                   signal=signal, signal_strength=strength,
-                                   is_significant=abs(z) > 1.96)
+        return VarianceRatioResult(
+            vr_q=vr,
+            q=q,
+            z_statistic=z,
+            signal=signal,
+            signal_strength=strength,
+            is_significant=abs(z) > 1.96,
+        )

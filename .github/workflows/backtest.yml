@@ -37,18 +37,18 @@ jobs:
       - name: Generate test fixture (if missing)
         run: |
           if [ ! -f tests/fixtures/30d_btcusdt_1m.parquet ]; then
-            PYTHONPATH=. python scripts/generate_test_fixtures.py
+            PYTHONPATH="."  python scripts/generate_test_fixtures.py
           fi
 
       - name: Run backtest regression
-        run: PYTHONPATH=. python scripts/backtest_regression.py --fixture tests/fixtures/30d_btcusdt_1m.parquet
+        run: PYTHONPATH="."  python scripts/backtest_regression.py --fixture tests/fixtures/30d_btcusdt_1m.parquet
         env:
           BACKTEST_MIN_SHARPE: "0.5"
           BACKTEST_MAX_DD: "0.12"
 
       - name: Run walk-forward validation
         run: |
-          PYTHONPATH=. python -c "
+          PYTHONPATH="."  python -c "
           import pandas as pd
           from backtesting.walk_forward import WalkForwardValidator
           df = pd.read_parquet('tests/fixtures/30d_btcusdt_1m.parquet')

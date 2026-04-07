@@ -14,6 +14,7 @@ Chain order (fail-fast):
 Reference:
     Gamma, E. et al. (1994). Design Patterns. Chain of Responsibility, p. 223.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -85,6 +86,22 @@ class RiskManagerService(BaseService):
     def get_subscribe_topics(self) -> list[str]:
         return [Topics.ORDER_CANDIDATE]
 
+    async def run(self) -> None:
+        """Bring the risk chain online and dispatch order candidates.
+
+        BaseService already opened the PUB socket and started the heartbeat
+        loop; here we initialise the Redis-backed risk components and then
+        block on :meth:`bus.subscribe` until shutdown.
+        """
+        await self.on_start()
+        topics = self.get_subscribe_topics()
+        self.logger.info("risk_manager_subscribing", topics=topics)
+        try:
+            await self.bus.subscribe(topics, self.on_message)
+        except asyncio.CancelledError:
+            self.logger.info("risk_manager_subscribe_cancelled")
+            raise
+
     async def on_message(self, topic: str, data: dict[str, Any]) -> None:
         """Process an incoming order candidate."""
         try:
@@ -140,9 +157,7 @@ class RiskManagerService(BaseService):
             )
 
         # STEP 3: Meta-Label Gate + Kelly modulation
-        r3, meta_confidence, kelly_final = await self._meta_gate.check(
-            candidate.symbol, kelly_raw
-        )
+        r3, meta_confidence, kelly_final = await self._meta_gate.check(candidate.symbol, kelly_raw)
         rule_results.append(r3)
         rationale.append(r3.reason)
         if not r3.passed:
@@ -231,7 +246,13 @@ class RiskManagerService(BaseService):
             )
 
         return await self._build_approved(
-            candidate, rule_results, rationale, kelly_raw, kelly_final, meta_confidence, current_size
+            candidate,
+            rule_results,
+            rationale,
+            kelly_raw,
+            kelly_final,
+            meta_confidence,
+            current_size,
         )
 
     async def _build_approved(
@@ -296,9 +317,7 @@ class RiskManagerService(BaseService):
                 self.state.lpush(REDIS_DECISION_HISTORY_KEY, data),
                 return_exceptions=True,
             )
-            await self.state.ltrim(
-                REDIS_DECISION_HISTORY_KEY, 0, REDIS_DECISION_HISTORY_MAX - 1
-            )
+            await self.state.ltrim(REDIS_DECISION_HISTORY_KEY, 0, REDIS_DECISION_HISTORY_MAX - 1)
         except Exception as exc:
             self.logger.error("audit_write_failed", error=str(exc))
 
@@ -319,7 +338,7 @@ class RiskManagerService(BaseService):
         except Exception:
             results = [None] * 8
 
-        def _safe(v: Any, default: Any = None) -> Any:
+        def _safe(v: Any, default: Any = None) -> Any:  # noqa: ANN401
             return v if not isinstance(v, Exception) and v is not None else default
 
         cap_raw = _safe(results[0], {})
@@ -341,8 +360,8 @@ class RiskManagerService(BaseService):
             for p in raw_pos:
                 try:
                     positions.append(Position.model_validate(p))
-                except Exception:
-                    pass
+                except Exception as exc:
+                    self.logger.debug("position_decode_failed", error=str(exc))
 
         corr_raw = _safe(results[6], {})
         corr: dict[tuple[str, str], float] = {}
@@ -352,8 +371,12 @@ class RiskManagerService(BaseService):
                     parts = str(k).split(":")
                     if len(parts) == 2:
                         corr[(parts[0], parts[1])] = float(v)
-                except Exception:
-                    pass
+                except Exception as exc:
+                    self.logger.debug(
+                        "correlation_decode_failed",
+                        key=str(k),
+                        error=str(exc),
+                    )
 
         session_raw = _safe(results[7], "us_normal")
         try:
@@ -411,45 +434,7 @@ class RiskManagerService(BaseService):
             self.logger.warning("benchmark_failed", error=str(exc))
 
 
-import sys
-import os
-import asyncio
-from pathlib import Path
+if __name__ == "__main__":
+    from core.service_runner import run_service_module
 
-# Fix sys.path for direct module runs
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-if __name__ == '__main__':
-    import importlib
-    
-    # We expect the class name to be XxxService (e.g. DataIngestionService, SignalEngineService...)
-    # But to make it generic without inspecting the AST, we can just find subclasses of BaseService
-    from core.base_service import BaseService
-    import inspect
-    
-    module_name = 'services.' + Path(__file__).parent.name + '.service'
-    module = importlib.import_module(module_name)
-    
-    service_class = None
-    for name, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, BaseService) and obj is not BaseService:
-            service_class = obj
-            break
-            
-    if not service_class:
-        print(f'Error: Could not find a BaseService subclass in {module_name}')
-        sys.exit(1)
-        
-    async def main():
-        service = service_class()
-        try:
-            await service.start()
-            while service._running:
-                await asyncio.sleep(1.0)
-        except KeyboardInterrupt:
-            print('Interrupted by user...')
-        finally:
-            await service.stop()
-
-    asyncio.run(main())
-
+    run_service_module(__file__)

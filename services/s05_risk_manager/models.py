@@ -15,6 +15,7 @@ Reference:
     Gamma, E. et al. (1994). Design Patterns. Addison-Wesley.
     — Chain of Responsibility, p. 223.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -28,9 +29,9 @@ from pydantic import BaseModel, Field, model_validator
 class CircuitBreakerState(StrEnum):
     """States of the circuit breaker state machine."""
 
-    CLOSED = "CLOSED"        # Normal — trading allowed
+    CLOSED = "CLOSED"  # Normal — trading allowed
     HALF_OPEN = "HALF_OPEN"  # Recovery probe — one order allowed
-    OPEN = "OPEN"            # Tripped — all trading blocked
+    OPEN = "OPEN"  # Tripped — all trading blocked
 
 
 class BlockReason(StrEnum):
@@ -110,11 +111,11 @@ class RiskDecision(BaseModel):
     approved: bool
     rule_results: list[RuleResult]
     first_failure: BlockReason | None = None
-    kelly_fraction_raw: float           # Before meta-label modulation
-    kelly_fraction_final: float         # After all modulations
-    meta_label_confidence: float        # [0.0, 1.0] from MetaLabeler
-    final_size: Decimal                 # Approved position size (0 if blocked)
-    rationale: list[str]                # Human-readable decision trail
+    kelly_fraction_raw: float  # Before meta-label modulation
+    kelly_fraction_final: float  # After all modulations
+    meta_label_confidence: float  # [0.0, 1.0] from MetaLabeler
+    final_size: Decimal  # Approved position size (0 if blocked)
+    rationale: list[str]  # Human-readable decision trail
 
     @model_validator(mode="after")
     def validate_consistency(self) -> RiskDecision:
@@ -154,26 +155,26 @@ class Position(BaseModel):
 
 # ── Risk Constants (all from DEVELOPMENT_PLAN.md Section 6) ────────────────────
 
-MAX_DAILY_LOSS_PCT: Final[float] = 0.03            # 3% daily drawdown → trip CB
-MAX_INTRADAY_LOSS_30M_PCT: Final[float] = 0.02     # 2% in 30min → trip CB
-VIX_SPIKE_THRESHOLD_PCT: Final[float] = 0.20       # VIX +20% in 1h → trip CB
-SERVICE_DOWN_SECONDS: Final[int] = 60              # Data/Signal down > 60s → trip
-CB_BLOCK_MINUTES_BEFORE: Final[int] = 45           # Block window before CB event
-CB_SCALP_MINUTES_AFTER: Final[int] = 15            # Post-event reduced scalp window
-CB_SCALP_SIZE_MULTIPLIER: Final[float] = 0.50      # Half size post-event
-MAX_POSITIONS: Final[int] = 6                      # Max simultaneous open positions
-MAX_TOTAL_EXPOSURE_PCT: Final[float] = 0.20        # 20% of capital max notional
-MAX_CLASS_EXPOSURE_PCT: Final[float] = 0.12        # 12% per asset class
-MAX_RISK_PER_TRADE_PCT: Final[float] = 0.005       # 0.5% capital risk per trade
-MAX_POSITION_SIZE_PCT: Final[float] = 0.10         # 10% of capital max size
-MIN_RR_RATIO: Final[float] = 1.5                   # Min reward/risk to enter
-CRYPTO_SIZE_MULTIPLIER: Final[float] = 0.70        # Crypto vol adjustment × 0.70
+MAX_DAILY_LOSS_PCT: Final[float] = 0.03  # 3% daily drawdown → trip CB
+MAX_INTRADAY_LOSS_30M_PCT: Final[float] = 0.02  # 2% in 30min → trip CB
+VIX_SPIKE_THRESHOLD_PCT: Final[float] = 0.20  # VIX +20% in 1h → trip CB
+SERVICE_DOWN_SECONDS: Final[int] = 60  # Data/Signal down > 60s → trip
+CB_BLOCK_MINUTES_BEFORE: Final[int] = 45  # Block window before CB event
+CB_SCALP_MINUTES_AFTER: Final[int] = 15  # Post-event reduced scalp window
+CB_SCALP_SIZE_MULTIPLIER: Final[float] = 0.50  # Half size post-event
+MAX_POSITIONS: Final[int] = 6  # Max simultaneous open positions
+MAX_TOTAL_EXPOSURE_PCT: Final[float] = 0.20  # 20% of capital max notional
+MAX_CLASS_EXPOSURE_PCT: Final[float] = 0.12  # 12% per asset class
+MAX_RISK_PER_TRADE_PCT: Final[float] = 0.005  # 0.5% capital risk per trade
+MAX_POSITION_SIZE_PCT: Final[float] = 0.10  # 10% of capital max size
+MIN_RR_RATIO: Final[float] = 1.5  # Min reward/risk to enter
+CRYPTO_SIZE_MULTIPLIER: Final[float] = 0.70  # Crypto vol adjustment × 0.70
 MIN_META_CONFIDENCE_TO_TRADE: Final[float] = 0.52  # Below → hard block
-MIN_KELLY_FRACTION: Final[float] = 0.01            # Below after modulation → block
-CORRELATION_BLOCK_THRESHOLD: Final[float] = 0.75   # rho > 0.75 with open pos → block
-HALF_OPEN_RECOVERY_MINUTES: Final[int] = 30        # Cooldown before HALF_OPEN attempt
+MIN_KELLY_FRACTION: Final[float] = 0.01  # Below after modulation → block
+CORRELATION_BLOCK_THRESHOLD: Final[float] = 0.75  # rho > 0.75 with open pos → block
+HALF_OPEN_RECOVERY_MINUTES: Final[int] = 30  # Cooldown before HALF_OPEN attempt
 REDIS_CB_KEY: Final[str] = "risk:circuit_breaker:state"
-REDIS_CB_TTL: Final[int] = 86400                   # 24h TTL for CB state
-REDIS_RISK_DECISION_TTL: Final[int] = 604800       # 7 days TTL for audit
+REDIS_CB_TTL: Final[int] = 86400  # 24h TTL for CB state
+REDIS_RISK_DECISION_TTL: Final[int] = 604800  # 7 days TTL for audit
 REDIS_DECISION_HISTORY_KEY: Final[str] = "risk:decision_history"
 REDIS_DECISION_HISTORY_MAX: Final[int] = 500

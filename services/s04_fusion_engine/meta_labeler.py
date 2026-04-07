@@ -1,33 +1,30 @@
-from __future__ import annotations
-import typing
-
-"""Meta-Labeling for APEX — S04 Fusion Engine.
+"""Meta-Labeling for APEX - S04 Fusion Engine.
 
 Meta-labeling (López de Prado 2018, Chapter 3) separates two concerns:
 
-    Primary model (S02 SignalScorer): direction → LONG or SHORT
-    Meta-labeler (this module):       binary   → TRADE (1) or NO-TRADE (0)
+    Primary model (S02 SignalScorer): direction -> LONG or SHORT
+    Meta-labeler (this module):       binary   -> TRADE (1) or NO-TRADE (0)
 
 The meta-labeler learns WHEN to trust the primary model's direction signal.
-It does NOT predict direction — it predicts signal reliability / trade viability.
+It does NOT predict direction - it predicts signal reliability / trade viability.
 
 Architecture (Phase 5 = deterministic rules, Phase 6 = trained binary classifier):
 
-    8 features → weighted soft score → threshold → TRADE/NO-TRADE + size_mult
+    8 features -> weighted soft score -> threshold -> TRADE/NO-TRADE + size_mult
 
 Hard blocks (instant veto, bypasses soft scoring):
     VPIN >= 0.90    : extreme flow toxicity, flash crash risk
     macro_mult <= 0 : crisis regime, system-wide halt ordered by S03
     spread > 50 bps : transaction costs exceed expected edge
 
-Soft scoring (weighted sum → meta_score ∈ [-1, +1]):
+Soft scoring (weighted sum -> meta_score in [-1, +1]):
     signal_strength  : primary model confidence
     n_triggers       : number of confluent signal sources
     hurst_exponent   : market roughness (low H = trending = more predictable)
-    vpin             : flow toxicity (negative weight — high VPIN penalises)
+    vpin             : flow toxicity (negative weight - high VPIN penalises)
     har_rv_vol       : HAR-RV volatility regime fitness [0.10, 0.30] optimal
     spread_bps       : transaction cost viability
-    session × macro  : timing quality composite
+    session x macro  : timing quality composite
 
 Calibration targets (Phase 5 baseline):
     Precision > 0.60  (60 % win rate on approved signals)
@@ -39,14 +36,15 @@ regression or GBM on the MetaFeatureLogger dataset. Interface stays identical.
 References:
     López de Prado, M. (2018). Advances in Financial Machine Learning.
         Wiley. Chapter 3: Labeling, Section 3.6 (Meta-Labeling).
-        Cornell University → AQR Capital Management.
+        Cornell University -> AQR Capital Management.
     López de Prado, M. (2019). A Data Science Solution to the
         Multiple-Testing Crisis in Financial Research.
         Journal of Financial Data Science 1(1), 94-110. AQR Capital.
 """
 
+from __future__ import annotations
 
-
+import typing
 from dataclasses import dataclass
 from typing import Any
 
@@ -190,10 +188,7 @@ class MetaLabeler:
         meta_score += self.WEIGHTS["vol_regime"] * vol_s
 
         # Spread: ≤5 bps = full credit, linearly penalised up to 50 bps
-        spread_s = (
-            1.0 if f.spread_bps <= 5
-            else max(-1.0, 1.0 - (f.spread_bps - 5.0) / 15.0)
-        )
+        spread_s = 1.0 if f.spread_bps <= 5 else max(-1.0, 1.0 - (f.spread_bps - 5.0) / 15.0)
         meta_score += self.WEIGHTS["spread"] * spread_s
 
         # Regime composite: session × macro quality
@@ -214,9 +209,7 @@ class MetaLabeler:
         )
         should_trade = meta_score >= self.TRADE_THRESHOLD
         blocking_reason = (
-            None
-            if should_trade
-            else f"Score {meta_score:.3f} < threshold {self.TRADE_THRESHOLD}"
+            None if should_trade else f"Score {meta_score:.3f} < threshold {self.TRADE_THRESHOLD}"
         )
 
         return MetaLabelDecision(
@@ -263,9 +256,7 @@ class MetaLabeler:
             n_triggers=len(signal.get("triggers", []) or []),
             hurst_exponent=float(analytics.get("hurst_exponent", 0.3) or 0.3),
             vpin=float(vpin.get("vpin", 0.5) or 0.5),
-            har_rv_forecast_vol=float(
-                analytics.get("rv_annualized_vol", 0.20) or 0.20
-            ),
+            har_rv_forecast_vol=float(analytics.get("rv_annualized_vol", 0.20) or 0.20),
             spread_bps=float(feats.get("spread_bps", 5.0) or 5.0),
             session_mult=float(session.get("session_mult", 1.0) or 1.0),
             macro_mult=float(regime.get("macro_mult", 1.0) or 1.0),

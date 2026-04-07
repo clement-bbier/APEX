@@ -1,4 +1,5 @@
 """Tests for MarketStats econometric methods."""
+
 from __future__ import annotations
 
 import pytest
@@ -24,6 +25,7 @@ class TestMarketStats:
     def test_ljung_box_autocorrelated_series(self) -> None:
         # Highly autocorrelated series (cumsum of ones)
         import numpy as np
+
         series = list(np.cumsum(np.ones(100)))
         result = self.stats().ljung_box(series, lags=5)
         assert "q_stat" in result
@@ -49,11 +51,13 @@ class TestMarketStats:
 
     def test_garch_empty_returns_sqrt_omega(self) -> None:
         import math
+
         result = self.stats().garch_volatility([], omega=0.0001)
         assert result == pytest.approx(math.sqrt(0.0001))
 
     def test_garch_positive_returns(self) -> None:
         import numpy as np
+
         returns = list(np.random.default_rng(42).standard_normal(50) * 0.01)
         vol = self.stats().garch_volatility(returns)
         assert vol > 0

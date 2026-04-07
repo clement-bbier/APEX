@@ -30,7 +30,32 @@
       "Bash(PYTHONPATH=. .venv/Scripts/python -m mypy . --strict)",
       "Bash(PYTHONPATH=. .venv/Scripts/python -m pytest tests/unit/s02/test_vpin.py tests/unit/core/test_fractional_diff.py -v --tb=short)",
       "Bash(PYTHONPATH=. .venv/Scripts/python -m pytest tests/unit/s02/test_vpin.py tests/unit/core/test_fractional_diff.py --cov=services/s02_signal_engine/vpin --cov=core/math/fractional_diff --cov-report=term-missing -q)",
-      "Bash(PYTHONPATH=. .venv/Scripts/python -m pytest tests/unit/s05/test_position_rules.py -q --no-header --override-ini=\"addopts=\")"
+      "Bash(PYTHONPATH=. .venv/Scripts/python -m pytest tests/unit/s05/test_position_rules.py -q --no-header --override-ini=\"addopts=\")",
+      "Read(//c/Users/cleme/AppData/Local/Temp/claude/c--Users-cleme-Documents-04-Projets-Personnels-CashMachine/34a172be-5c55-4ae8-86f0-e821eff48619/tasks/**)",
+      "Bash(.venv/Scripts/bandit.exe -r core supervisor services -c pyproject.toml -f txt)",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -r core supervisor services -c pyproject.toml -f json)",
+      "Bash(python -c \"import json,sys; data=json.load\\(sys.stdin\\); print\\('Total issues:', len\\(data['results']\\)\\); [print\\(r['test_id'], r['issue_severity'], r['filename']+':'+str\\(r['line_number']\\), '-', r['issue_text'][:60]\\) for r in data['results']]\")",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -r core supervisor services -c pyproject.toml -f json -o /tmp/bandit.json)",
+      "Bash(python -c \"import json; data=json.load\\(open\\('/tmp/bandit.json'\\)\\); print\\('Total issues:', len\\(data['results']\\)\\); print\\(\\); [print\\(r['test_id'], r['issue_severity'], r['filename']+':'+str\\(r['line_number']\\), '-', r['issue_text'][:60]\\) for r in data['results']]\")",
+      "Bash(python -c \"import json; data=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit.json'\\)\\); print\\('Total issues:', len\\(data['results']\\)\\); print\\(\\); [print\\(r['test_id'], r['issue_severity'], r['filename']+':'+str\\(r['line_number']\\), '-', r['issue_text'][:60]\\) for r in data['results']]\")",
+      "Bash(.venv/Scripts/ruff.exe check:*)",
+      "Bash(.venv/Scripts/ruff.exe format:*)",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -r core supervisor services backtesting -c pyproject.toml -f json -o C:/Users/cleme/AppData/Local/Temp/bandit2.json)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit2.json'\\)\\); print\\('issues:', len\\(d['results']\\)\\); [print\\(r['test_id'], r['issue_severity'], r['filename']+':'+str\\(r['line_number']\\), '-', r['issue_text'][:65]\\) for r in d['results']]\")",
+      "Bash(.venv/Scripts/pip.exe install:*)",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -r core supervisor services backtesting -c pyproject.toml -f json -o C:/Users/cleme/AppData/Local/Temp/bandit3.json)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit3.json'\\)\\); print\\('issues:', len\\(d['results']\\)\\)\")",
+      "Bash(.venv/Scripts/python.exe -m mypy .)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python.exe -m pytest tests/unit/core/test_state.py tests/unit/core/test_topics.py --no-cov -q)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python.exe -m pytest tests/unit/ --no-cov -q --timeout=30)",
+      "Bash(PYTHONPATH=. .venv/Scripts/python.exe scripts/smoke_broker.py)",
+      "Bash(.venv/Scripts/python.exe -c ':*)",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -r core supervisor services backtesting -c pyproject.toml -f json -o C:/Users/cleme/AppData/Local/Temp/bandit_final.json)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit_final.json'\\)\\); print\\('bandit issues:', len\\(d['results']\\)\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -q -r core supervisor services backtesting -c pyproject.toml -f json -o C:/Users/cleme/AppData/Local/Temp/bandit_final2.json)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit_final2.json'\\)\\); print\\('issues:', len\\(d['results']\\)\\)\")",
+      "Bash(PYTHONIOENCODING=utf-8 .venv/Scripts/bandit.exe -q -r core supervisor services backtesting -c pyproject.toml -f json -o C:/Users/cleme/AppData/Local/Temp/bandit_final3.json)",
+      "Bash(python -c \"import json; d=json.load\\(open\\('C:/Users/cleme/AppData/Local/Temp/bandit_final3.json'\\)\\); print\\('issues:', len\\(d['results']\\)\\)\")"
     ]
   }
 }

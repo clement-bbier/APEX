@@ -3,6 +3,7 @@
 Tests cover all 6 functions: 4 check_* (blocking) and 2 apply_* (modifying).
 Includes 2 Hypothesis property tests with 1000 examples each.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -26,28 +27,41 @@ from services.s05_risk_manager.position_rules import (
 
 _CAPITAL = Decimal("100_000")
 
+
 def _long_order(
-    entry="50000", sl="49500", tp_scalp="50750", tp_swing="52000",
-    size="0.01", symbol="BTCUSDT"
+    entry="50000", sl="49500", tp_scalp="50750", tp_swing="52000", size="0.01", symbol="BTCUSDT"
 ) -> OrderCandidate:
     sz = Decimal(size)
     return OrderCandidate(
-        order_id="o1", symbol=symbol, direction=Direction.LONG,
-        timestamp_ms=1_700_000_000_000, size=sz,
-        size_scalp_exit=sz * Decimal("0.35"), size_swing_exit=sz * Decimal("0.65"),
-        entry=Decimal(entry), stop_loss=Decimal(sl),
-        target_scalp=Decimal(tp_scalp), target_swing=Decimal(tp_swing),
+        order_id="o1",
+        symbol=symbol,
+        direction=Direction.LONG,
+        timestamp_ms=1_700_000_000_000,
+        size=sz,
+        size_scalp_exit=sz * Decimal("0.35"),
+        size_swing_exit=sz * Decimal("0.65"),
+        entry=Decimal(entry),
+        stop_loss=Decimal(sl),
+        target_scalp=Decimal(tp_scalp),
+        target_swing=Decimal(tp_swing),
         capital_at_risk=Decimal("5"),
     )
+
 
 def _short_order() -> OrderCandidate:
     sz = Decimal("0.01")
     return OrderCandidate(
-        order_id="o2", symbol="AAPL", direction=Direction.SHORT,
-        timestamp_ms=1_700_000_000_000, size=sz,
-        size_scalp_exit=sz * Decimal("0.35"), size_swing_exit=sz * Decimal("0.65"),
-        entry=Decimal("150"), stop_loss=Decimal("152"),
-        target_scalp=Decimal("148"), target_swing=Decimal("145"),
+        order_id="o2",
+        symbol="AAPL",
+        direction=Direction.SHORT,
+        timestamp_ms=1_700_000_000_000,
+        size=sz,
+        size_scalp_exit=sz * Decimal("0.35"),
+        size_swing_exit=sz * Decimal("0.65"),
+        entry=Decimal("150"),
+        stop_loss=Decimal("152"),
+        target_scalp=Decimal("148"),
+        target_swing=Decimal("145"),
         capital_at_risk=Decimal("0.2"),
     )
 
@@ -70,11 +84,17 @@ class TestStopLossPresent:
     def test_stop_loss_direction_short_sl_below_entry_blocked(self) -> None:
         sz = Decimal("0.01")
         order = OrderCandidate(
-            order_id="o3", symbol="AAPL", direction=Direction.SHORT,
-            timestamp_ms=1_700_000_000_000, size=sz,
-            size_scalp_exit=sz * Decimal("0.35"), size_swing_exit=sz * Decimal("0.65"),
-            entry=Decimal("150"), stop_loss=Decimal("148"),  # SL BELOW entry for SHORT
-            target_scalp=Decimal("148"), target_swing=Decimal("145"),
+            order_id="o3",
+            symbol="AAPL",
+            direction=Direction.SHORT,
+            timestamp_ms=1_700_000_000_000,
+            size=sz,
+            size_scalp_exit=sz * Decimal("0.35"),
+            size_swing_exit=sz * Decimal("0.65"),
+            entry=Decimal("150"),
+            stop_loss=Decimal("148"),  # SL BELOW entry for SHORT
+            target_scalp=Decimal("148"),
+            target_swing=Decimal("145"),
             capital_at_risk=Decimal("0.2"),
         )
         r = check_stop_loss_present(order)

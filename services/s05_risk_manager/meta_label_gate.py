@@ -27,6 +27,7 @@ Reference:
     Bailey, D.H. & Lopez de Prado, M. (2012). Sharpe Ratio Efficient Frontier.
     Journal of Risk, 15(2), 3-44.
 """
+
 from __future__ import annotations
 
 import json
@@ -59,9 +60,7 @@ class MetaLabelGate:
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
 
-    async def check(
-        self, symbol: str, kelly_raw: float
-    ) -> tuple[RuleResult, float, float]:
+    async def check(self, symbol: str, kelly_raw: float) -> tuple[RuleResult, float, float]:
         """Evaluate meta-label confidence and modulate Kelly fraction.
 
         Args:
@@ -159,7 +158,11 @@ class MetaLabelGate:
         try:
             raw = await self._redis.get(key)
             if raw is None:
-                logger.debug("meta_label_not_found", symbol=symbol, fallback=_STARTUP_FALLBACK_CONFIDENCE)
+                logger.debug(
+                    "meta_label_not_found",
+                    symbol=symbol,
+                    fallback=_STARTUP_FALLBACK_CONFIDENCE,
+                )
                 return _STARTUP_FALLBACK_CONFIDENCE
             if isinstance(raw, (int, float)):
                 confidence = float(raw)

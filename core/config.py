@@ -9,7 +9,7 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -73,11 +73,21 @@ class Settings(BaseSettings):
     )
 
     # ── ZeroMQ ────────────────────────────────────────────────────────────────
-    zmq_pub_port: int = Field(default=5555, description="ZMQ PUB socket port")
-    zmq_sub_port: int = Field(default=5555, description="ZMQ SUB socket port (same broker)")
-    zmq_push_port: int = Field(default=5556, description="ZMQ PUSH socket port")
-    zmq_pull_port: int = Field(default=5556, description="ZMQ PULL socket port")
-    zmq_host: str = Field(default="localhost", description="ZMQ broker host")
+    # APEX uses a single XSUB/XPUB broker (see ``core/zmq_broker.py``).
+    # Publishers CONNECT to ``zmq_pub_port`` (the broker's XSUB facing port);
+    # subscribers CONNECT to ``zmq_sub_port`` (the XPUB facing port). Only
+    # the broker BINDS — services never bind anything.
+    zmq_pub_port: int = Field(
+        default=5555,
+        description="Broker XSUB port — publishers CONNECT here",
+    )
+    zmq_sub_port: int = Field(
+        default=5556,
+        description="Broker XPUB port — subscribers CONNECT here",
+    )
+    zmq_push_port: int = Field(default=5557, description="ZMQ PUSH socket port")
+    zmq_pull_port: int = Field(default=5557, description="ZMQ PULL socket port")
+    zmq_host: str = Field(default="127.0.0.1", description="ZMQ broker host")
 
     # ── Risk Parameters ───────────────────────────────────────────────────────
     max_daily_drawdown_pct: float = Field(
@@ -193,15 +203,36 @@ class Settings(BaseSettings):
     )
 
     # ── Alerts ────────────────────────────────────────────────────────────────
+    # SMTP fields accept both their canonical name (``alert_smtp_*``) and the
+    # short ``smtp_*`` variant used inside the historical .env file. Pydantic
+    # picks the first source it finds.
     alert_email: str | None = Field(default=None, description="Email address for alerts")
-    alert_smtp_host: str = Field(default="smtp.gmail.com")
-    alert_smtp_port: int = Field(default=587)
-    alert_smtp_user: str = Field(default="")
-    alert_smtp_password: str = Field(default="")
+    alert_smtp_host: str = Field(
+        default="smtp.gmail.com",
+        validation_alias=AliasChoices("alert_smtp_host", "smtp_host"),
+    )
+    alert_smtp_port: int = Field(
+        default=587,
+        validation_alias=AliasChoices("alert_smtp_port", "smtp_port"),
+    )
+    alert_smtp_user: str = Field(
+        default="",
+        validation_alias=AliasChoices("alert_smtp_user", "smtp_user"),
+    )
+    alert_smtp_password: str = Field(
+        default="",
+        validation_alias=AliasChoices("alert_smtp_password", "smtp_password"),
+    )
     twilio_sid: str | None = Field(default=None, description="Twilio account SID")
     twilio_token: str | None = Field(default=None, description="Twilio auth token")
     twilio_from_number: str = Field(default="", description="Twilio sender phone number")
     alert_phone_number: str = Field(default="", description="SMS recipient phone number")
+
+    # ── Database (optional persistence layer) ─────────────────────────────────
+    db_password: str = Field(
+        default="",
+        description="Optional database password (consumed by docker-compose / scripts)",
+    )
 
     # ── Monitoring Dashboard ──────────────────────────────────────────────────
     dashboard_host: str = Field(default="0.0.0.0")  # noqa: S104

@@ -11,6 +11,7 @@ Surprise = (Actual - Consensus) / |Consensus|
 Positive surprise (actual > consensus) → risk-on boost
 Negative surprise → risk-off, reduce macro_mult
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

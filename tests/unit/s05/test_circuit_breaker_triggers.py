@@ -2,6 +2,7 @@
 
 Tests verify each trigger in isolation. No real Redis, no network I/O.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

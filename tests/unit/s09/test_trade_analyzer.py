@@ -1,4 +1,5 @@
 """Tests for TradeAnalyzer attribution and Kelly stats update."""
+
 from __future__ import annotations
 
 from decimal import Decimal

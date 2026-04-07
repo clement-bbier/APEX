@@ -1,7 +1,7 @@
 """MetaFeatureLogger — Persists every MetaLabelDecision for future ML training.
 
 Each decision (TRADE or NO-TRADE) is logged with its full feature vector.
-After 3 months of paper trading, this creates a ~5,000–15,000 row training
+After 3 months of paper trading, this creates a ~5,000-15,000 row training
 dataset for a supervised binary classifier (MetaLabeler v2).
 
 Dual persistence strategy:

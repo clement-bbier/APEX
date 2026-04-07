@@ -27,6 +27,7 @@ References:
     Bouchaud, J.P. (2018). Trades, Quotes and Prices: Financial Markets
         Under the Microscope. Cambridge University Press.
 """
+
 from __future__ import annotations
 
 import math
@@ -37,24 +38,24 @@ from dataclasses import dataclass
 class ImpactEstimate:
     """Market impact decomposition for one order."""
 
-    linear_impact_bps: float       # Kyle linear: λ × Q (bps)
-    sqrt_impact_bps: float         # Square-root: σ √(Q/V) × η (bps)
-    recommended_model: str         # "sqrt" | "linear"
-    participation_rate: float      # Q / V — fraction of daily volume
-    is_large_order: bool           # participation > 1% → use sqrt model
-    total_slippage_bps: float      # Best estimate for paper trading
+    linear_impact_bps: float  # Kyle linear: λ × Q (bps)
+    sqrt_impact_bps: float  # Square-root: σ √(Q/V) × η (bps)
+    recommended_model: str  # "sqrt" | "linear"
+    participation_rate: float  # Q / V — fraction of daily volume
+    is_large_order: bool  # participation > 1% → use sqrt model
+    total_slippage_bps: float  # Best estimate for paper trading
 
 
 @dataclass
 class AlmgrenChrissSchedule:
     """Optimal execution schedule from Almgren-Chriss model."""
 
-    n_periods: int                 # Number of execution intervals
-    trade_schedule: list[float]    # Fraction to trade in each period
-    expected_cost: float           # E[implementation shortfall] in bps
-    variance_cost: float           # Var[cost] — risk component
-    optimal_lambda: float          # Risk-aversion parameter used
-    twap_comparison: float         # vs TWAP expected cost (bps)
+    n_periods: int  # Number of execution intervals
+    trade_schedule: list[float]  # Fraction to trade in each period
+    expected_cost: float  # E[implementation shortfall] in bps
+    variance_cost: float  # Var[cost] — risk component
+    optimal_lambda: float  # Risk-aversion parameter used
+    twap_comparison: float  # vs TWAP expected cost (bps)
 
 
 class MarketImpactModel:
@@ -69,7 +70,7 @@ class MarketImpactModel:
     """
 
     # Square-root impact constant (Bouchaud et al. 2018, calibrated)
-    ETA: float = 0.5              # Impact coefficient
+    ETA: float = 0.5  # Impact coefficient
     LARGE_ORDER_THRESHOLD: float = 0.01  # 1% of ADV
 
     def sqrt_impact(
@@ -106,9 +107,7 @@ class MarketImpactModel:
         impact_pct = self.ETA * sigma_daily * math.sqrt(participation)
         return impact_pct * 10_000.0  # convert to bps
 
-    def kyle_lambda_impact(
-        self, kyle_lambda: float, quantity: float, price: float
-    ) -> float:
+    def kyle_lambda_impact(self, kyle_lambda: float, quantity: float, price: float) -> float:
         """Kyle (1985) linear price impact in basis points.
 
         ΔP = λ × Q → impact_bps = λ × Q / price × 10_000
@@ -210,7 +209,7 @@ class MarketImpactModel:
         T = 1.0  # normalized time horizon  # noqa: N806
 
         # κ = rate of decay from risk-aversion + permanent impact
-        kappa_sq = lambda_risk * sigma ** 2 / eta_val
+        kappa_sq = lambda_risk * sigma**2 / eta_val
         kappa = math.sqrt(max(0.0, kappa_sq))
 
         schedule: list[float] = []
@@ -226,8 +225,7 @@ class MarketImpactModel:
                 t_rem = T - t
                 # Optimal trade rate: sinh(κ × t_rem) / sinh(κ × T) × κ
                 sinh_kT = math.sinh(kappa * T)  # noqa: N806
-                ratio = (math.sinh(kappa * t_rem) / sinh_kT
-                         if sinh_kT > 1e-10 else 1.0 / n_periods)
+                ratio = math.sinh(kappa * t_rem) / sinh_kT if sinh_kT > 1e-10 else 1.0 / n_periods
                 trade = remaining * (1.0 - ratio) if i < n_periods - 1 else remaining
                 trade = max(0.0, min(remaining, trade))
                 schedule.append(trade)
@@ -236,7 +234,7 @@ class MarketImpactModel:
         # Expected cost and variance (Almgren-Chriss 2001 eq. 20-21)
         expected_cost = eta_val * sum(s**2 for s in schedule) * 10_000
         variance_cost = sigma**2 * sum(s**2 for s in schedule) * 10_000
-        twap_cost = eta_val * (1.0/n_periods) * n_periods * 10_000
+        twap_cost = eta_val * (1.0 / n_periods) * n_periods * 10_000
 
         return AlmgrenChrissSchedule(
             n_periods=n_periods,

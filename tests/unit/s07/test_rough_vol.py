@@ -1,4 +1,5 @@
 """Tests RoughVolAnalyzer: Hurst exponent estimation and Variance Ratio Test."""
+
 from __future__ import annotations
 
 import numpy as np

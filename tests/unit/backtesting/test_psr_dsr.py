@@ -1,4 +1,5 @@
 """Institutional metrics: PSR, DSR, PBO, MinTRL — property-tested."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -31,9 +32,7 @@ class TestPSR:
         assert probabilistic_sharpe_ratio(r, 0.0) > probabilistic_sharpe_ratio(r, 2.0)
 
     def test_more_obs_higher_psr(self) -> None:
-        assert probabilistic_sharpe_ratio([0.003] * 500) >= probabilistic_sharpe_ratio(
-            [0.003] * 50
-        )
+        assert probabilistic_sharpe_ratio([0.003] * 500) >= probabilistic_sharpe_ratio([0.003] * 50)
 
     def test_fewer_than_4_returns_zero(self) -> None:
         assert probabilistic_sharpe_ratio([0.01, 0.02, 0.01]) == 0.0
@@ -118,14 +117,14 @@ class TestMinTRL:
         assert minimum_track_record_length(0.5, benchmark_sharpe=1.0) > 1_000_000
 
     def test_fat_tails_increase_need(self) -> None:
-        assert minimum_track_record_length(
-            1.5, excess_kurtosis=5.0
-        ) > minimum_track_record_length(1.5, excess_kurtosis=0.0)
+        assert minimum_track_record_length(1.5, excess_kurtosis=5.0) > minimum_track_record_length(
+            1.5, excess_kurtosis=0.0
+        )
 
     def test_higher_confidence_more_obs(self) -> None:
-        assert minimum_track_record_length(
-            2.0, confidence=0.99
-        ) > minimum_track_record_length(2.0, confidence=0.90)
+        assert minimum_track_record_length(2.0, confidence=0.99) > minimum_track_record_length(
+            2.0, confidence=0.90
+        )
 
     def test_returns_positive_integer(self) -> None:
         result = minimum_track_record_length(1.5)

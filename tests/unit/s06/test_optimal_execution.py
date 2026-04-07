@@ -1,4 +1,5 @@
 """Tests MarketImpactModel: square-root impact, Kyle linear, Almgren-Chriss."""
+
 from __future__ import annotations
 
 from services.s06_execution.optimal_execution import MarketImpactModel
@@ -32,14 +33,21 @@ class TestBestImpact:
     m = MarketImpactModel()
 
     def test_large_order_uses_sqrt(self) -> None:
-        est = self.m.best_impact_estimate(quantity=10000, adv=100000, daily_vol=0.20,
-                                          price=50000, kyle_lambda=1e-5, spread_bps=5.0)
+        est = self.m.best_impact_estimate(
+            quantity=10000,
+            adv=100000,
+            daily_vol=0.20,
+            price=50000,
+            kyle_lambda=1e-5,
+            spread_bps=5.0,
+        )
         assert est.recommended_model == "sqrt"
         assert est.is_large_order is True
 
     def test_small_order_uses_linear(self) -> None:
-        est = self.m.best_impact_estimate(quantity=10, adv=1e6, daily_vol=0.20,
-                                          price=50000, kyle_lambda=1e-5, spread_bps=5.0)
+        est = self.m.best_impact_estimate(
+            quantity=10, adv=1e6, daily_vol=0.20, price=50000, kyle_lambda=1e-5, spread_bps=5.0
+        )
         assert est.recommended_model == "linear"
         assert est.is_large_order is False
 

@@ -7,6 +7,7 @@ Tests the complete chain:
 This is the most important integration test - it proves the pipeline works end-to-end.
 Requires: Redis running (docker compose -f docker/docker-compose.test.yml up -d)
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -39,12 +40,8 @@ class TestFullPipelinePaper:
     def test_regime_modulates_sizing(self) -> None:
         """Verify macro_mult reduces position size in high-vol regime."""
         engine = RegimeEngine()
-        regime_normal = engine.compute(
-            vix=18.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3
-        )
-        regime_crisis = engine.compute(
-            vix=38.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3
-        )
+        regime_normal = engine.compute(vix=18.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
+        regime_crisis = engine.compute(vix=38.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
 
         sizer = KellySizer()
         capital = Decimal("10000")

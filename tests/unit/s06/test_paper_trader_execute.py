@@ -241,13 +241,17 @@ class TestComputeSlippage:
     def test_adv_path_larger_order_more_slippage(self) -> None:
         trader = PaperTrader()
         small = trader.compute_slippage(
-            spread_bps=5.0, kyle_lambda=1e-5,
-            size=Decimal("10"), price=Decimal("50000"),
+            spread_bps=5.0,
+            kyle_lambda=1e-5,
+            size=Decimal("10"),
+            price=Decimal("50000"),
             adv=1_000_000.0,
         )
         large = trader.compute_slippage(
-            spread_bps=5.0, kyle_lambda=1e-5,
-            size=Decimal("10000"), price=Decimal("50000"),
+            spread_bps=5.0,
+            kyle_lambda=1e-5,
+            size=Decimal("10000"),
+            price=Decimal("50000"),
             adv=1_000_000.0,
         )
         assert large > small
@@ -255,8 +259,10 @@ class TestComputeSlippage:
     def test_fallback_never_negative(self) -> None:
         trader = PaperTrader()
         result = trader.compute_slippage(
-            spread_bps=0.0, kyle_lambda=0.0,
-            size=Decimal("0"), price=Decimal("100"),
+            spread_bps=0.0,
+            kyle_lambda=0.0,
+            size=Decimal("0"),
+            price=Decimal("100"),
         )
         assert result >= 0.0
 

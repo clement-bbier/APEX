@@ -7,6 +7,7 @@ Using Hypothesis for automatic edge case generation.
 These tests are the mathematical proof that the system cannot violate
 its core safety properties regardless of market conditions.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -40,9 +41,7 @@ class TestKellyNeverExceedsCapital:
         """No matter the inputs, position size must be <= capital."""
         sizer = KellySizer()
         kelly_f = sizer.kelly_fraction(win_rate=win_rate, avg_rr=rr)
-        size = sizer.position_size(
-            capital, kelly_f, macro_mult, 1.0, 0.0, False
-        )
+        size = sizer.position_size(capital, kelly_f, macro_mult, 1.0, 0.0, False)
         assert size >= Decimal("0"), "Position cannot be negative"
         assert size <= capital, f"Position {size} exceeds capital {capital}"
 
@@ -70,9 +69,7 @@ class TestSignalScoreInBounds:
         min_str=st.floats(0.0, 0.5, allow_nan=False),
     )
     @settings(max_examples=300)
-    def test_score_always_clamped(
-        self, s1: float, s2: float, s3: float, min_str: float
-    ) -> None:
+    def test_score_always_clamped(self, s1: float, s2: float, s3: float, min_str: float) -> None:
         """Signal score always in valid range regardless of component values."""
         scorer = SignalScorer(min_components=2, min_strength=min_str)
         components = [
@@ -90,9 +87,7 @@ class TestSignalScoreInBounds:
     def test_insufficient_components_gives_zero(self, n_comps: int) -> None:
         """Less than min_components triggered always gives score=0."""
         scorer = SignalScorer(min_components=2, min_strength=0.0)
-        components = [
-            SignalComponent(f"sig{i}", 0.9, 0.35, True) for i in range(n_comps)
-        ]
+        components = [SignalComponent(f"sig{i}", 0.9, 0.35, True) for i in range(n_comps)]
         score, _ = scorer.compute(components)
         assert score == 0.0
 
@@ -105,9 +100,7 @@ class TestKellyFractionBounds:
         avg_rr=st.floats(min_value=0.1, max_value=10.0, allow_nan=False),
     )
     @settings(max_examples=300)
-    def test_kelly_fraction_in_valid_range(
-        self, win_rate: float, avg_rr: float
-    ) -> None:
+    def test_kelly_fraction_in_valid_range(self, win_rate: float, avg_rr: float) -> None:
         """Kelly fraction must always be in [0.0, 0.25]."""
         sizer = KellySizer()
         f = sizer.kelly_fraction(win_rate=win_rate, avg_rr=avg_rr)

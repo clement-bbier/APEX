@@ -14,6 +14,7 @@ Reference:
     Markowitz, H. (1952). Portfolio Selection. Journal of Finance, 7(1), 77-91.
     Lopez de Prado, M. (2018). AFML, Ch. 16. Portfolio construction under constraints.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -57,7 +58,10 @@ def check_max_positions(positions: list[Position]) -> RuleResult:
             open_count=len(positions),
             max_positions=MAX_POSITIONS,
         )
-    return RuleResult.ok(rule_name="check_max_positions", reason=f"{len(positions)}/{MAX_POSITIONS} positions")
+    return RuleResult.ok(
+        rule_name="check_max_positions",
+        reason=f"{len(positions)}/{MAX_POSITIONS} positions",
+    )
 
 
 def check_total_exposure(

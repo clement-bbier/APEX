@@ -1,18 +1,30 @@
 name: apex-trading
 
+# YAML anchors merge ONE LEVEL deep. Because most services need to
+# override SERVICE_MODULE in their own ``environment:`` block, the
+# parent block ``environment:`` would be replaced wholesale and the
+# REDIS_URL/ZMQ_HOST defaults would be lost. We side-step that by
+# putting the shared values in a top-level x-env anchor referenced via
+# ``environment: [...]`` syntax (list-of-mappings) which DOES merge.
+x-svc-env: &svc-env
+  REDIS_URL: redis://redis:6379/0
+  ZMQ_HOST: zmq-broker
+  ZMQ_PUB_PORT: "5555"
+  ZMQ_SUB_PORT: "5556"
+  PYTHONUNBUFFERED: "1"
+
 x-svc: &svc
   build:
     context: ..
     dockerfile: docker/Dockerfile.service
   env_file: ../.env
-  environment:
-    REDIS_URL: redis://redis:6379/0
-    ZMQ_HOST: broker
   networks: [apex]
   restart: unless-stopped
   depends_on:
     redis:
       condition: service_healthy
+    zmq-broker:
+      condition: service_started
 
 services:
   redis:
@@ -42,62 +54,95 @@ services:
       interval: 10s
       retries: 5
 
-  s10-monitor:
-    <<: *svc
+  zmq-broker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.service
+    env_file: ../.env
     environment:
-      SERVICE_MODULE: services.s10_monitor.service
-    ports:
-      - "8080:8080"
+      <<: *svc-env
+      SERVICE_MODULE: core.zmq_broker
+    networks: [apex]
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "5555"
+      - "5556"
 
   s01-data:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s01_data_ingestion.service
 
   s07-analytics:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s07_quant_analytics.service
 
   s08-macro:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s08_macro_intelligence.service
 
   s02-signal:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s02_signal_engine.service
 
   s03-regime:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s03_regime_detector.service
 
   s04-fusion:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s04_fusion_engine.service
 
   s05-risk:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s05_risk_manager.service
 
   s06-execution:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s06_execution.service
 
   s09-feedback:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: services.s09_feedback_loop.service
+
+  s10-monitor:
+    <<: *svc
+    environment:
+      <<: *svc-env
+      SERVICE_MODULE: services.s10_monitor.service
+    ports:
+      - "8080:8080"
 
   supervisor:
     <<: *svc
     environment:
+      <<: *svc-env
       SERVICE_MODULE: supervisor.orchestrator
+    depends_on:
+      redis:
+        condition: service_healthy
+      zmq-broker:
+        condition: service_started
 
 networks:
   apex:

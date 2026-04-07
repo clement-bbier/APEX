@@ -1,4 +1,5 @@
 """Tests for KellySizer.get_rolling_stats_from_redis."""
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock

@@ -85,12 +85,8 @@ class TradeAnalyzer:
 
         win_rate = len(wins) / len(recent)
 
-        avg_win = (
-            sum(abs(float(getattr(t, "pnl_pct", 0.0))) for t in wins) / max(len(wins), 1)
-        )
-        avg_loss = (
-            sum(abs(float(getattr(t, "pnl_pct", 0.0))) for t in losses) / max(len(losses), 1)
-        )
+        avg_win = sum(abs(float(getattr(t, "pnl_pct", 0.0))) for t in wins) / max(len(wins), 1)
+        avg_loss = sum(abs(float(getattr(t, "pnl_pct", 0.0))) for t in losses) / max(len(losses), 1)
         avg_rr = avg_win / avg_loss if avg_loss > 0 else 1.5
 
         await self._state.set(

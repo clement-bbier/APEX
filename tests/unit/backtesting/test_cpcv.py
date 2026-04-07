@@ -227,9 +227,7 @@ class TestCPCVProperties:
 
     @given(n_splits=st.integers(3, 7), n_test_splits=st.integers(1, 3))
     @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
-    def test_combination_count_matches_math(
-        self, n_splits: int, n_test_splits: int
-    ) -> None:
+    def test_combination_count_matches_math(self, n_splits: int, n_test_splits: int) -> None:
         if n_test_splits >= n_splits:
             return
         cv = CombinatorialPurgedCV(n_splits, n_test_splits, embargo_pct=0.0)
@@ -239,9 +237,7 @@ class TestCPCVProperties:
 
     @given(n_splits=st.integers(3, 6), n_test_splits=st.integers(1, 3))
     @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
-    def test_train_test_always_disjoint(
-        self, n_splits: int, n_test_splits: int
-    ) -> None:
+    def test_train_test_always_disjoint(self, n_splits: int, n_test_splits: int) -> None:
         if n_test_splits >= n_splits:
             return
         cv = CombinatorialPurgedCV(n_splits, n_test_splits, embargo_pct=0.0)

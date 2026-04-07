@@ -127,9 +127,7 @@ class RegimeML:
             for t in range(1, seq_len):
                 for j in range(n_states):
                     log_alpha[t, j] = (
-                        np.logaddexp.reduce(
-                            log_alpha[t - 1] + np.log(trans_mat[:, j] + 1e-300)
-                        )
+                        np.logaddexp.reduce(log_alpha[t - 1] + np.log(trans_mat[:, j] + 1e-300))
                         + log_b[t, j]
                     )
 
@@ -165,9 +163,9 @@ class RegimeML:
             gamma_sum = gamma.sum(axis=0) + 1e-300
             pi = gamma[0] / gamma[0].sum()
             mu = (gamma * obs[:, None]).sum(axis=0) / gamma_sum
-            sigma = np.sqrt(
-                (gamma * (obs[:, None] - mu[None, :]) ** 2).sum(axis=0) / gamma_sum
-            ) + 1e-8
+            sigma = (
+                np.sqrt((gamma * (obs[:, None] - mu[None, :]) ** 2).sum(axis=0) / gamma_sum) + 1e-8
+            )
 
             xi_sum = xi.sum(axis=0) + 1e-300
             trans_mat = xi_sum / xi_sum.sum(axis=1, keepdims=True)
@@ -282,7 +280,7 @@ class RegimeML:
 
         # L2 cost via prefix sums: cost(s, t) = sum(y[s:t]^2) - (sum(y[s:t])^2)/(t-s)
         prefix_sum = np.concatenate([[0.0], np.cumsum(arr)])
-        prefix_sum2 = np.concatenate([[0.0], np.cumsum(arr ** 2)])
+        prefix_sum2 = np.concatenate([[0.0], np.cumsum(arr**2)])
 
         def l2_cost(s: int, t: int) -> float:
             """L2 (variance) cost for segment arr[s:t]."""
@@ -291,7 +289,7 @@ class RegimeML:
                 return 0.0
             s_val = prefix_sum[t] - prefix_sum[s]
             s2_val = prefix_sum2[t] - prefix_sum2[s]
-            return float(s2_val - (s_val ** 2) / n)
+            return float(s2_val - (s_val**2) / n)
 
         var = float(np.var(arr)) if np.var(arr) > 0 else 1.0
         if penalty is None:
@@ -435,7 +433,7 @@ class RegimeML:
         # OLS for delta_r ~ rho * r_lag (no intercept)
         rho = float(np.dot(r_lag, delta_r) / (np.dot(r_lag, r_lag) + 1e-300))
         epsilon = delta_r - rho * r_lag
-        sigma_sq = float(np.sum(epsilon ** 2) / (len(epsilon) - 1) + 1e-300)
+        sigma_sq = float(np.sum(epsilon**2) / (len(epsilon) - 1) + 1e-300)
         se_rho = math.sqrt(sigma_sq / (np.dot(r_lag, r_lag) + 1e-300))
         adf_stat = rho / (se_rho + 1e-300)
 

@@ -1,4 +1,5 @@
 """Tests for DriftDetector - signal quality and win rate drift detection."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock

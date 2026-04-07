@@ -173,12 +173,10 @@ class WalkForwardValidator:
         results: list[WalkForwardResult] = []
         for window in windows:
             train_df = data[
-                (data["timestamp"] >= window.train_start)
-                & (data["timestamp"] < window.train_end)
+                (data["timestamp"] >= window.train_start) & (data["timestamp"] < window.train_end)
             ]
             test_df = data[
-                (data["timestamp"] >= window.test_start)
-                & (data["timestamp"] < window.test_end)
+                (data["timestamp"] >= window.test_start) & (data["timestamp"] < window.test_end)
             ]
 
             if len(test_df) < 100:
@@ -269,9 +267,7 @@ class TickBasedWalkForwardValidator:
         self._embargo_bars = embargo_bars
         self._train_ratio = train_ratio
 
-    def build_windows_fast(
-        self, ticks: list[NormalizedTick]
-    ) -> list[_TickWalkForwardWindow]:
+    def build_windows_fast(self, ticks: list[NormalizedTick]) -> list[_TickWalkForwardWindow]:
         """Fast O(n) window builder without list.index() calls."""
         n = len(ticks)
         if n < self._n_splits * 2:
@@ -436,9 +432,7 @@ class CombinatorialPurgedCV:
             List of (train_indices, test_indices) pairs — one per combination.
         """
         if n_samples < self.n_splits * 2:
-            raise ValueError(
-                f"n_samples ({n_samples}) too small for {self.n_splits} splits"
-            )
+            raise ValueError(f"n_samples ({n_samples}) too small for {self.n_splits} splits")
         group_size = n_samples // self.n_splits
         embargo_size = int(n_samples * self.embargo_pct)
 
@@ -516,11 +510,7 @@ class CombinatorialPurgedCV:
         is_median = float(np.median(is_sharpes)) if is_sharpes else 0.0
         oos_arr = np.asarray(oos_sharpes, dtype=float) if oos_sharpes else np.array([0.0])
 
-        pbo = (
-            float(np.sum(oos_arr < is_median)) / len(oos_sharpes)
-            if oos_sharpes
-            else 1.0
-        )
+        pbo = float(np.sum(oos_arr < is_median)) / len(oos_sharpes) if oos_sharpes else 1.0
         oos_median = float(np.median(oos_arr))
 
         if pbo < 0.25 and oos_median > 0.5:

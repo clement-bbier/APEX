@@ -49,12 +49,11 @@ class RegimeDetectorService(BaseService):
     service_id = "s03_regime_detector"
 
     def __init__(self) -> None:
-        """Initialize regime components and ZMQ publisher."""
+        """Initialize regime components (PUB socket created by BaseService.start)."""
         super().__init__(self.service_id)
         self._engine = RegimeEngine()
         self._session = SessionTracker()
         self._calendar = CBCalendar()
-        self.bus.init_publisher()
 
     # ── BaseService interface ─────────────────────────────────────────────────
 
@@ -103,8 +102,11 @@ class RegimeDetectorService(BaseService):
         session: Session = self._session.get_session(now)
         session_mult = self._session.get_multiplier(session)
         us_sessions = {
-            Session.US_OPEN, Session.US_MORNING, Session.US_LUNCH,
-            Session.US_AFTERNOON, Session.US_CLOSE,
+            Session.US_OPEN,
+            Session.US_MORNING,
+            Session.US_LUNCH,
+            Session.US_AFTERNOON,
+            Session.US_CLOSE,
         }
         session_ctx = SessionContext(
             timestamp_ms=now_ms,
@@ -235,45 +237,7 @@ class RegimeDetectorService(BaseService):
         return str(val).lower() == "open" if val is not None else False
 
 
-import sys
-import os
-import asyncio
-from pathlib import Path
+if __name__ == "__main__":
+    from core.service_runner import run_service_module
 
-# Fix sys.path for direct module runs
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-if __name__ == '__main__':
-    import importlib
-    
-    # We expect the class name to be XxxService (e.g. DataIngestionService, SignalEngineService...)
-    # But to make it generic without inspecting the AST, we can just find subclasses of BaseService
-    from core.base_service import BaseService
-    import inspect
-    
-    module_name = 'services.' + Path(__file__).parent.name + '.service'
-    module = importlib.import_module(module_name)
-    
-    service_class = None
-    for name, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, BaseService) and obj is not BaseService:
-            service_class = obj
-            break
-            
-    if not service_class:
-        print(f'Error: Could not find a BaseService subclass in {module_name}')
-        sys.exit(1)
-        
-    async def main():
-        service = service_class()
-        try:
-            await service.start()
-            while service._running:
-                await asyncio.sleep(1.0)
-        except KeyboardInterrupt:
-            print('Interrupted by user...')
-        finally:
-            await service.stop()
-
-    asyncio.run(main())
-
+    run_service_module(__file__)

@@ -17,6 +17,7 @@ Reference:
     Vince, R. (1992). The Mathematics of Money Management. Wiley.
     Tharp, V.K. (1998). Trade Your Way to Financial Freedom. McGraw-Hill.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -136,13 +137,25 @@ def apply_crypto_multiplier(order: OrderCandidate) -> tuple[Decimal, RuleResult]
     """Apply CRYPTO_SIZE_MULTIPLIER (0.70) for crypto symbols."""
     if _is_crypto(order.symbol):
         adjusted = order.size * Decimal(str(CRYPTO_SIZE_MULTIPLIER))
-        return adjusted, RuleResult.ok(rule_name="apply_crypto_multiplier", reason=f"crypto x {CRYPTO_SIZE_MULTIPLIER}")
-    return order.size, RuleResult.ok(rule_name="apply_crypto_multiplier", reason="equity: no adjustment")
+        return adjusted, RuleResult.ok(
+            rule_name="apply_crypto_multiplier",
+            reason=f"crypto x {CRYPTO_SIZE_MULTIPLIER}",
+        )
+    return order.size, RuleResult.ok(
+        rule_name="apply_crypto_multiplier",
+        reason="equity: no adjustment",
+    )
 
 
 def apply_session_multiplier(order: OrderCandidate, session: Session) -> tuple[Decimal, RuleResult]:
     """Apply x1.10 bonus during prime sessions (US_PRIME)."""
     if session in _PRIME_SESSIONS:
         adjusted = order.size * Decimal(str(_SESSION_PRIME_MULTIPLIER))
-        return adjusted, RuleResult.ok(rule_name="apply_session_multiplier", reason=f"prime session x {_SESSION_PRIME_MULTIPLIER}")
-    return order.size, RuleResult.ok(rule_name="apply_session_multiplier", reason=f"{session}: no bonus")
+        return adjusted, RuleResult.ok(
+            rule_name="apply_session_multiplier",
+            reason=f"prime session x {_SESSION_PRIME_MULTIPLIER}",
+        )
+    return order.size, RuleResult.ok(
+        rule_name="apply_session_multiplier",
+        reason=f"{session}: no bonus",
+    )

@@ -193,9 +193,7 @@ class BacktestEngine:
             (blocked, reason) tuple.
         """
         for event in self.macro_events:
-            event_time = datetime.fromisoformat(
-                event["timestamp"].replace("Z", "+00:00")
-            )
+            event_time = datetime.fromisoformat(event["timestamp"].replace("Z", "+00:00"))
             block_start = event_time - timedelta(minutes=45)
             if block_start <= timestamp <= event_time:
                 return True, f"{event['type']} block window"
@@ -242,6 +240,7 @@ class BacktestEngine:
 
         # Risk check (Phase 6 pure functions)
         from services.s05_risk_manager.models import RuleResult as _RuleResult
+
         _checks: list[_RuleResult] = [
             check_stop_loss_present(candidate),
             check_min_rr(candidate),

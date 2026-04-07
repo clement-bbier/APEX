@@ -17,7 +17,11 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any
 
-if sys.platform == 'win32':
+# Windows ships with the ProactorEventLoop by default which is incompatible
+# with pyzmq's asyncio integration. Force the selector loop *before* any
+# event loop is created — every service module imports BaseService, so this
+# guarantees the policy is in place.
+if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 from core.bus import MessageBus
@@ -40,6 +44,9 @@ class BaseService(ABC):
         1. await service.start()   → connects Redis, starts loops
         2. Runs until interrupted
         3. await service.stop()    → graceful shutdown
+
+    The PUB and SUB sockets always CONNECT to the central XSUB/XPUB
+    broker (see :mod:`core.zmq_broker`). No service binds anything.
     """
 
     def __init__(self, service_id: str) -> None:
@@ -95,6 +102,7 @@ class BaseService(ABC):
             )
             raise
 
+        # All services CONNECT their PUB socket to the broker XSUB port.
         self.bus.init_publisher()
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
 

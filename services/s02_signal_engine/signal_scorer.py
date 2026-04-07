@@ -9,6 +9,7 @@ Mathematical foundation:
 
 Only publishes a Signal when |final_strength| > MIN_SIGNAL_STRENGTH (configurable).
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field

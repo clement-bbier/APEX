@@ -10,6 +10,7 @@ an official schedule at:
 For live announcement detection, monitors:
   https://www.federalreserve.gov/feeds/press_all.xml
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -69,19 +70,17 @@ class CBWatcher:
         events: list[dict[str, Any]] = []
         for e in FOMC_DATES_2024_2025:
             dt = datetime.fromisoformat(e["date"]).replace(
-                hour=14, minute=0, tzinfo=UTC  # FOMC typically 2pm ET = 19:00 UTC
+                hour=14,
+                minute=0,
+                tzinfo=UTC,  # FOMC typically 2pm ET = 19:00 UTC
             )
             events.append(
                 {
                     "institution": "FED",
                     "event_type": e["type"],
                     "scheduled_at": dt.isoformat(),
-                    "block_start": (
-                        dt - timedelta(minutes=BLOCK_WINDOW_MINUTES)
-                    ).isoformat(),
-                    "monitor_end": (
-                        dt + timedelta(minutes=MONITOR_WINDOW_MINUTES)
-                    ).isoformat(),
+                    "block_start": (dt - timedelta(minutes=BLOCK_WINDOW_MINUTES)).isoformat(),
+                    "monitor_end": (dt + timedelta(minutes=MONITOR_WINDOW_MINUTES)).isoformat(),
                 }
             )
         return events
@@ -89,18 +88,12 @@ class CBWatcher:
     async def get_next_event(self) -> dict[str, Any] | None:
         """Return the next upcoming CB event from now."""
         now = datetime.now(UTC)
-        future = [
-            e
-            for e in self._events
-            if datetime.fromisoformat(e["scheduled_at"]) > now
-        ]
+        future = [e for e in self._events if datetime.fromisoformat(e["scheduled_at"]) > now]
         if not future:
             return None
         return min(future, key=lambda e: e["scheduled_at"])
 
-    def is_in_block_window(
-        self, now: datetime | None = None
-    ) -> tuple[bool, dict[str, Any] | None]:
+    def is_in_block_window(self, now: datetime | None = None) -> tuple[bool, dict[str, Any] | None]:
         """Return (True, event) if we're within the 45min pre-event block window."""
         if now is None:
             now = datetime.now(UTC)
@@ -130,15 +123,16 @@ class CBWatcher:
         Returns:
             List of dicts with keys "title", "link", and "published".
         """
-        import xml.etree.ElementTree as ET
+        # ``defusedxml`` is a drop-in replacement for ``xml.etree.ElementTree``
+        # hardened against billion-laughs / external-entity attacks. Bandit
+        # B405/B314 are explicitly satisfied by using it.
+        from defusedxml import ElementTree as ET  # noqa: N817
 
         async with aiohttp.ClientSession() as session:
-            async with session.get(
-                FED_RSS_URL, timeout=aiohttp.ClientTimeout(total=15)
-            ) as resp:
+            async with session.get(FED_RSS_URL, timeout=aiohttp.ClientTimeout(total=15)) as resp:
                 text = await resp.text()
 
-        root = ET.fromstring(text)  # noqa: S314
+        root = ET.fromstring(text)
         ns = {"atom": "http://www.w3.org/2005/Atom"}
         items: list[dict[str, Any]] = []
 

@@ -16,6 +16,7 @@ Session schedule (all times in LOCAL timezone):
   ASIAN       : 00:00-08:00 UTC -> mult = 0.70 (crypto only)
   LONDON      : 08:00-13:30 UTC -> mult = 0.90 (crypto only)
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, time
@@ -133,9 +134,7 @@ class SessionTracker:
         """
         from datetime import timedelta
 
-        candidate = utc_now.astimezone(NY_TZ).replace(
-            hour=9, minute=30, second=0, microsecond=0
-        )
+        candidate = utc_now.astimezone(NY_TZ).replace(hour=9, minute=30, second=0, microsecond=0)
         candidate_utc = candidate.astimezone(UTC_TZ)
 
         if candidate_utc <= utc_now:
