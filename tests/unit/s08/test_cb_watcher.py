@@ -1,4 +1,5 @@
 """Tests for Central Bank event watcher."""
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta

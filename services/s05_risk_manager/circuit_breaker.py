@@ -24,6 +24,7 @@ Reference:
     Nygard, M.T. (2007). Release It! Pragmatic Bookshelf. Ch. 5.
     NYSE Rule 80B (market-wide circuit breakers) -- institutional precedent.
 """
+
 from __future__ import annotations
 
 import json
@@ -97,8 +98,7 @@ class CircuitBreaker:
                 rule_name="circuit_breaker",
                 block_reason=BlockReason.CIRCUIT_BREAKER_OPEN,
                 reason=(
-                    f"Circuit breaker OPEN since {snapshot.tripped_at}: "
-                    f"{snapshot.tripped_reason}"
+                    f"Circuit breaker OPEN since {snapshot.tripped_at}: {snapshot.tripped_reason}"
                 ),
             )
 

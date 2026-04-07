@@ -1,4 +1,5 @@
 """Tests TripleBarrierLabeler avec Hypothesis property tests."""
+
 from __future__ import annotations
 
 import random

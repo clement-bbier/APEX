@@ -1,4 +1,5 @@
 """Tests for rolling correlation and cross-asset block logic."""
+
 from __future__ import annotations
 
 import math

@@ -1,4 +1,5 @@
 """Session tracker tests - all sessions, DST transitions, weekends."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime

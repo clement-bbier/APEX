@@ -1,4 +1,5 @@
 """Tests for Phase-2 dynamic regime detection engine."""
+
 from __future__ import annotations
 
 import pytest
@@ -64,8 +65,6 @@ class TestRegimeEngine:
         r_clean = self.engine().compute(
             vix=18.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3
         )
-        r_both = self.engine().compute(
-            vix=18.0, dxy_1h_change_pct=0.8, yield_10y=4.3, yield_2y=4.5
-        )
+        r_both = self.engine().compute(vix=18.0, dxy_1h_change_pct=0.8, yield_10y=4.3, yield_2y=4.5)
         # Both DXY (×0.7) and yield inversion (×0.8) applied
         assert r_both.macro_mult < r_clean.macro_mult * 0.8

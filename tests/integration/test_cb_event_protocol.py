@@ -7,6 +7,7 @@ Verifies:
 3. No trades execute during window
 4. Post-event scalp is allowed with reduced sizing
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timedelta

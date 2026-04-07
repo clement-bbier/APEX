@@ -6,6 +6,7 @@ No real Redis, no real ZMQ, no network I/O.
 
 Helper: build_service() creates a wired RiskManagerService backed by fakeredis.
 """
+
 from __future__ import annotations
 
 import json
@@ -58,6 +59,7 @@ def _make_service(redis: fakeredis.aioredis.FakeRedis) -> RiskManagerService:
 
     # Wire state store with fakeredis
     from core.state import StateStore
+
     svc.state = StateStore.__new__(StateStore)
     svc.state._service_id = "s05_test"
     svc.state._settings = MagicMock()
@@ -302,15 +304,16 @@ async def test_audit_written_to_redis() -> None:
 
 @given(
     capital=st.decimals(
-        min_value=Decimal("100"), max_value=Decimal("500_000"), places=2,
-        allow_nan=False, allow_infinity=False,
+        min_value=Decimal("100"),
+        max_value=Decimal("500_000"),
+        places=2,
+        allow_nan=False,
+        allow_infinity=False,
     ),
     confidence=st.floats(min_value=0.52, max_value=1.0, allow_nan=False, allow_infinity=False),
 )
 @hyp_settings(max_examples=1000)
-def test_approved_order_risk_never_exceeds_max(
-    capital: Decimal, confidence: float
-) -> None:
+def test_approved_order_risk_never_exceeds_max(capital: Decimal, confidence: float) -> None:
     """INVARIANT ABSOLU: for ANY capital and confidence, approved order
     monetary risk <= MAX_RISK_PER_TRADE_PCT (0.5%) x capital.
 
@@ -342,6 +345,5 @@ def test_approved_order_risk_never_exceeds_max(
         actual_risk = sl_dist * order.size
         max_allowed = capital * Decimal("0.005")
         assert actual_risk <= max_allowed + Decimal("0.0001"), (
-            f"INVARIANT VIOLATED: risk={actual_risk} > max={max_allowed} "
-            f"for capital={capital}"
+            f"INVARIANT VIOLATED: risk={actual_risk} > max={max_allowed} for capital={capital}"
         )

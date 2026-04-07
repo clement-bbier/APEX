@@ -101,9 +101,7 @@ class TestHedgeTrigger:
         signal = _signal(Direction.LONG)
         features = TechnicalFeatures(rsi_1m=75.0)
         regime = _regime()
-        should, direction, _ = self.trigger.should_hedge(
-            signal, features, regime, Decimal("500")
-        )
+        should, direction, _ = self.trigger.should_hedge(signal, features, regime, Decimal("500"))
         assert should is True
         assert direction == Direction.SHORT
 
@@ -115,8 +113,6 @@ class TestHedgeTrigger:
             bb_lower=Decimal("44000"),  # price == bb_lower
         )
         regime = _regime()
-        should, direction, _ = self.trigger.should_hedge(
-            signal, features, regime, Decimal("500")
-        )
+        should, direction, _ = self.trigger.should_hedge(signal, features, regime, Decimal("500"))
         assert should is True
         assert direction == Direction.LONG

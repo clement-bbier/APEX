@@ -1,4 +1,5 @@
 """Tests for RegimeML - HMM, PELT breakpoints, Engle-Granger cointegration."""
+
 from __future__ import annotations
 
 import math
@@ -155,8 +156,14 @@ class TestCointegrationTest:
         y = rng.normal(0, 1, 30).tolist()
         result = ml.cointegration_test(x, y)
         required_keys = {
-            "cointegrated", "adf_statistic", "critical_value",
-            "significance", "hedge_ratio", "intercept", "n_obs", "status",
+            "cointegrated",
+            "adf_statistic",
+            "critical_value",
+            "significance",
+            "hedge_ratio",
+            "intercept",
+            "n_obs",
+            "status",
         }
         assert required_keys.issubset(result.keys())
 

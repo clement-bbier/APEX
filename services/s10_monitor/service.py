@@ -121,22 +121,8 @@ class MonitorService(BaseService):
 
             await asyncio.sleep(15)
 
-if __name__ == '__main__':
-    import sys
-    from pathlib import Path
-    sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-    async def main() -> None:
-        service = MonitorService()
-        try:
-            print("Waiting for other services...")
-            await service.start()
-            while service._running:
-                await asyncio.sleep(1.0)
-        except KeyboardInterrupt:
-            logger.info('Interrupted by user...')
-        finally:
-            await service.stop()
+if __name__ == "__main__":
+    from core.service_runner import run_service_module
 
-    asyncio.run(main())
-
+    run_service_module(__file__)

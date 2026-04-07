@@ -3,6 +3,7 @@
 Uses fakeredis -- no real Redis, no network I/O.
 Time is controlled via utc_now parameter injection.
 """
+
 from __future__ import annotations
 
 import json

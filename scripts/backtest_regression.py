@@ -28,7 +28,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.resolve()))
 os.environ["BACKTEST_MODE"] = "True"
 
 
-
 async def run(fixture_path: str) -> int:
     """Execute the regression test.
 
@@ -93,6 +92,7 @@ async def run(fixture_path: str) -> int:
     print(f"  Avg W/L  : +${avg_w:,.2f} / -${avg_l:,.2f}")
 
     from core.config import get_settings
+
     print(f"  DEBUG Backtest Mode: {get_settings().backtest_mode}")
 
     # Risk metrics
@@ -117,6 +117,7 @@ def main() -> None:
     """Parse CLI arguments and run the regression gate."""
     # Force backtest mode logic for relaxed thresholds
     import os
+
     os.environ["BACKTEST_MODE"] = "True"
 
     parser = argparse.ArgumentParser(description="APEX backtest regression gate")

@@ -146,11 +146,15 @@ class RegimeEngine:
             reasoning.append(f"Extreme funding rate {btc_funding_rate:.3f} → x0.9")
 
         # Step 4: Risk mode classification
-        risk_mode = RiskMode.RISK_OFF if (
-            dxy_1h_change_pct > 0.3
-            or yield_inverted
-            or vol_regime in (VolRegime.CRISIS, VolRegime.HIGH_VOL)
-        ) else RiskMode.RISK_ON
+        risk_mode = (
+            RiskMode.RISK_OFF
+            if (
+                dxy_1h_change_pct > 0.3
+                or yield_inverted
+                or vol_regime in (VolRegime.CRISIS, VolRegime.HIGH_VOL)
+            )
+            else RiskMode.RISK_ON
+        )
 
         return RegimeState(
             vol_regime=vol_regime,

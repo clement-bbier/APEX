@@ -2,6 +2,7 @@
 
 Uses fakeredis to avoid any real Redis dependency.
 """
+
 from __future__ import annotations
 
 import fakeredis.aioredis

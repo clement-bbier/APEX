@@ -2,6 +2,7 @@
 
 Covers hard gate, Kelly modulation, fallback, and 2 Hypothesis property tests.
 """
+
 from __future__ import annotations
 
 import fakeredis.aioredis

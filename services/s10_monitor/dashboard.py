@@ -17,6 +17,7 @@ Features:
 Architecture: read-only dashboard. No order placement from UI.
 Orders only via ZMQ pipeline (per CLAUDE.md security rules).
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -464,6 +465,7 @@ connect();
 
 # ── WebSocket Connection Manager ───────────────────────────────────────────────
 
+
 class ConnectionManager:
     def __init__(self) -> None:
         self._connections: list[WebSocket] = []
@@ -490,11 +492,15 @@ class ConnectionManager:
 
 # ── Dashboard Server ───────────────────────────────────────────────────────────
 
+
 class DashboardServer:
     """APEX Command Center server — FastAPI + WebSocket + REST API."""
 
     def __init__(
-        self, state: StateStore, host: str = "0.0.0.0", port: int = 8080,
+        self,
+        state: StateStore,
+        host: str = "0.0.0.0",
+        port: int = 8080,
     ) -> None:
         self._state = state
         self._host = host
@@ -518,63 +524,75 @@ class DashboardServer:
         @app.get("/api/v1/system/status")
         async def system_status() -> dict[str, Any]:
             from services.s10_monitor.command_api import get_system_status
+
             r = await get_system_status(state)
             return r.model_dump()
 
         @app.get("/api/v1/positions")
         async def positions() -> list[dict[str, Any]]:
             from services.s10_monitor.command_api import get_positions
+
             return [p.model_dump() for p in await get_positions(state)]
 
         @app.get("/api/v1/pnl")
         async def pnl() -> dict[str, Any]:
             from services.s10_monitor.command_api import get_pnl
+
             return (await get_pnl(state)).model_dump()
 
         @app.get("/api/v1/regime")
         async def regime() -> dict[str, Any]:
             from services.s10_monitor.command_api import get_regime
+
             return (await get_regime(state)).model_dump()
 
         @app.get("/api/v1/signals/recent")
         async def signals() -> list[dict[str, Any]]:
             from services.s10_monitor.command_api import get_recent_signals
+
             return [s.model_dump() for s in await get_recent_signals(state)]
 
         @app.get("/api/v1/circuit-breaker")
         async def cb() -> dict[str, Any]:
             from services.s10_monitor.command_api import get_circuit_breaker
+
             return await get_circuit_breaker(state)
 
         @app.get("/api/v1/risk")
         async def risk() -> dict[str, Any]:
             from services.s10_monitor.command_api import get_risk_status
+
             return await get_risk_status(state)
 
         @app.post("/api/v1/circuit-breaker/reset")
         async def cb_reset(x_confirm: str | None = None) -> dict[str, Any]:
             from services.s10_monitor.command_api import reset_circuit_breaker
+
             r = await reset_circuit_breaker(state, x_confirm)
             return r.model_dump()
 
         @app.get("/api/v1/performance")
         async def perf() -> dict[str, Any]:
             from services.s10_monitor.command_api import get_performance
+
             return (await get_performance(state)).model_dump()
 
         @app.get("/api/v1/cb-events")
         async def cb_events() -> list[dict[str, Any]]:
             from services.s10_monitor.command_api import get_cb_events
+
             return [e.model_dump() for e in await get_cb_events(state)]
 
         @app.get("/api/v1/config")
         async def config() -> dict[str, Any]:
             from services.s10_monitor.command_api import get_config
+
             return await get_config()
 
         @app.get("/api/v1/alerts/recent")
         async def alerts() -> list[dict[str, Any]]:
             from services.s10_monitor.command_api import get_recent_alerts
+
             return [a.model_dump() for a in await get_recent_alerts(state)]
 
         @app.websocket("/ws")
@@ -605,6 +623,7 @@ class DashboardServer:
             get_risk_status,
             get_system_status,
         )
+
         state = self._state
         payload: dict[str, Any] = {}
         try:
@@ -621,8 +640,18 @@ class DashboardServer:
                 get_risk_status(state),
                 return_exceptions=True,
             )
-            labels = ["pnl", "positions", "regime", "signals", "circuit_breaker",
-                      "performance", "cb_events", "alerts", "system", "risk"]
+            labels = [
+                "pnl",
+                "positions",
+                "regime",
+                "signals",
+                "circuit_breaker",
+                "performance",
+                "cb_events",
+                "alerts",
+                "system",
+                "risk",
+            ]
             for label, result in zip(labels, results, strict=True):
                 if isinstance(result, Exception):
                     logger.debug("broadcast_partial_fail", label=label, error=str(result))
@@ -630,7 +659,9 @@ class DashboardServer:
                 if hasattr(result, "model_dump"):
                     payload[label] = result.model_dump()
                 elif isinstance(result, list):
-                    payload[label] = [r.model_dump() if hasattr(r, "model_dump") else r for r in result]
+                    payload[label] = [
+                        r.model_dump() if hasattr(r, "model_dump") else r for r in result
+                    ]
                 else:
                     payload[label] = result
 
@@ -646,4 +677,3 @@ class DashboardServer:
         config = uvicorn.Config(self.app, host=self._host, port=self._port, log_level="warning")
         server = uvicorn.Server(config)
         await server.serve()
-

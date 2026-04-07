@@ -3,6 +3,7 @@
 Covers: FractionalDifferentiator (batch) + IncrementalFracDiff (streaming).
 Property tests via Hypothesis ensure correctness for any d ∈ (0, 1).
 """
+
 from __future__ import annotations
 
 import math
@@ -167,7 +168,7 @@ class TestFractionalDifferentiatorBatch:
         For high d (≈0.9) weights decay rapidly: 50 lags covers most of it.
         """
         fd = FractionalDifferentiator()
-        m_low = fd.memory_retained(0.1, 50)   # slow decay  → low fraction
+        m_low = fd.memory_retained(0.1, 50)  # slow decay  → low fraction
         m_high = fd.memory_retained(0.9, 50)  # fast decay  → high fraction
         assert m_low < m_high
 
@@ -240,6 +241,7 @@ class TestADFStationary:
         """NaN in series causes math.sqrt to raise ValueError → except handler (line 182-183)."""
         fd = FractionalDifferentiator()
         import math as _math
+
         # math.sqrt(nan) raises ValueError, triggering the except branch
         nan_series = [_math.nan] * 30
         assert fd._adf_stationary(nan_series) is False

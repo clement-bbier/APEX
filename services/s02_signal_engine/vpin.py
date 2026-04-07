@@ -23,6 +23,7 @@ References:
         Crashes, and the Probability of Informed Trading.
         Journal of Portfolio Management, 37(2), 118-128.
 """
+
 from __future__ import annotations
 
 from collections import deque
@@ -103,9 +104,7 @@ class VPINCalculator:
             return
         target = adv / self._n_buckets_per_day
         # EMA smoothing: avoids discontinuities when ADV changes rapidly
-        self._bucket_size = (
-            (1.0 - self.EMA_ALPHA) * self._bucket_size + self.EMA_ALPHA * target
-        )
+        self._bucket_size = (1.0 - self.EMA_ALPHA) * self._bucket_size + self.EMA_ALPHA * target
         self._adv_source = "live"
 
     def update(self, tick: NormalizedTick) -> bool:
@@ -141,14 +140,13 @@ class VPINCalculator:
         self._current_total_vol += volume
 
         if self._current_total_vol >= self._bucket_size:
-            excess = (
-                (self._current_total_vol - self._bucket_size)
-                / self._current_total_vol
+            excess = (self._current_total_vol - self._bucket_size) / self._current_total_vol
+            self._buckets.append(
+                (
+                    self._current_buy_vol * (1.0 - excess),
+                    self._current_sell_vol * (1.0 - excess),
+                )
             )
-            self._buckets.append((
-                self._current_buy_vol * (1.0 - excess),
-                self._current_sell_vol * (1.0 - excess),
-            ))
             # Carry-forward excess volume into next bucket
             self._current_buy_vol *= excess
             self._current_sell_vol *= excess

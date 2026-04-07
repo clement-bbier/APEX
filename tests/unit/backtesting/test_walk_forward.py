@@ -1,4 +1,5 @@
 """Tests for the purged walk-forward cross-validator (Lopez de Prado, Chapter 7)."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -52,12 +53,20 @@ class TestWalkForwardValidator:
         v = self.make_validator()
         results = [
             WalkForwardResult(
-                0, sharpe=1.2, max_drawdown=0.04, win_rate=0.54,
-                n_trades=50, out_of_sample_return=0.05,
+                0,
+                sharpe=1.2,
+                max_drawdown=0.04,
+                win_rate=0.54,
+                n_trades=50,
+                out_of_sample_return=0.05,
             ),
             WalkForwardResult(
-                1, sharpe=0.9, max_drawdown=0.06, win_rate=0.51,
-                n_trades=45, out_of_sample_return=0.03,
+                1,
+                sharpe=0.9,
+                max_drawdown=0.06,
+                win_rate=0.51,
+                n_trades=45,
+                out_of_sample_return=0.03,
             ),
         ]
         agg = v.aggregate_results(results)

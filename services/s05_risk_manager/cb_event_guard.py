@@ -21,6 +21,7 @@ Reference:
     Hautsch, N. & Hess, D. (2007). Journal of Financial and Quantitative
     Analysis, 42(1), 133-167.
 """
+
 from __future__ import annotations
 
 import json

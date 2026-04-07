@@ -2,6 +2,7 @@
 Integration test: BTC and AAPL signals processed simultaneously.
 Verifies services handle concurrent symbols without interference.
 """
+
 from __future__ import annotations
 
 from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer

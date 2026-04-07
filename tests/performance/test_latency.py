@@ -6,6 +6,7 @@ Per DEVELOPMENT_PLAN.md Phase 3 DoD:
 
 These tests do NOT require Redis or ZMQ - they measure pure computation latency.
 """
+
 from __future__ import annotations
 
 import time

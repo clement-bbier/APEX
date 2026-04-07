@@ -1,29 +1,64 @@
-FROM rust:1.84-slim AS rust-builder
+# syntax=docker/dockerfile:1.7
+#
+# Multi-stage build for any APEX micro-service.
+#
+# Stage 1 (rust-builder): build the apex_mc and apex_risk Python wheels
+#   from the Rust workspace using maturin.
+# Stage 2 (python-builder): install all Python dependencies + the Rust
+#   wheels into a private user site so we can copy the result into the
+#   slim runtime image without dragging compilers along.
+# Stage 3 (runtime): minimal Debian-slim image, non-root user, every
+#   service is launched via SERVICE_MODULE (set per-container).
+
+# ── Stage 1 — Rust wheels via maturin ─────────────────────────────────
+FROM python:3.12-slim AS rust-builder
+ENV DEBIAN_FRONTEND=noninteractive \
+    CARGO_TERM_COLOR=never \
+    PATH="/root/.cargo/bin:${PATH}"
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        build-essential ca-certificates curl pkg-config \
+ && rm -rf /var/lib/apt/lists/*
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+ | sh -s -- -y --default-toolchain stable --profile minimal
+RUN pip install --no-cache-dir "maturin>=1.9.4"
 WORKDIR /build
 COPY rust/ rust/
-RUN pip install "maturin>=1.9.4" --break-system-packages 2>/dev/null || pip install "maturin>=1.9.4"
-RUN cd rust/apex_mc && maturin build --release --out /wheels && \
-    cd ../apex_risk && maturin build --release --out /wheels
+RUN mkdir /wheels \
+ && (cd rust/apex_mc   && maturin build --release --out /wheels) \
+ && (cd rust/apex_risk && maturin build --release --out /wheels) \
+ && ls -la /wheels
 
+# ── Stage 2 — Python deps in a per-user prefix ────────────────────────
 FROM python:3.12-slim AS python-builder
+ENV PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gcc g++ libffi-dev \
+ && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
-RUN apt-get update && apt-get install -y --no-install-recommends gcc g++ && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --user -r requirements.txt
 COPY --from=rust-builder /wheels/*.whl /wheels/
-RUN pip install --no-cache-dir --user /wheels/*.whl
+RUN pip install --user /wheels/*.whl
 
+# ── Stage 3 — Slim runtime image ──────────────────────────────────────
 FROM python:3.12-slim AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app
-RUN groupadd --gid 1000 apex && \
-    useradd --uid 1000 --gid apex --create-home apex
+    PYTHONPATH=/app \
+    PATH=/home/apex/.local/bin:/usr/local/bin:/usr/bin:/bin
+RUN groupadd --gid 1000 apex \
+ && useradd --uid 1000 --gid apex --create-home apex
 WORKDIR /app
-COPY --from=python-builder /root/.local /home/apex/.local
-COPY . .
-RUN chown -R apex:apex /app
+# Site-packages installed under --user end up in /root/.local; the apex
+# user reads them from /home/apex/.local. Copy with the right ownership.
+COPY --from=python-builder --chown=apex:apex /root/.local /home/apex/.local
+COPY --chown=apex:apex . /app
 USER apex
-CMD python -m ${SERVICE_MODULE}
-HEALTHCHECK --interval=10s --timeout=5s --retries=3 \
-    CMD python -c "import redis; redis.Redis.from_url('${REDIS_URL}').ping()"
+# SERVICE_MODULE is set per service in docker-compose.yml, e.g.
+# ``services.s01_data_ingestion.service`` or
+# ``core.zmq_broker`` for the broker container.
+CMD ["sh", "-c", "exec python -m ${SERVICE_MODULE}"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \
+    CMD ["sh", "-c", "python -c \"import os, redis; redis.Redis.from_url(os.environ['REDIS_URL']).ping()\""]

@@ -29,3 +29,4 @@ mypy>=1.13.0,<2.0.0
 bandit[toml]>=1.8.0,<2.0.0
 fakeredis>=2.26.0
 pytest-timeout>=2.3.0
+defusedxml>=0.7.1

@@ -1,4 +1,5 @@
 """Tests RealizedVolEstimator: HAR-RV, Bipower Variation, Jump Detection."""
+
 from __future__ import annotations
 
 import numpy as np
@@ -27,7 +28,7 @@ class TestBV:
         assert self.e.bipower_variation([0.01]) == 0.0
 
     def test_bv_le_rv_with_jump(self) -> None:
-        r = [0.001]*50 + [0.10] + [0.001]*50
+        r = [0.001] * 50 + [0.10] + [0.001] * 50
         assert self.e.bipower_variation(r) <= self.e.realized_variance(r)
 
     def test_non_negative(self) -> None:
@@ -43,7 +44,7 @@ class TestJumpDetection:
         assert 0.0 <= m.jump_ratio <= 1.0
 
     def test_large_jump_detected(self) -> None:
-        r = [0.0005]*100 + [0.05] + [0.0005]*100
+        r = [0.0005] * 100 + [0.05] + [0.0005] * 100
         m = self.e.jump_detection(r)
         assert m.has_significant_jump is True
         assert m.jump_component > 0
@@ -58,20 +59,20 @@ class TestHARForecast:
     e = RealizedVolEstimator()
 
     def test_too_short_fallback(self) -> None:
-        f = self.e.har_rv_forecast([0.01]*5)
+        f = self.e.har_rv_forecast([0.01] * 5)
         assert f.forecast_rv >= 0
         assert f.n_obs == 5
 
     def test_positive_forecast(self) -> None:
         rng = np.random.default_rng(42)
-        rv = (rng.standard_normal(100)**2 * 0.0001 + 0.0001).tolist()
+        rv = (rng.standard_normal(100) ** 2 * 0.0001 + 0.0001).tolist()
         f = self.e.har_rv_forecast(rv)
         assert f.forecast_rv > 0
         assert f.forecast_vol > 0
 
     def test_r2_in_range(self) -> None:
         rng = np.random.default_rng(0)
-        rv = (rng.standard_normal(60)**2 * 0.0001 + 0.0002).tolist()
+        rv = (rng.standard_normal(60) ** 2 * 0.0001 + 0.0002).tolist()
         f = self.e.har_rv_forecast(rv)
         assert 0.0 <= f.r_squared <= 1.0
 

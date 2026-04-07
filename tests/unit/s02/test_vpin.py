@@ -3,6 +3,7 @@
 Covers: balanced/imbalanced flow, ADV EMA update, extreme hard-block,
 bucket completion, property tests via Hypothesis.
 """
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -120,6 +121,7 @@ class TestToxicityClassification:
         buy = 50.0 + 50.0 * target_vpin
         sell = 50.0 - 50.0 * target_vpin
         from collections import deque
+
         calc._buckets = deque([(buy, sell)] * 10, maxlen=100)
         return calc.compute()
 
@@ -205,6 +207,7 @@ class TestExtremeBlock:
         """When VPIN ≥ 0.95 the multiplier must be 0 — signal must be blocked."""
         calc = VPINCalculator(default_bucket_size=100.0)
         from collections import deque
+
         calc._buckets = deque([(99.0, 1.0)] * 50, maxlen=50)
         m = calc.compute()
         assert m.size_multiplier == 0.0

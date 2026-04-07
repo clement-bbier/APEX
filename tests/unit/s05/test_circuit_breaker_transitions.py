@@ -3,6 +3,7 @@
 Tests verify the CLOSED/OPEN/HALF_OPEN state machine using fakeredis.
 No real Redis, no network I/O.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

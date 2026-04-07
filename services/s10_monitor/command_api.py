@@ -10,8 +10,10 @@ but NEVER place orders or bypass the Risk Manager.
 
 Mounted on the DashboardServer FastAPI app at /api/v1/.
 """
+
 from __future__ import annotations
 
+import json
 import time
 from typing import Any
 
@@ -27,9 +29,10 @@ logger = get_logger("s10_monitor.command_api")
 
 # ── Response models ───────────────────────────────────────────────────────────
 
+
 class ServiceHealth(BaseModel):
     service_id: str
-    status: str          # "healthy" | "degraded" | "dead"
+    status: str  # "healthy" | "degraded" | "dead"
     last_seen_seconds: float
     is_alive: bool
 
@@ -120,9 +123,15 @@ class ActionResult(BaseModel):
 
 _START_TIME = time.time()
 _SERVICE_IDS_FULL = [
-    "s01_data_ingestion", "s02_signal_engine", "s03_regime_detector",
-    "s04_fusion_engine", "s05_risk_manager", "s06_execution",
-    "s07_quant_analytics", "s08_macro_intelligence", "s09_feedback_loop",
+    "s01_data_ingestion",
+    "s02_signal_engine",
+    "s03_regime_detector",
+    "s04_fusion_engine",
+    "s05_risk_manager",
+    "s06_execution",
+    "s07_quant_analytics",
+    "s08_macro_intelligence",
+    "s09_feedback_loop",
     "s10_monitor",
 ]
 
@@ -137,6 +146,7 @@ def _require_confirmation(confirm: str | None) -> None:
 
 
 # ── System Status ─────────────────────────────────────────────────────────────
+
 
 async def get_system_status(state: StateStore) -> SystemStatus:
     """Overall system health: all services, CB state, trading mode."""
@@ -159,8 +169,11 @@ async def get_system_status(state: StateStore) -> SystemStatus:
 
         if not alive:
             all_healthy = False
-        services.append(ServiceHealth(service_id=sid, status=status,
-                                      last_seen_seconds=round(age, 1), is_alive=alive))
+        services.append(
+            ServiceHealth(
+                service_id=sid, status=status, last_seen_seconds=round(age, 1), is_alive=alive
+            )
+        )
 
     try:
         cb_raw = await state.get("circuit_breaker:state")
@@ -169,10 +182,12 @@ async def get_system_status(state: StateStore) -> SystemStatus:
         cb_state = "UNKNOWN"
 
     from core.config import get_settings
+
     settings = get_settings()
 
     return SystemStatus(
-        all_healthy=all_healthy, services=services,
+        all_healthy=all_healthy,
+        services=services,
         circuit_breaker=cb_state,
         trading_mode=settings.trading_mode.value.upper(),
         uptime_seconds=round(now - _START_TIME, 0),
@@ -180,6 +195,7 @@ async def get_system_status(state: StateStore) -> SystemStatus:
 
 
 # ── Positions ─────────────────────────────────────────────────────────────────
+
 
 async def get_positions(state: StateStore) -> list[PositionSummary]:
     """All open positions with unrealized PnL."""
@@ -204,13 +220,16 @@ async def get_positions(state: StateStore) -> list[PositionSummary]:
             pnl_pct = ((current - entry) / entry * 100) if entry > 0 else 0.0
             if direction == "short":
                 pnl_pct = -pnl_pct
-            results.append(PositionSummary(
-                symbol=symbol, direction=direction,
-                entry_price=str(round(entry, 4)),
-                size=str(pos.get("size", "0")),
-                unrealized_pnl_pct=round(pnl_pct, 3),
-                session=str(pos.get("session", "unknown")),
-            ))
+            results.append(
+                PositionSummary(
+                    symbol=symbol,
+                    direction=direction,
+                    entry_price=str(round(entry, 4)),
+                    size=str(pos.get("size", "0")),
+                    unrealized_pnl_pct=round(pnl_pct, 3),
+                    session=str(pos.get("session", "unknown")),
+                )
+            )
         except Exception as exc:
             logger.debug("position_parse_failed", error=str(exc))
     return results
@@ -218,32 +237,33 @@ async def get_positions(state: StateStore) -> list[PositionSummary]:
 
 # ── PnL ───────────────────────────────────────────────────────────────────────
 
+
 async def get_pnl(state: StateStore) -> PnLSummary:
     """Real-time PnL dashboard: realized, unrealized, drawdown, win rate."""
     try:
         trades = await state.lrange("trades:all", 0, -1)
         today_start = int(time.time() // 86400 * 86400 * 1000)
         today_trades = [
-            t for t in trades
+            t
+            for t in trades
             if isinstance(t, dict) and t.get("exit_timestamp_ms", 0) >= today_start
         ]
 
         realized = sum(float(t.get("net_pnl", 0) or 0) for t in today_trades)
         wins = sum(
-            1 for t in trades[-50:]
-            if isinstance(t, dict) and float(t.get("net_pnl", 0) or 0) > 0
+            1 for t in trades[-50:] if isinstance(t, dict) and float(t.get("net_pnl", 0) or 0) > 0
         )
         win_rate = wins / min(len(trades), 50) if trades else 0.0
 
         from core.config import get_settings
+
         capital = float(get_settings().initial_capital)
         daily_pct = realized / capital * 100 if capital > 0 else 0.0
 
         # Drawdown from equity curve
         curve = await state.lrange("equity_curve", 0, 99)
         curve_vals = [
-            float(e.get("equity", capital) if isinstance(e, dict) else capital)
-            for e in curve
+            float(e.get("equity", capital) if isinstance(e, dict) else capital) for e in curve
         ]
         max_dd = 0.0
         if len(curve_vals) >= 2:
@@ -274,12 +294,19 @@ async def get_pnl(state: StateStore) -> PnLSummary:
         )
     except Exception as exc:
         logger.error("pnl_error", error=str(exc))
-        return PnLSummary(realized_today="$0.00", unrealized_total="$0.00",
-                          daily_pnl_pct=0.0, max_drawdown_pct=0.0,
-                          win_rate_rolling=0.0, trade_count_today=0, sharpe_rolling=0.0)
+        return PnLSummary(
+            realized_today="$0.00",
+            unrealized_total="$0.00",
+            daily_pnl_pct=0.0,
+            max_drawdown_pct=0.0,
+            win_rate_rolling=0.0,
+            trade_count_today=0,
+            sharpe_rolling=0.0,
+        )
 
 
 # ── Regime ────────────────────────────────────────────────────────────────────
+
 
 async def get_regime(state: StateStore) -> RegimeSummary:
     """Current market regime: vol, trend, macro multipliers, CB events."""
@@ -312,6 +339,7 @@ async def get_regime(state: StateStore) -> RegimeSummary:
 
 # ── Signals ───────────────────────────────────────────────────────────────────
 
+
 async def get_recent_signals(state: StateStore) -> list[SignalSummary]:
     """Latest signal for each tracked symbol."""
     try:
@@ -330,14 +358,16 @@ async def get_recent_signals(state: StateStore) -> list[SignalSummary]:
                 continue
             ts_ms = float(sig.get("timestamp_ms", 0) or 0)
             age = now - ts_ms / 1000.0
-            results.append(SignalSummary(
-                symbol=str(sig.get("symbol", "?")),
-                direction=str(sig.get("direction", "?")),
-                strength=float(sig.get("strength", 0) or 0),
-                triggers=list(sig.get("triggers", [])),
-                confidence=float(sig.get("confidence", 0) or 0),
-                age_seconds=round(age, 1),
-            ))
+            results.append(
+                SignalSummary(
+                    symbol=str(sig.get("symbol", "?")),
+                    direction=str(sig.get("direction", "?")),
+                    strength=float(sig.get("strength", 0) or 0),
+                    triggers=list(sig.get("triggers", [])),
+                    confidence=float(sig.get("confidence", 0) or 0),
+                    age_seconds=round(age, 1),
+                )
+            )
         except Exception as exc:
             logger.debug("signal_parse_failed", error=str(exc))
             continue
@@ -345,6 +375,7 @@ async def get_recent_signals(state: StateStore) -> list[SignalSummary]:
 
 
 # ── Circuit Breaker ───────────────────────────────────────────────────────────
+
 
 async def get_circuit_breaker(state: StateStore) -> dict[str, Any]:
     """Circuit breaker current status and trip history."""
@@ -374,13 +405,15 @@ async def reset_circuit_breaker(
     try:
         await state.set("circuit_breaker:state", "closed", ttl=86400)
         logger.warning("circuit_breaker_manually_reset", action="dashboard_user")
-        return ActionResult(success=True, message="Circuit breaker reset to CLOSED.",
-                            timestamp=str(time.time()))
+        return ActionResult(
+            success=True, message="Circuit breaker reset to CLOSED.", timestamp=str(time.time())
+        )
     except Exception as exc:
         return ActionResult(success=False, message=str(exc), timestamp=str(time.time()))
 
 
 # ── Performance ───────────────────────────────────────────────────────────────
+
 
 async def get_performance(state: StateStore) -> PerformanceStats:
     """Full performance attribution: Sharpe, Sortino, Calmar, by session/signal."""
@@ -415,11 +448,16 @@ async def get_performance(state: StateStore) -> PerformanceStats:
                 best_signal = max(by_sig, key=lambda k: by_sig[k].get("win_rate", 0))
 
         return PerformanceStats(
-            sharpe_daily=round(sharpe, 3), sortino_daily=round(sortino, 3),
-            calmar=round(calmar, 3), max_drawdown_pct=round(max_dd, 3),
-            win_rate=round(wr, 3), profit_factor=round(pf, 3),
-            avg_win_usd=round(avg_w, 2), avg_loss_usd=round(avg_l, 2),
-            total_trades=len(trades), best_session=best_session,
+            sharpe_daily=round(sharpe, 3),
+            sortino_daily=round(sortino, 3),
+            calmar=round(calmar, 3),
+            max_drawdown_pct=round(max_dd, 3),
+            win_rate=round(wr, 3),
+            profit_factor=round(pf, 3),
+            avg_win_usd=round(avg_w, 2),
+            avg_loss_usd=round(avg_l, 2),
+            total_trades=len(trades),
+            best_session=best_session,
             best_signal_type=best_signal,
         )
     except Exception as exc:
@@ -428,6 +466,7 @@ async def get_performance(state: StateStore) -> PerformanceStats:
 
 
 # ── CB Events ─────────────────────────────────────────────────────────────────
+
 
 async def get_cb_events(state: StateStore) -> list[CBEventInfo]:
     """Upcoming central bank events with block/monitor window status."""
@@ -448,19 +487,22 @@ async def get_cb_events(state: StateStore) -> list[CBEventInfo]:
                 continue
             try:
                 from datetime import datetime
+
                 scheduled_str = str(ev.get("scheduled_at", ""))
                 scheduled = datetime.fromisoformat(scheduled_str.replace("Z", "+00:00"))
                 minutes_until = (scheduled.timestamp() - now) / 60
                 if minutes_until < -120:  # skip events 2h in the past
                     continue
-                results.append(CBEventInfo(
-                    institution=str(ev.get("institution", "?")),
-                    event_type=str(ev.get("event_type", "?")),
-                    scheduled_at=scheduled_str[:16],
-                    minutes_until=round(minutes_until, 1),
-                    block_active=block_active,
-                    monitor_active=monitor_active,
-                ))
+                results.append(
+                    CBEventInfo(
+                        institution=str(ev.get("institution", "?")),
+                        event_type=str(ev.get("event_type", "?")),
+                        scheduled_at=scheduled_str[:16],
+                        minutes_until=round(minutes_until, 1),
+                        block_active=block_active,
+                        monitor_active=monitor_active,
+                    )
+                )
             except Exception as ev_exc:
                 logger.debug("cb_event_parse_failed", error=str(ev_exc))
                 continue
@@ -471,9 +513,11 @@ async def get_cb_events(state: StateStore) -> list[CBEventInfo]:
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
+
 async def get_config() -> dict[str, Any]:
     """Current system configuration (read-only, no secrets exposed)."""
     from core.config import get_settings
+
     s = get_settings()
     return {
         "trading_mode": s.trading_mode.value,
@@ -492,6 +536,7 @@ async def get_config() -> dict[str, Any]:
 
 # ── Alerts ────────────────────────────────────────────────────────────────────
 
+
 async def get_recent_alerts(state: StateStore) -> list[AlertEntry]:
     """Last 50 system alerts."""
     try:
@@ -499,20 +544,20 @@ async def get_recent_alerts(state: StateStore) -> list[AlertEntry]:
         results: list[AlertEntry] = []
         for a in alerts:
             if isinstance(a, dict):
-                results.append(AlertEntry(
-                    timestamp=str(a.get("timestamp", "")),
-                    level=str(a.get("level", "INFO")),
-                    message=str(a.get("message", "")),
-                ))
+                results.append(
+                    AlertEntry(
+                        timestamp=str(a.get("timestamp", "")),
+                        level=str(a.get("level", "INFO")),
+                        message=str(a.get("message", "")),
+                    )
+                )
         return results
     except Exception:
         return []
-import json
 
 
 async def get_risk_status(state: StateStore) -> dict[str, Any]:
-    """
-    Risk Manager real-time status for S10 Dashboard.
+    """Risk Manager real-time status for S10 Dashboard.
 
     Aggregates:
     - Circuit breaker state + daily P&L (from Redis circuit_breaker snapshot)
@@ -528,11 +573,11 @@ async def get_risk_status(state: StateStore) -> dict[str, Any]:
     for item in raw_decisions:
         try:
             decisions.append(json.loads(item) if isinstance(item, str) else item)
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("decision_decode_failed", error=str(exc))
 
     approved = [d for d in decisions if d.get("approved") is True]
-    blocked  = [d for d in decisions if d.get("approved") is False]
+    blocked = [d for d in decisions if d.get("approved") is False]
 
     kelly_finals = [float(d.get("kelly_fraction_final", 0)) for d in approved]
     avg_kelly = sum(kelly_finals) / len(kelly_finals) if kelly_finals else 0.0
@@ -542,27 +587,30 @@ async def get_risk_status(state: StateStore) -> dict[str, Any]:
         r = str(d.get("first_failure", "unknown"))
         block_reasons[r] = block_reasons.get(r, 0) + 1
 
+    cb = cb_raw if isinstance(cb_raw, dict) else {}
+    pf = portfolio if isinstance(portfolio, dict) else {}
+
     return {
         "circuit_breaker": {
-            "state": cb_raw.get("state", "CLOSED") if isinstance(cb_raw, dict) else "CLOSED",
-            "daily_pnl": str(cb_raw.get("daily_pnl", "0")) if isinstance(cb_raw, dict) else "0",
-            "daily_loss_pct": round(float(cb_raw.get("daily_loss_pct", 0.0) if isinstance(cb_raw, dict) else 0.0), 4),
-            "tripped_reason": cb_raw.get("tripped_reason") if isinstance(cb_raw, dict) else None,
-            "consecutive_losses": int(cb_raw.get("consecutive_losses", 0) if isinstance(cb_raw, dict) else 0),
-            "recovery_attempts": int(cb_raw.get("recovery_attempts", 0) if isinstance(cb_raw, dict) else 0),
+            "state": cb.get("state", "CLOSED"),
+            "daily_pnl": str(cb.get("daily_pnl", "0")),
+            "daily_loss_pct": round(float(cb.get("daily_loss_pct", 0.0)), 4),
+            "tripped_reason": cb.get("tripped_reason"),
+            "consecutive_losses": int(cb.get("consecutive_losses", 0)),
+            "recovery_attempts": int(cb.get("recovery_attempts", 0)),
         },
         "portfolio": {
-            "available_capital": str(portfolio.get("available", "0")) if isinstance(portfolio, dict) else "0",
-            "total_exposure_pct": round(float(portfolio.get("exposure_pct", 0.0) if isinstance(portfolio, dict) else 0.0), 4),
-            "open_positions": int(portfolio.get("n_positions", 0) if isinstance(portfolio, dict) else 0),
+            "available_capital": str(pf.get("available", "0")),
+            "total_exposure_pct": round(float(pf.get("exposure_pct", 0.0)), 4),
+            "open_positions": int(pf.get("n_positions", 0)),
         },
         "decisions_last_100": {
             "total": len(decisions),
             "approved": len(approved),
             "blocked": len(blocked),
-            "approval_rate_pct": round(
-                len(approved) / len(decisions) * 100, 1
-            ) if decisions else 0.0,
+            "approval_rate_pct": (
+                round(len(approved) / len(decisions) * 100, 1) if decisions else 0.0
+            ),
         },
         "kelly_stats": {
             "avg_kelly_final": round(avg_kelly, 4),

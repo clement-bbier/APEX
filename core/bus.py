@@ -2,6 +2,26 @@
 
 Provides async PUB/SUB and PUSH/PULL patterns using pyzmq.
 All messages are serialized as JSON.
+
+Topology
+--------
+APEX uses a single XSUB/XPUB **broker** (see :mod:`core.zmq_broker`).
+The broker is the only process that BINDs anything:
+
+* Publishers CONNECT their PUB sockets to ``zmq_pub_port`` — the broker
+  receives them on its bound XSUB socket.
+* Subscribers CONNECT their SUB sockets to ``zmq_sub_port`` — the broker
+  fans messages out from its bound XPUB socket.
+
+This is the canonical "Forwarder" pattern from the ZeroMQ guide. It
+allows any number of services to publish *and* subscribe simultaneously,
+which is impossible with a single bound PUB socket: a PUB socket can
+only deliver messages it produced itself, so the previous topology
+(S01 binds, others connect) silently dropped every message published by
+S02-S10.
+
+The ``init_publisher`` / ``init_subscriber`` methods do not take a
+``bind`` argument anymore — services always connect.
 """
 
 from __future__ import annotations
@@ -24,7 +44,8 @@ class MessageBus:
     """ZeroMQ message bus with PUB/SUB and PUSH/PULL patterns.
 
     All sockets are non-blocking (asyncio-compatible via zmq.asyncio).
-    JSON is used for serialization of all payloads.
+    JSON is used for serialization of all payloads. Every socket
+    CONNECTs to the canonical APEX broker; nothing is bound here.
     """
 
     def __init__(self, service_id: str) -> None:
@@ -45,19 +66,27 @@ class MessageBus:
     # ── PUB/SUB ───────────────────────────────────────────────────────────────
 
     def init_publisher(self) -> None:
-        """Initialize and bind the PUB socket."""
+        """Create the PUB socket and CONNECT it to the broker XSUB port.
+
+        Idempotent: subsequent calls are no-ops.
+        """
         if self._pub_socket is not None:
             return
         self._pub_socket = self._context.socket(zmq.PUB)
-        addr = f"tcp://*:{self._settings.zmq_pub_port}"
-        self._pub_socket.bind(addr)
-        logger.info("ZMQ PUB socket bound", service=self._service_id, addr=addr)
+        addr = f"tcp://{self._settings.zmq_host}:{self._settings.zmq_pub_port}"
+        self._pub_socket.connect(addr)
+        logger.info(
+            "zmq_pub_connected",
+            service=self._service_id,
+            addr=addr,
+        )
 
     def init_subscriber(self, topics: list[str]) -> None:
-        """Initialize the SUB socket and subscribe to given topics.
+        """Create the SUB socket, CONNECT to the broker XPUB port and subscribe.
 
         Args:
-            topics: List of topic prefixes to subscribe to (empty string = all).
+            topics: List of topic prefixes to subscribe to. Use a single
+                empty string ``[""]`` to receive every message on the bus.
         """
         if self._sub_socket is not None:
             return
@@ -67,7 +96,7 @@ class MessageBus:
         for topic in topics:
             self._sub_socket.setsockopt_string(zmq.SUBSCRIBE, topic)
         logger.info(
-            "ZMQ SUB socket connected",
+            "zmq_sub_connected",
             service=self._service_id,
             addr=addr,
             topics=topics,
@@ -76,22 +105,30 @@ class MessageBus:
     # ── PUSH/PULL ─────────────────────────────────────────────────────────────
 
     def init_pusher(self) -> None:
-        """Initialize and bind the PUSH socket."""
+        """Create the PUSH socket and CONNECT to the canonical PUSH endpoint."""
         if self._push_socket is not None:
             return
         self._push_socket = self._context.socket(zmq.PUSH)
-        addr = f"tcp://*:{self._settings.zmq_push_port}"
-        self._push_socket.bind(addr)
-        logger.info("ZMQ PUSH socket bound", service=self._service_id, addr=addr)
+        addr = f"tcp://{self._settings.zmq_host}:{self._settings.zmq_push_port}"
+        self._push_socket.connect(addr)
+        logger.info(
+            "zmq_push_connected",
+            service=self._service_id,
+            addr=addr,
+        )
 
     def init_puller(self) -> None:
-        """Initialize the PULL socket and connect."""
+        """Create the PULL socket and CONNECT to the canonical PULL endpoint."""
         if self._pull_socket is not None:
             return
         self._pull_socket = self._context.socket(zmq.PULL)
         addr = f"tcp://{self._settings.zmq_host}:{self._settings.zmq_pull_port}"
         self._pull_socket.connect(addr)
-        logger.info("ZMQ PULL socket connected", service=self._service_id, addr=addr)
+        logger.info(
+            "zmq_pull_connected",
+            service=self._service_id,
+            addr=addr,
+        )
 
     # ── Send ──────────────────────────────────────────────────────────────────
 

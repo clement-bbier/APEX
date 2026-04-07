@@ -22,6 +22,7 @@ References:
     Hosking (1981). Biometrika 68(1). IBM Research.
     Granger & Joyeux (1980). JTSA 1(1). Nobel Economics 2003.
 """
+
 from __future__ import annotations
 
 import math
@@ -208,9 +209,7 @@ class IncrementalFracDiff:
     Reference: López de Prado (2018), AFML, Chapter 5, Section 5.5.
     """
 
-    def __init__(
-        self, d: float, n_lags: int = 50, threshold: float = 1e-5
-    ) -> None:
+    def __init__(self, d: float, n_lags: int = 50, threshold: float = 1e-5) -> None:
         """Pre-compute FFD weights and initialize rolling buffer.
 
         Args:
@@ -227,9 +226,7 @@ class IncrementalFracDiff:
             if abs(w) < threshold:
                 break
             raw.append(w)
-        self._weights: np.ndarray[Any, np.dtype[np.float64]] = np.asarray(
-            raw, dtype=float
-        )
+        self._weights: np.ndarray[Any, np.dtype[np.float64]] = np.asarray(raw, dtype=float)
         self._actual_lags: int = len(raw)
         self._buffer: deque[float] = deque(maxlen=self._actual_lags)
 

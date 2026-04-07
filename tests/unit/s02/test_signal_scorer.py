@@ -1,4 +1,5 @@
 """Tests for multi-dimensional signal scoring confluence."""
+
 from __future__ import annotations
 
 from hypothesis import given, settings

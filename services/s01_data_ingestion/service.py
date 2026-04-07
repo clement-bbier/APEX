@@ -40,19 +40,18 @@ class DataIngestionService(BaseService):
     * Publish on ZMQ topic ``tick.{market}.{symbol}``.
     * Cache the latest tick in Redis under key ``tick:{symbol}``.
 
-    This service is a *source* - it does not subscribe to any ZMQ topics.
+    This service is a *source* — it does not subscribe to any ZMQ topics.
+    Like every other APEX service it connects its PUB socket to the
+    XSUB/XPUB broker (see :mod:`core.zmq_broker`).
     """
 
     service_id: str = "s01_data_ingestion"
 
     def __init__(self) -> None:
-        """Initialise feeds, normalisers, and the ZMQ publisher."""
+        """Initialise feeds and normalisers (PUB socket created by BaseService.start)."""
         super().__init__(self.service_id)
 
         settings = get_settings()
-
-        # Bind the ZMQ PUB socket so we can publish ticks immediately.
-        self.bus.init_publisher()
 
         # Crypto feed (Binance).
         self._binance_normalizer = BinanceNormalizer()
@@ -181,45 +180,7 @@ class DataIngestionService(BaseService):
             )
 
 
-import sys
-import os
-import asyncio
-from pathlib import Path
+if __name__ == "__main__":
+    from core.service_runner import run_service_module
 
-# Fix sys.path for direct module runs
-sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-
-if __name__ == '__main__':
-    import importlib
-    
-    # We expect the class name to be XxxService (e.g. DataIngestionService, SignalEngineService...)
-    # But to make it generic without inspecting the AST, we can just find subclasses of BaseService
-    from core.base_service import BaseService
-    import inspect
-    
-    module_name = 'services.' + Path(__file__).parent.name + '.service'
-    module = importlib.import_module(module_name)
-    
-    service_class = None
-    for name, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, BaseService) and obj is not BaseService:
-            service_class = obj
-            break
-            
-    if not service_class:
-        print(f'Error: Could not find a BaseService subclass in {module_name}')
-        sys.exit(1)
-        
-    async def main():
-        service = service_class()
-        try:
-            await service.start()
-            while service._running:
-                await asyncio.sleep(1.0)
-        except KeyboardInterrupt:
-            print('Interrupted by user...')
-        finally:
-            await service.stop()
-
-    asyncio.run(main())
-
+    run_service_module(__file__)

@@ -12,6 +12,7 @@ References:
     Andersen et al. (2003). Modeling and Forecasting Realized Volatility.
         Econometrica, 71(2), 579-625.
 """
+
 from __future__ import annotations
 
 import math
@@ -24,25 +25,25 @@ import numpy as np
 class RealizedVolMetrics:
     """Full decomposition of realized quadratic variation."""
 
-    rv: float                   # Realized Variance = Σ r²_i
-    bv: float                   # Bipower Variation (jump-robust)
-    jump_component: float       # RV - BV >= 0
+    rv: float  # Realized Variance = Σ r²_i
+    bv: float  # Bipower Variation (jump-robust)
+    jump_component: float  # RV - BV >= 0
     has_significant_jump: bool  # jump_ratio > 1% → structural break
-    annualized_vol: float       # √(RV × 252)
-    jump_ratio: float           # jump_component / RV ∈ [0, 1]
+    annualized_vol: float  # √(RV × 252)
+    jump_ratio: float  # jump_component / RV ∈ [0, 1]
 
 
 @dataclass
 class HARForecast:
     """HAR-RV model output — next-period realized variance forecast."""
 
-    forecast_rv: float      # Predicted RV
-    forecast_vol: float     # √(forecast_rv × 252) annualized
-    beta_daily: float       # Daily lag coefficient
-    beta_weekly: float      # Weekly lag (5-day avg) coefficient
-    beta_monthly: float     # Monthly lag (22-day avg) coefficient
-    r_squared: float        # In-sample R²
-    n_obs: int              # Observations used in estimation
+    forecast_rv: float  # Predicted RV
+    forecast_vol: float  # √(forecast_rv × 252) annualized
+    beta_daily: float  # Daily lag coefficient
+    beta_weekly: float  # Weekly lag (5-day avg) coefficient
+    beta_monthly: float  # Monthly lag (22-day avg) coefficient
+    r_squared: float  # In-sample R²
+    n_obs: int  # Observations used in estimation
 
 
 class RealizedVolEstimator:
@@ -92,7 +93,7 @@ class RealizedVolEstimator:
         arr = np.abs(np.asarray(log_returns, dtype=float))
         mu1 = math.sqrt(2.0 / math.pi)
         # Scaling: (1/μ₁²) to make BV unbiased for continuous QV
-        bv = (1.0 / (mu1 ** 2)) * float(np.sum(arr[1:] * arr[:-1]))
+        bv = (1.0 / (mu1**2)) * float(np.sum(arr[1:] * arr[:-1]))
         return max(0.0, bv)
 
     def jump_detection(self, log_returns: list[float]) -> RealizedVolMetrics:
@@ -120,7 +121,9 @@ class RealizedVolEstimator:
         # Annualization: 252 days × 390 min/day for 1-min data
         ann_factor = 252.0 if n <= 50 else 252.0 * 390.0 / n
         return RealizedVolMetrics(
-            rv=rv, bv=bv, jump_component=jump,
+            rv=rv,
+            bv=bv,
+            jump_component=jump,
             has_significant_jump=jump_ratio > self.JUMP_THRESHOLD,
             annualized_vol=math.sqrt(max(0.0, rv * ann_factor)),
             jump_ratio=jump_ratio,
@@ -153,48 +156,70 @@ class RealizedVolEstimator:
         n = len(daily_rv_series)
         if n < 25:
             mean_rv = float(np.mean(daily_rv_series)) if daily_rv_series else 0.0
-            return HARForecast(forecast_rv=mean_rv,
-                               forecast_vol=math.sqrt(max(0.0, mean_rv * 252)),
-                               beta_daily=0.0, beta_weekly=0.0, beta_monthly=0.0,
-                               r_squared=0.0, n_obs=n)
+            return HARForecast(
+                forecast_rv=mean_rv,
+                forecast_vol=math.sqrt(max(0.0, mean_rv * 252)),
+                beta_daily=0.0,
+                beta_weekly=0.0,
+                beta_monthly=0.0,
+                r_squared=0.0,
+                n_obs=n,
+            )
 
         rv = np.asarray(daily_rv_series, dtype=float)
         start = 22  # enough for monthly lag
         y = rv[start:]
         T = len(y)  # noqa: N806
-        rv_d = rv[start - 1: start - 1 + T]
-        rv_w = np.array([np.mean(rv[max(0, i-5):i]) for i in range(start-1, start-1+T)])
-        rv_m = np.array([np.mean(rv[max(0, i-22):i]) for i in range(start-1, start-1+T)])
+        rv_d = rv[start - 1 : start - 1 + T]
+        rv_w = np.array([np.mean(rv[max(0, i - 5) : i]) for i in range(start - 1, start - 1 + T)])
+        rv_m = np.array([np.mean(rv[max(0, i - 22) : i]) for i in range(start - 1, start - 1 + T)])
 
         X = np.column_stack([np.ones(T), rv_d, rv_w, rv_m])  # noqa: N806
         try:
             beta, _, _, _ = np.linalg.lstsq(X, y, rcond=None)
         except np.linalg.LinAlgError:
             mean_rv = float(np.mean(daily_rv_series))
-            return HARForecast(forecast_rv=mean_rv,
-                               forecast_vol=math.sqrt(max(0.0, mean_rv * 252)),
-                               beta_daily=0.0, beta_weekly=0.0, beta_monthly=0.0,
-                               r_squared=0.0, n_obs=n)
+            return HARForecast(
+                forecast_rv=mean_rv,
+                forecast_vol=math.sqrt(max(0.0, mean_rv * 252)),
+                beta_daily=0.0,
+                beta_weekly=0.0,
+                beta_monthly=0.0,
+                r_squared=0.0,
+                n_obs=n,
+            )
 
         y_hat = X @ beta
         ss_res = float(np.sum((y - y_hat) ** 2))
         ss_tot = float(np.sum((y - np.mean(y)) ** 2))
         r2 = max(0.0, 1.0 - ss_res / ss_tot) if ss_tot > 0 else 0.0
 
-        forecast_rv = max(0.0, float(beta[0] + beta[1]*rv[-1]
-                                     + beta[2]*np.mean(rv[-5:])
-                                     + beta[3]*np.mean(rv[-22:])))
+        forecast_rv = max(
+            0.0,
+            float(
+                beta[0]
+                + beta[1] * rv[-1]
+                + beta[2] * np.mean(rv[-5:])
+                + beta[3] * np.mean(rv[-22:])
+            ),
+        )
 
         return HARForecast(
             forecast_rv=forecast_rv,
             forecast_vol=math.sqrt(forecast_rv * 252.0),
-            beta_daily=float(beta[1]), beta_weekly=float(beta[2]),
-            beta_monthly=float(beta[3]), r_squared=r2, n_obs=n,
+            beta_daily=float(beta[1]),
+            beta_weekly=float(beta[2]),
+            beta_monthly=float(beta[3]),
+            r_squared=r2,
+            n_obs=n,
         )
 
     def vol_adjusted_kelly(
-        self, base_kelly: float, forecast_vol: float,
-        target_vol: float = 0.15, max_fraction: float = 0.25,
+        self,
+        base_kelly: float,
+        forecast_vol: float,
+        target_vol: float = 0.15,
+        max_fraction: float = 0.25,
     ) -> float:
         """Volatility-targeting Kelly (AQR, Winton, Man AHL approach).
 

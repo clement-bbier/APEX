@@ -1,4 +1,5 @@
 """Tests for economic surprise index engine."""
+
 from __future__ import annotations
 
 import pytest
@@ -32,16 +33,12 @@ class TestSurpriseIndexEngine:
 
     def test_positive_surprise_increases_mult(self) -> None:
         e = self.engine()
-        mult = e.compute_mult_adjustment(
-            surprise_pct=0.5, impact="high", hours_since_release=0.0
-        )
+        mult = e.compute_mult_adjustment(surprise_pct=0.5, impact="high", hours_since_release=0.0)
         assert mult > 1.0
 
     def test_negative_surprise_decreases_mult(self) -> None:
         e = self.engine()
-        mult = e.compute_mult_adjustment(
-            surprise_pct=-0.5, impact="high", hours_since_release=0.0
-        )
+        mult = e.compute_mult_adjustment(surprise_pct=-0.5, impact="high", hours_since_release=0.0)
         assert mult < 1.0
 
     def test_low_impact_smaller_effect(self) -> None:
@@ -60,9 +57,7 @@ class TestSurpriseIndexEngine:
 
     def test_build_release(self) -> None:
         e = self.engine()
-        release = e.build_release(
-            name="NFP", consensus=200_000.0, actual=250_000.0, impact="high"
-        )
+        release = e.build_release(name="NFP", consensus=200_000.0, actual=250_000.0, impact="high")
         assert isinstance(release, EconRelease)
         assert release.name == "NFP"
         assert release.surprise_pct == pytest.approx(0.25)

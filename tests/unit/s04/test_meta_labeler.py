@@ -48,23 +48,17 @@ def _good_features() -> MetaFeatures:
 
 def _blocked_vpin() -> MetaFeatures:
     f = _good_features()
-    return MetaFeatures(
-        **{**f.__dict__, "vpin": 0.95}
-    )
+    return MetaFeatures(**{**f.__dict__, "vpin": 0.95})
 
 
 def _blocked_macro() -> MetaFeatures:
     f = _good_features()
-    return MetaFeatures(
-        **{**f.__dict__, "macro_mult": 0.0}
-    )
+    return MetaFeatures(**{**f.__dict__, "macro_mult": 0.0})
 
 
 def _blocked_spread() -> MetaFeatures:
     f = _good_features()
-    return MetaFeatures(
-        **{**f.__dict__, "spread_bps": 60.0}
-    )
+    return MetaFeatures(**{**f.__dict__, "spread_bps": 60.0})
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +80,10 @@ class TestHardBlocks:
         d = self.ml.score(_blocked_macro())
         assert not d.should_trade
         assert d.adjusted_size_mult == 0.0
-        assert "macro_mult" in (d.blocking_reason or "").lower() or "crisis" in (d.blocking_reason or "").lower()
+        assert (
+            "macro_mult" in (d.blocking_reason or "").lower()
+            or "crisis" in (d.blocking_reason or "").lower()
+        )
 
     def test_wide_spread_blocks_trade(self) -> None:
         d = self.ml.score(_blocked_spread())
@@ -213,7 +210,7 @@ class TestGetFeaturesFromRedis:
             "analytics:fast": {"hurst_exponent": None},
         }
         f = self.ml.get_features_from_redis("BTCUSDT", data)
-        assert f.vpin > 0.0        # default 0.5
+        assert f.vpin > 0.0  # default 0.5
         assert f.hurst_exponent > 0.0  # default 0.3
 
 
@@ -237,17 +234,13 @@ class TestMetaFeatureLogger:
     def test_log_calls_zmq_publish(self) -> None:
         logger, bus, state = self._make_logger()
         decision = MetaLabeler().score(_good_features())
-        asyncio.run(
-            logger.log("BTCUSDT", _good_features(), decision)
-        )
+        asyncio.run(logger.log("BTCUSDT", _good_features(), decision))
         bus.publish.assert_called_once()
 
     def test_log_calls_redis_lpush(self) -> None:
         logger, bus, state = self._make_logger()
         decision = MetaLabeler().score(_good_features())
-        asyncio.run(
-            logger.log("BTCUSDT", _good_features(), decision)
-        )
+        asyncio.run(logger.log("BTCUSDT", _good_features(), decision))
         state.lpush.assert_called_once()
         state.ltrim.assert_called_once()
 
@@ -262,9 +255,7 @@ class TestMetaFeatureLogger:
         flogger = MetaFeatureLogger(bus, state)
         decision = MetaLabeler().score(_good_features())
         # Must not raise even when ZMQ fails
-        asyncio.run(
-            flogger.log("BTCUSDT", _good_features(), decision)
-        )
+        asyncio.run(flogger.log("BTCUSDT", _good_features(), decision))
 
     def test_redis_failure_does_not_raise(self) -> None:
         from services.s04_fusion_engine.feature_logger import MetaFeatureLogger
@@ -276,17 +267,13 @@ class TestMetaFeatureLogger:
         state.ltrim = AsyncMock(return_value=None)
         flogger = MetaFeatureLogger(bus, state)
         decision = MetaLabeler().score(_good_features())
-        asyncio.run(
-            flogger.log("BTCUSDT", _good_features(), decision)
-        )
+        asyncio.run(flogger.log("BTCUSDT", _good_features(), decision))
 
     def test_payload_contains_required_fields(self) -> None:
         logger, bus, _state = self._make_logger()
         features = _good_features()
         decision = MetaLabeler().score(features)
-        asyncio.run(
-            logger.log("BTCUSDT", features, decision)
-        )
+        asyncio.run(logger.log("BTCUSDT", features, decision))
         args, _ = bus.publish.call_args
         _topic, payload = args
         assert "ts_utc" in payload
@@ -301,9 +288,7 @@ class TestMetaFeatureLogger:
 
         logger, bus, _state = self._make_logger()
         decision = MetaLabeler().score(_good_features())
-        asyncio.run(
-            logger.log("BTCUSDT", _good_features(), decision)
-        )
+        asyncio.run(logger.log("BTCUSDT", _good_features(), decision))
         args, _ = bus.publish.call_args
         topic = args[0]
         assert topic == Topics.ANALYTICS_META_FEATURES
@@ -313,9 +298,7 @@ class TestMetaFeatureLogger:
 
         logger, _bus, state = self._make_logger()
         decision = MetaLabeler().score(_good_features())
-        asyncio.run(
-            logger.log("BTCUSDT", _good_features(), decision)
-        )
+        asyncio.run(logger.log("BTCUSDT", _good_features(), decision))
         state.ltrim.assert_called_once_with(
             MetaFeatureLogger.REDIS_KEY, 0, MetaFeatureLogger.REDIS_MAX_LEN - 1
         )

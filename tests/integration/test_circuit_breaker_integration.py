@@ -2,6 +2,7 @@
 Integration test: circuit breaker prevents execution when triggered.
 Tests the safety invariant: once open, NO orders can be submitted.
 """
+
 from __future__ import annotations
 
 from core.config import Settings
@@ -17,11 +18,11 @@ class TestCircuitBreakerIntegration:
     def test_all_triggers_open_breaker(self) -> None:
         """All six trigger paths must trip the breaker."""
         triggers = [
-            lambda cb: cb.update_daily_pnl(-0.031),     # -3.1% > 3% threshold
-            lambda cb: cb.update_30min_pnl(-0.025),      # 2.5% rolling loss > 2%
-            lambda cb: cb.update_vix_change(0.21),       # 21% VIX spike > 20%
+            lambda cb: cb.update_daily_pnl(-0.031),  # -3.1% > 3% threshold
+            lambda cb: cb.update_30min_pnl(-0.025),  # 2.5% rolling loss > 2%
+            lambda cb: cb.update_vix_change(0.21),  # 21% VIX spike > 20%
             lambda cb: cb.notify_service_down("s01", 65),  # 65s > 60s timeout
-            lambda cb: cb.update_price_gap(0.06),        # 6% gap > 5% threshold
+            lambda cb: cb.update_price_gap(0.06),  # 6% gap > 5% threshold
         ]
         for i, trigger in enumerate(triggers):
             cb = make_cb()

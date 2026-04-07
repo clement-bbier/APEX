@@ -8,6 +8,7 @@ This service does NOT automatically adjust parameters.
 It observes and reports - humans validate all changes.
 (per MANIFEST.md Section 9, Service 09)
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass

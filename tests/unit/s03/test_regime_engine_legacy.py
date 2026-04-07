@@ -1,6 +1,7 @@
 """Tests for RegimeEngine legacy API (compute_vol_regime, compute_macro_mult,
 compute_trend_regime, compute_risk_mode).
 """
+
 from __future__ import annotations
 
 import pytest
@@ -93,6 +94,7 @@ class TestComputeTrendRegime:
     def _prices_ranging(self) -> list[float]:
         """50 prices oscillating tightly."""
         import math
+
         return [100.0 + math.sin(i * 0.1) * 0.001 for i in range(60)]
 
     def test_insufficient_data_returns_ranging(self, engine: RegimeEngine) -> None:
@@ -163,7 +165,10 @@ class TestRegimeEnginePhase2BtcFunding:
         engine = RegimeEngine()
         r_clean = engine.compute(vix=18.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
         r_funding = engine.compute(
-            vix=18.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3,
+            vix=18.0,
+            dxy_1h_change_pct=0.0,
+            yield_10y=4.5,
+            yield_2y=4.3,
             btc_funding_rate=0.05,
         )
         assert r_funding.macro_mult < r_clean.macro_mult
@@ -172,7 +177,10 @@ class TestRegimeEnginePhase2BtcFunding:
         engine = RegimeEngine()
         r1 = engine.compute(vix=18.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
         r2 = engine.compute(
-            vix=18.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3,
+            vix=18.0,
+            dxy_1h_change_pct=0.0,
+            yield_10y=4.5,
+            yield_2y=4.3,
             btc_funding_rate=0.01,
         )
         assert r1.macro_mult == r2.macro_mult
@@ -180,6 +188,7 @@ class TestRegimeEnginePhase2BtcFunding:
     def test_risk_on_in_calm_markets(self) -> None:
         engine = RegimeEngine()
         from services.s03_regime_detector.regime_engine import RiskMode
+
         r = engine.compute(vix=12.0, dxy_1h_change_pct=0.1, yield_10y=4.5, yield_2y=4.3)
         assert r.risk_mode == RiskMode.RISK_ON
 
@@ -187,6 +196,7 @@ class TestRegimeEnginePhase2BtcFunding:
         """VIX exactly at boundary values."""
         engine = RegimeEngine()
         from services.s03_regime_detector.regime_engine import VolRegime
+
         r_crisis = engine.compute(vix=35.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
         r_high = engine.compute(vix=25.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
         r_normal = engine.compute(vix=15.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
