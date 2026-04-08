@@ -16,12 +16,15 @@ import math
 from collections import defaultdict
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from scipy import stats as scipy_stats
 
 from core.models.order import TradeRecord
+
+if TYPE_CHECKING:
+    from backtesting.walk_forward import CombinatorialPurgedCV
 
 # Annualisation factor for 1-minute bars (252 trading days × 390 min/day)
 _ANNUAL_FACTOR_1M: float = math.sqrt(252 * 390)
@@ -496,12 +499,113 @@ def minimum_track_record_length(
     return max(1, math.ceil(1.0 + var_f * (z / (sr_raw - sr_star)) ** 2))
 
 
+def probability_of_backtest_overfitting_cpcv(
+    strategy_returns: np.ndarray[Any, np.dtype[np.float64]],
+    cv: CombinatorialPurgedCV,
+    risk_free_rate: float = 0.0,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
+) -> float:
+    """Compute the rank-based Probability of Backtest Overfitting via CPCV.
+
+    Non-parametric rank-PBO from Bailey, Borwein, Lopez de Prado, Zhu
+    (2014), Eq. 11 (logit) and Eq. 12 (PBO definition). For each of the
+    ``C(n_splits, n_test_splits)`` combinatorial CPCV paths:
+
+    1. Compute the in-sample Sharpe of every candidate strategy on the
+       concatenated training folds.
+    2. Identify the IS-best strategy (highest Sharpe).
+    3. Compute the out-of-sample Sharpe of every strategy on the test
+       folds and rank that IS-best strategy among the OOS distribution
+       (``scipy.stats.rankdata`` with ``method="average"``).
+    4. Map the rank to the relative position
+       ``omega = (rank + 0.5) / (n_strategies + 1)``. The ``+0.5``
+       numerator and ``N+1`` denominator keep ``omega`` strictly inside
+       ``(0, 1)`` so the logit ``lambda = log(omega / (1 - omega))`` is
+       always finite (no boundary singularities).
+    5. PBO is the fraction of combinations whose logit is ``<= 0``,
+       i.e. where the IS-best strategy lands at or below the OOS median.
+
+    Interpretation: ``PBO`` close to 0 means IS-best strategies
+    systematically remain top performers OOS (genuine edge); ``PBO``
+    close to 0.5 means selection is indistinguishable from noise; ``PBO``
+    close to 1 means the in-sample winners are systematically the OOS
+    losers (severe overfitting).
+
+    Args:
+        strategy_returns: 2D array of shape ``(n_observations, n_strategies)``
+            of periodic returns (e.g. daily fractions) for each candidate.
+        cv: A :class:`~backtesting.walk_forward.CombinatorialPurgedCV`
+            instance whose ``split(n_observations)`` yields the
+            ``(train_idx, test_idx)`` pairs.
+        risk_free_rate: Annualised risk-free rate forwarded to
+            :func:`sharpe_ratio` for both IS and OOS Sharpe computations.
+        annual_factor: Annualisation factor (``sqrt(252)`` for daily).
+
+    Returns:
+        PBO in ``[0, 1]``. Values ``< 0.1`` suggest a genuine edge,
+        values near ``0.5`` suggest the backtest is statistically
+        indistinguishable from noise selection.
+
+    Raises:
+        ValueError: if ``strategy_returns`` is not 2D, if
+            ``n_strategies < 2``, or if the CPCV produces no splits.
+
+    Reference:
+        Bailey, D. H., Borwein, J. M., Lopez de Prado, M., & Zhu, Q. J.
+        (2014). The Probability of Backtest Overfitting. Journal of
+        Computational Finance. Equation 11 (logit) and Equation 12
+        (PBO definition).
+    """
+    arr = np.asarray(strategy_returns, dtype=float)
+    if arr.ndim != 2:
+        raise ValueError(
+            f"strategy_returns must be 2D (n_obs, n_strategies); got shape {arr.shape}"
+        )
+    n_obs, n_strats = arr.shape
+    if n_strats < 2:
+        raise ValueError(f"PBO requires at least 2 strategies; got {n_strats}")
+
+    splits = cv.split(n_obs)
+    if not splits:
+        raise ValueError("CPCV produced no splits — check n_obs vs n_splits")
+
+    n_logits_le_zero = 0
+    for train_idx, test_idx in splits:
+        train_mat = arr[np.asarray(train_idx, dtype=np.int64), :]
+        test_mat = arr[np.asarray(test_idx, dtype=np.int64), :]
+        is_sharpes = np.array(
+            [
+                sharpe_ratio([float(x) for x in train_mat[:, j]], risk_free_rate, annual_factor)
+                for j in range(n_strats)
+            ],
+            dtype=float,
+        )
+        oos_sharpes = np.array(
+            [
+                sharpe_ratio([float(x) for x in test_mat[:, j]], risk_free_rate, annual_factor)
+                for j in range(n_strats)
+            ],
+            dtype=float,
+        )
+        best_is = int(np.argmax(is_sharpes))
+        ranks = scipy_stats.rankdata(oos_sharpes, method="average")
+        rank_best = float(ranks[best_is])
+        omega = (rank_best + 0.5) / (n_strats + 1)
+        lambda_c = math.log(omega / (1.0 - omega))
+        if lambda_c <= 0.0:
+            n_logits_le_zero += 1
+
+    return n_logits_le_zero / len(splits)
+
+
 def backtest_overfitting_probability(
     in_sample_sharpe: float,
     out_of_sample_sharpe: float,
     n_trials: int,
 ) -> float:
-    """PBO — Estimated probability that the backtest is overfit.
+    """DEPRECATED: use :func:`probability_of_backtest_overfitting_cpcv`.
+
+    PBO — Estimated probability that the backtest is overfit.
 
     PBO > 0.5 → overfit → DO NOT DEPLOY.
     PBO < 0.1 → strong evidence of genuine edge.
@@ -524,6 +628,15 @@ def backtest_overfitting_probability(
     Returns:
         PBO in [0, 1].
     """
+    import warnings
+
+    warnings.warn(
+        "backtest_overfitting_probability() is deprecated. Use "
+        "probability_of_backtest_overfitting_cpcv() which implements "
+        "Bailey et al. 2014 Eq. 11 canonically via CPCV.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     if n_trials <= 1:
         return 0.0
     if in_sample_sharpe <= 0:
@@ -610,6 +723,9 @@ def full_report(
     risk_free_rate: float = 0.05,
     *,
     n_trials: int = 1,
+    strategy_returns_matrix: np.ndarray[Any, np.dtype[np.float64]] | None = None,
+    n_cv_splits: int = 10,
+    n_cv_test_splits: int = 2,
 ) -> dict[str, Any]:
     """Generate a complete performance report from trade records.
 
@@ -679,7 +795,22 @@ def full_report(
         annual_factor=_ANNUAL_FACTOR_DAILY,
     )
 
-    return {
+    pbo: float | None = None
+    if strategy_returns_matrix is not None:
+        from backtesting.walk_forward import CombinatorialPurgedCV
+
+        cv = CombinatorialPurgedCV(
+            n_splits=n_cv_splits,
+            n_test_splits=n_cv_test_splits,
+        )
+        pbo = probability_of_backtest_overfitting_cpcv(
+            strategy_returns_matrix,
+            cv,
+            risk_free_rate=risk_free_rate,
+            annual_factor=_ANNUAL_FACTOR_DAILY,
+        )
+
+    report: dict[str, Any] = {
         "sharpe": sharpe_ratio(
             daily_returns,
             risk_free_rate=risk_free_rate,
@@ -705,3 +836,6 @@ def full_report(
         "by_signal": by_signal_breakdown(trades),
         "equity_curve": curve,
     }
+    if pbo is not None:
+        report["pbo"] = float(pbo)
+    return report
