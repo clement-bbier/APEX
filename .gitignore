@@ -27,3 +27,7 @@ repomix-output*.xml
 .env
 prompt_phase*.md
 EXTENSIONS.md
+
+# Claude Code internal worktree state — never commit
+.claude/worktrees/
+.claude/settings.local.json

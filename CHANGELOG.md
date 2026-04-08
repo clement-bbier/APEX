@@ -5,6 +5,26 @@ Format: [Semantic Versioning](https://semver.org/)
 
 ---
 
+## [Unreleased] — SRE-001 Foundation merged
+
+### Added
+- Multi-agent governance: AI_RULES.md, CODEOWNERS, 4 agent prompts
+- Hardened CI: split coverage gates, Node24-ready actions, preflight Makefile
+- ADR-0001 documenting the ZMQ XSUB/XPUB broker topology
+- Issue template `agent-task.yml` for structured agent dispatch
+
+### Fixed
+- Dockerfile groupadd exit 127 (passwd package + slim-bookworm pin)
+- 61 ruff errors cleared
+- CircuitBreaker / CBEventGuard legacy sync API shims for v1 integration tests
+- backtest-gate fixture schema aligned with data_loader contract
+
+### Known issues
+- backtest-gate is marked `continue-on-error: true` pending APEX-METRICS-V2
+- rust/Cargo.lock not yet committed (tracked by infra issue)
+
+---
+
 ## [0.3.0] — Phase 4: Academic Alpha & Command Center
 
 ### Added
