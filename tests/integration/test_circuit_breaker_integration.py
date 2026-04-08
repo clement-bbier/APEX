@@ -86,9 +86,7 @@ class TestCircuitBreakerIntegration:
         for label, override, expected_reason in triggers:
             cb = make_cb()
             initial = await cb.get_snapshot()
-            assert initial.state == CircuitBreakerState.CLOSED, (
-                f"{label}: should start CLOSED"
-            )
+            assert initial.state == CircuitBreakerState.CLOSED, f"{label}: should start CLOSED"
 
             result = await cb.check(**_kwargs(**override))  # type: ignore[arg-type]
             assert result.passed is False, f"{label}: check() must fail"
