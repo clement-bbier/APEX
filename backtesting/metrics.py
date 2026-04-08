@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -209,6 +210,64 @@ def equity_curve_from_trades(initial_capital: float, trades: list[TradeRecord]) 
         equity += _to_float(trade.net_pnl)
         curve.append(equity)
     return curve
+
+
+def daily_equity_curve_from_trades(
+    initial_capital: float,
+    trades: list[TradeRecord],
+) -> list[float]:
+    """Build a daily-resampled equity curve from trade records.
+
+    Trades are bucketed by UTC calendar day on their ``exit_timestamp_ms``.
+    The returned series contains one equity value per active day, equal to
+    the running portfolio equity after applying every trade closed on that
+    day. The initial capital is prepended so that ``pct_change`` over the
+    series captures the first day's PnL.
+
+    This is the standard input for an annualised (√252) Sharpe ratio
+    (Lopez de Prado, 2018, Ch. 14): per-trade returns are not iid in time
+    and produce arbitrarily biased Sharpe values for HFT-style strategies.
+
+    Args:
+        initial_capital: Starting capital.
+        trades: Trade records (any order).
+
+    Returns:
+        List of daily equity values, length = 1 + number of active days.
+    """
+    if not trades:
+        return [initial_capital]
+    sorted_trades = sorted(trades, key=lambda t: t.exit_timestamp_ms)
+    daily_pnl: dict[str, float] = defaultdict(float)
+    day_order: list[str] = []
+    for trade in sorted_trades:
+        day = datetime.fromtimestamp(trade.exit_timestamp_ms / 1000.0, tz=UTC).strftime("%Y-%m-%d")
+        if day not in daily_pnl:
+            day_order.append(day)
+        daily_pnl[day] += _to_float(trade.net_pnl)
+    equity = initial_capital
+    curve = [equity]
+    for day in day_order:
+        equity += daily_pnl[day]
+        curve.append(equity)
+    return curve
+
+
+def daily_returns_from_equity(curve: list[float]) -> list[float]:
+    """Compute daily pct_change returns from a daily equity curve.
+
+    Args:
+        curve: Daily equity values (output of
+            :func:`daily_equity_curve_from_trades`).
+
+    Returns:
+        List of daily fractional returns; empty if fewer than 2 points.
+    """
+    if len(curve) < 2:
+        return []
+    return [
+        (curve[i] - curve[i - 1]) / curve[i - 1] for i in range(1, len(curve)) if curve[i - 1] > 0
+    ]
 
 
 def by_session_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
@@ -499,6 +558,13 @@ def full_report(
     period_returns = [
         (curve[i] - curve[i - 1]) / curve[i - 1] for i in range(1, len(curve)) if curve[i - 1] > 0
     ]
+    # Sharpe is computed on daily-resampled equity curve returns (not
+    # per-trade returns), per Lopez de Prado (2018) Ch. 14. Per-trade
+    # returns of magnitude ~1e-5 (HFT) are dominated by the annualised
+    # risk-free rate term and produce arbitrarily negative Sharpe even
+    # for highly profitable strategies — see issue #8.
+    daily_curve = daily_equity_curve_from_trades(initial_capital, trades)
+    daily_returns = daily_returns_from_equity(daily_curve)
     final_equity = curve[-1]
     annual_return = final_equity / initial_capital - 1  # simplified single-period
 
@@ -506,7 +572,11 @@ def full_report(
     avg_w, avg_l = avg_win_loss(trades)
 
     return {
-        "sharpe": sharpe_ratio(period_returns, risk_free_rate),
+        "sharpe": sharpe_ratio(
+            daily_returns,
+            risk_free_rate=risk_free_rate,
+            annual_factor=_ANNUAL_FACTOR_DAILY,
+        ),
         "sortino": sortino_ratio(period_returns, risk_free_rate),
         "calmar": calmar_ratio(annual_return, dd),
         "max_drawdown": dd,
