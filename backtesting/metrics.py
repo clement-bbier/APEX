@@ -534,22 +534,103 @@ def backtest_overfitting_probability(
     return max(0.0, min(1.0, 0.5 * (1 + d) * (0.5 + 0.5 * log_f)))
 
 
+def _stationary_bootstrap_sharpe_ci(
+    returns: np.ndarray[Any, np.dtype[np.float64]],
+    risk_free_rate: float,
+    annual_factor: float,
+    n_resamples: int = 1000,
+    confidence: float = 0.95,
+    seed: int = 42,
+) -> tuple[float, float]:
+    """Compute a bootstrap confidence interval on the Sharpe ratio.
+
+    Uses the stationary bootstrap of Politis and Romano (1994), which
+    preserves the weak dependence structure of the returns series by
+    sampling blocks of geometrically-distributed length and concatenating
+    them with wrap-around. Unlike the moving-block bootstrap, the resulting
+    resampled series is itself stationary, which is the right null model
+    for evaluating Sharpe under serial correlation.
+
+    Args:
+        returns: 1D array of period returns (e.g. daily fractions).
+        risk_free_rate: Annualised risk-free rate.
+        annual_factor: Annualisation factor (√252 for daily).
+        n_resamples: Number of bootstrap replications.
+        confidence: Two-sided confidence level (default 0.95).
+        seed: RNG seed for reproducibility.
+
+    Returns:
+        Tuple ``(ci_low, ci_high)`` at the requested confidence level.
+        Returns ``(0.0, 0.0)`` for fewer than 2 observations and
+        ``(point, point)`` when the series has zero variance.
+
+    Reference:
+        Politis, D. N., and Romano, J. P. (1994). "The Stationary
+        Bootstrap." Journal of the American Statistical Association,
+        89(428), 1303-1313.
+    """
+    n = int(returns.size)
+    if n < 2:
+        return 0.0, 0.0
+    returns_list: list[float] = [float(x) for x in returns]
+    point = sharpe_ratio(returns_list, risk_free_rate, annual_factor)
+    if float(np.std(returns, ddof=1)) < 1e-12:
+        return point, point
+
+    rng = np.random.default_rng(seed)
+    block_len = max(1, round(n ** (1.0 / 3.0)))
+    p = 1.0 / block_len
+    alpha = 1.0 - confidence
+    lo_pct = 100.0 * (alpha / 2.0)
+    hi_pct = 100.0 * (1.0 - alpha / 2.0)
+
+    sharpe_values = np.empty(n_resamples, dtype=float)
+    for b in range(n_resamples):
+        idx = np.empty(n, dtype=np.int64)
+        i = 0
+        while i < n:
+            start = int(rng.integers(0, n))
+            length = int(rng.geometric(p))
+            length = min(length, n - i)
+            for k in range(length):
+                idx[i + k] = (start + k) % n
+            i += length
+        resample = returns[idx]
+        sharpe_values[b] = sharpe_ratio([float(x) for x in resample], risk_free_rate, annual_factor)
+
+    finite = sharpe_values[np.isfinite(sharpe_values)]
+    if finite.size == 0:
+        return point, point
+    return float(np.percentile(finite, lo_pct)), float(np.percentile(finite, hi_pct))
+
+
 def full_report(
     trades: list[TradeRecord],
     initial_capital: float = 100_000.0,
     risk_free_rate: float = 0.05,
+    *,
+    n_trials: int = 1,
 ) -> dict[str, Any]:
     """Generate a complete performance report from trade records.
+
+    Adds three ADR-0002 mandatory fields on top of the headline metrics:
+    Probabilistic Sharpe Ratio (Bailey and López de Prado, 2012), Deflated
+    Sharpe Ratio (Bailey and López de Prado, 2014) computed against the
+    caller-provided ``n_trials`` count, and a 95% stationary-bootstrap
+    confidence interval on the Sharpe ratio (Politis and Romano, 1994).
 
     Args:
         trades: All completed trade records.
         initial_capital: Starting portfolio capital.
         risk_free_rate: Annualised risk-free rate for Sharpe/Sortino.
+        n_trials: Number of independent strategy variants tested. Used by
+            the Deflated Sharpe Ratio to correct for selection bias.
+            Defaults to 1 for backward compatibility.
 
     Returns:
         Dict with all metrics: sharpe, sortino, calmar, max_dd, win_rate,
-        profit_factor, avg_win, avg_loss, by_session, by_regime, by_signal,
-        equity_curve.
+        profit_factor, avg_win, avg_loss, psr, dsr, sharpe_ci_95_low,
+        sharpe_ci_95_high, by_session, by_regime, by_signal, equity_curve.
     """
     if not trades:
         return {"error": "no trades"}
@@ -571,12 +652,43 @@ def full_report(
     dd, dd_dur = max_drawdown(curve)
     avg_w, avg_l = avg_win_loss(trades)
 
+    # Per Bailey & Lopez de Prado (2012, 2014), PSR and DSR must be computed
+    # on the same excess-return series that the headline Sharpe is built from
+    # — otherwise PSR/DSR would be silently inconsistent with Sharpe whenever
+    # risk_free_rate != 0. sharpe_ratio() subtracts ``rf / annual_factor**2``
+    # internally; we mirror that here exactly.
+    rf_per_period = risk_free_rate / (_ANNUAL_FACTOR_DAILY**2)
+    daily_excess_returns = [r - rf_per_period for r in daily_returns]
+    daily_excess_returns_arr = np.asarray(daily_excess_returns, dtype=float)
+    psr = probabilistic_sharpe_ratio(
+        daily_excess_returns,
+        benchmark_sharpe=0.0,
+        annual_factor=_ANNUAL_FACTOR_DAILY,
+    )
+    dsr = deflated_sharpe_ratio(
+        daily_excess_returns,
+        n_trials=n_trials,
+        annual_factor=_ANNUAL_FACTOR_DAILY,
+        benchmark_sharpe=0.0,
+    )
+    # Excess returns are already net of rf, so pass rf=0 to avoid double
+    # subtraction inside sharpe_ratio() within the bootstrap.
+    ci_low, ci_high = _stationary_bootstrap_sharpe_ci(
+        daily_excess_returns_arr,
+        risk_free_rate=0.0,
+        annual_factor=_ANNUAL_FACTOR_DAILY,
+    )
+
     return {
         "sharpe": sharpe_ratio(
             daily_returns,
             risk_free_rate=risk_free_rate,
             annual_factor=_ANNUAL_FACTOR_DAILY,
         ),
+        "psr": float(psr),
+        "dsr": float(dsr),
+        "sharpe_ci_95_low": float(ci_low),
+        "sharpe_ci_95_high": float(ci_high),
         "sortino": sortino_ratio(period_returns, risk_free_rate),
         "calmar": calmar_ratio(annual_return, dd),
         "max_drawdown": dd,
