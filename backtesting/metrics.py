@@ -58,7 +58,13 @@ def sharpe_ratio(
     excess = arr - rf_per_period
     std = float(np.std(excess, ddof=1))
     if std < 1e-9:
-        return 0.0  # zero variance != bad strategy
+        # Zero-variance series: Sharpe is undefined in the strict sense.
+        # Return sign-aware infinity so callers can still order strategies
+        # (consistent gains -> +inf, consistent losses -> -inf, flat -> 0).
+        mean_excess = float(np.mean(excess))
+        if abs(mean_excess) < 1e-9:
+            return 0.0
+        return float("inf") if mean_excess > 0 else float("-inf")
     return float(np.mean(excess)) / std * annual_factor
 
 
