@@ -13,13 +13,15 @@ from __future__ import annotations
 from decimal import Decimal
 
 import fakeredis.aioredis
+import pytest
 
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
 from services.s03_regime_detector.regime_engine import RegimeEngine
 from services.s04_fusion_engine.kelly_sizer import KellySizer
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker, CircuitState
+from services.s05_risk_manager.circuit_breaker import CircuitBreaker
+from services.s05_risk_manager.models import CircuitBreakerState
 from services.s05_risk_manager.position_rules import check_max_risk_per_trade
 from services.s06_execution.paper_trader import PaperTrader
 
@@ -100,12 +102,21 @@ class TestFullPipelinePaper:
         assert slippage_wide > slippage_tight
         assert slippage_tight >= 0.0
 
-    def test_circuit_breaker_halts_on_drawdown(self) -> None:
+    @pytest.mark.asyncio
+    async def test_circuit_breaker_halts_on_drawdown(self) -> None:
         """3% daily drawdown must open circuit breaker and block all orders."""
         cb = CircuitBreaker(fakeredis.aioredis.FakeRedis())
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitBreakerState.CLOSED
 
-        cb.update_daily_pnl(-0.031)  # -3.1% > 3% threshold
-        assert cb.state == CircuitState.OPEN
-        assert cb.allows_new_orders() is False
+        result = await cb.check(
+            current_daily_pnl=Decimal("-3100"),  # -3.1% of 100k
+            starting_capital=Decimal("100000"),
+            intraday_loss_30m=Decimal("0"),
+            vix_current=20.0,
+            vix_1h_ago=20.0,
+            service_last_seen={},
+        )
+        assert result.passed is False
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitBreakerState.OPEN
