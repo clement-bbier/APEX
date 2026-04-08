@@ -39,7 +39,7 @@ jobs:
         with:
           workspaces: rust
       - working-directory: rust
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
       - name: Build Rust wheels
         run: |
           python -m pip install "maturin>=1.9.4"
