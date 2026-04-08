@@ -1,0 +1,46 @@
+name: Agent Task
+description: Create a task to be picked up by an AI agent worker
+title: "[AGENT] "
+labels: []
+body:
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Target agent
+      options:
+        - sre
+        - alpha
+        - config
+        - tests
+        - infra
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective (one sentence)
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope (files allowed to touch)
+      description: List the exact paths the agent is allowed to modify. Refer to AI_RULES.md.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: How do we know it's done? List concrete, verifiable conditions.
+    validations:
+      required: true
+  - type: checkboxes
+    id: rules
+    attributes:
+      label: Compliance
+      options:
+        - label: I have read AI_RULES.md and confirmed the target agent has write access to the listed scope
+          required: true
+        - label: This task does not modify human-only paths
+          required: true

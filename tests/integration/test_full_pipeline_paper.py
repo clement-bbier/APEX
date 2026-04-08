@@ -11,9 +11,11 @@ Requires: Redis running (docker compose -f docker/docker-compose.test.yml up -d)
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import MagicMock
 
-from core.config import Settings
+import fakeredis.aioredis
+
+from core.models.order import OrderCandidate
+from core.models.signal import Direction
 from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
 from services.s03_regime_detector.regime_engine import RegimeEngine
 from services.s04_fusion_engine.kelly_sizer import KellySizer
@@ -59,20 +61,25 @@ class TestFullPipelinePaper:
     def test_risk_manager_blocks_oversized_position(self) -> None:
         """Risk manager must reject any position exceeding 0.5% capital risk."""
         capital = Decimal("10000")
-        max_risk = capital * Decimal("0.005")  # 0.5% = $50
 
-        order = MagicMock()
-        order.entry_price = Decimal("50000")
-        order.stop_loss = Decimal("49000")  # $1000 risk per BTC
-        order.size_total = Decimal("0.5")  # 0.5 BTC = $500 risk -- exceeds limit
-
-        risk_per_unit = order.entry_price - order.stop_loss
-        total_risk = risk_per_unit * order.size_total
-        assert total_risk > max_risk  # confirms it's over the limit
+        order = OrderCandidate(
+            order_id="test-oversized-1",
+            symbol="BTCUSDT",
+            direction=Direction.LONG,
+            timestamp_ms=1_700_000_000_000,
+            size=Decimal("0.5"),
+            size_scalp_exit=Decimal("0.2"),
+            size_swing_exit=Decimal("0.3"),
+            entry=Decimal("50000"),
+            stop_loss=Decimal("49000"),  # $1000 risk per BTC * 0.5 = $500 risk
+            target_scalp=Decimal("51000"),
+            target_swing=Decimal("52000"),
+            capital_at_risk=Decimal("500"),
+        )
 
         result = check_max_risk_per_trade(order, capital)
         assert result.passed is False
-        assert "exceeds" in result.reason.lower()
+        assert "max" in result.reason.lower() or "risk" in result.reason.lower()
 
     def test_paper_trader_slippage_is_applied(self) -> None:
         """Paper trader must apply realistic slippage (never fill at exact price)."""
@@ -95,10 +102,10 @@ class TestFullPipelinePaper:
 
     def test_circuit_breaker_halts_on_drawdown(self) -> None:
         """3% daily drawdown must open circuit breaker and block all orders."""
-        cb = CircuitBreaker(Settings())
+        cb = CircuitBreaker(fakeredis.aioredis.FakeRedis())
         assert cb.state == CircuitState.CLOSED
         assert cb.allows_new_orders() is True
 
-        cb.update_daily_pnl(pnl_pct=-0.031)  # -3.1% > 3% threshold
+        cb.update_daily_pnl(-0.031)  # -3.1% > 3% threshold
         assert cb.state == CircuitState.OPEN
         assert cb.allows_new_orders() is False

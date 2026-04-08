@@ -25,7 +25,22 @@
       "Bash(PYTHONPATH=. REDIS_URL=redis://127.0.0.1:6379/0 ZMQ_HOST=127.0.0.1 ZMQ_PUB_PORT=5555 ZMQ_SUB_PORT=5556 .venv/Scripts/python.exe supervisor/orchestrator.py)",
       "Bash(tee C:/Users/cleme/AppData/Local/Temp/orch_run.log)",
       "Bash(echo \"Spawned PID $!\")",
-      "Bash(.venv/Scripts/python.exe -m mypy supervisor/orchestrator.py)"
+      "Bash(.venv/Scripts/python.exe -m mypy supervisor/orchestrator.py)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git checkout:*)",
+      "Bash(find . -type d -name __pycache__ -not -path \"./.venv/*\" -exec rm -rf {} +)",
+      "Bash(.venv/Scripts/python.exe -m pip install -q pytest-asyncio fakeredis bandit \"maturin>=1.9.4\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(.venv/Scripts/python.exe -m ruff check . --fix --unsafe-fixes)",
+      "Bash(.venv/Scripts/python.exe -m ruff format .)",
+      "Bash(.venv/Scripts/python.exe -m ruff check .)",
+      "Bash(.venv/Scripts/python.exe -m mypy . --strict)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/ --cov=services --cov=core --cov=backtesting --cov-fail-under=40 --timeout=30 -q)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/unit/test_backtest_metrics.py -k \"TestSharpeRatio\" --no-cov)",
+      "Bash(.venv/Scripts/python.exe -m pytest tests/integration/ --timeout=60 -q --no-cov)",
+      "Bash(.venv/Scripts/python.exe scripts/generate_test_fixtures.py)"
     ]
   }
 }
