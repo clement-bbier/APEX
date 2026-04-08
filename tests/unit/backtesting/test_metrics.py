@@ -346,3 +346,88 @@ def test_full_report_pbo_field_present_when_matrix_provided() -> None:
     assert "pbo" not in report_no_matrix
     assert "pbo" in report_with
     assert 0.0 <= float(report_with["pbo"]) <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Drawdown / tail-risk metrics (issue #23 — ADR-0002 Section A item 6)
+# Martin & McCann (1989) Ulcer Index, Sortino & Price (1994), Young (1991).
+# ---------------------------------------------------------------------------
+
+
+def test_ulcer_index_zero_on_monotonic_equity() -> None:
+    """A strictly increasing equity curve has Ulcer Index = 0."""
+    report = _full_report_from_seeded_strategy(
+        n_days=60, win_rate=1.0, mean_return=0.005, loss_size=0.0, seed=42
+    )
+    assert report["ulcer_index"] == pytest.approx(0.0, abs=1e-9)
+    # Martin ratio is also 0 by convention when Ulcer is 0.
+    assert report["martin_ratio"] == 0.0
+
+
+def test_ulcer_index_positive_on_drawdown() -> None:
+    """Any drawdown produces a strictly positive Ulcer Index."""
+    report = _full_report_from_seeded_strategy(
+        n_days=60, win_rate=0.55, mean_return=0.004, loss_size=0.005, seed=7
+    )
+    assert report["ulcer_index"] > 0.0
+    assert report["max_drawdown"] > 0.0
+    # max_drawdown_absolute is monetary and non-positive on any non-monotonic curve.
+    assert report["max_drawdown_absolute"] < 0.0
+
+
+def test_calmar_matches_manual_computation() -> None:
+    """Reported Calmar equals hand-computed CAGR / |maxDD|."""
+    report = _full_report_from_seeded_strategy(seed=42)
+    manual = report["cagr"] / abs(report["max_drawdown"])
+    assert report["calmar"] == pytest.approx(manual, rel=1e-9)
+
+
+def test_sortino_greater_than_sharpe_when_returns_right_skewed() -> None:
+    """Right-skewed returns mean Sortino > Sharpe.
+
+    Construct a strategy with rare large gains and frequent small
+    losses (right skew). The downside semi-deviation only sees the
+    small losses, while full std also captures the large positive
+    excursions, so Sortino > Sharpe.
+    """
+    report = _full_report_from_seeded_strategy(
+        n_days=180,
+        win_rate=0.30,  # rare wins
+        mean_return=0.020,  # large gains
+        loss_size=0.005,  # small losses
+        seed=11,
+    )
+    assert report["return_skewness"] > 0.0  # confirm right-skew
+    assert report["sortino"] > report["sharpe"]
+
+
+def test_tail_ratio_greater_than_one_on_right_skewed_returns() -> None:
+    """Right-tail dominance gives tail_ratio > 1."""
+    report = _full_report_from_seeded_strategy(
+        n_days=180,
+        win_rate=0.30,
+        mean_return=0.020,
+        loss_size=0.005,
+        seed=11,
+    )
+    assert report["tail_ratio"] > 1.0
+
+
+def test_return_distribution_stats_present_and_finite() -> None:
+    """All 3 distribution fields are present and finite (or +inf)."""
+    report = _full_report_from_seeded_strategy(seed=42)
+    assert isinstance(report["return_skewness"], float)
+    assert np.isfinite(report["return_skewness"])
+    assert np.isfinite(report["return_excess_kurtosis"])
+    tail = report["tail_ratio"]
+    assert np.isfinite(tail) or tail == float("inf")
+
+
+def test_martin_ratio_handles_zero_ulcer() -> None:
+    """Monotonic equity → Ulcer = 0 → Martin defined as 0.0, not raise."""
+    report = _full_report_from_seeded_strategy(
+        n_days=60, win_rate=1.0, mean_return=0.003, loss_size=0.0, seed=1
+    )
+    assert report["ulcer_index"] == 0.0
+    assert report["martin_ratio"] == 0.0
+    assert math.isfinite(report["martin_ratio"])
