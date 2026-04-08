@@ -85,3 +85,108 @@ def test_profitable_strategy_has_positive_sharpe() -> None:
         f"Profitable strategy (WR={win_rate_obs:.2f}, PF={pf_obs:.2f}) "
         f"should have positive Sharpe, got {report['sharpe']}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Property tests for PSR / DSR / stationary-bootstrap CI wiring (issue #19).
+# References:
+#   Bailey & López de Prado (2012) — PSR
+#   Bailey & López de Prado (2014) — DSR
+#   Politis & Romano (1994)         — stationary bootstrap
+#   ADR-0002 Quant Methodology Charter
+# ---------------------------------------------------------------------------
+
+
+def _seeded_equity_curve(
+    n_days: int = 60,
+    win_rate: float = 0.6,
+    mean_return: float = 0.003,
+    loss_size: float = 0.003,
+    seed: int = 42,
+) -> tuple[list[TradeRecord], float]:
+    """Build a synthetic seeded daily equity curve and matching trades."""
+    rng = np.random.default_rng(seed)
+    coin = rng.random(n_days)
+    daily_returns = np.where(coin < win_rate, mean_return, -loss_size)
+    base_ts_s = 1_704_067_200  # 2024-01-01 UTC
+    initial = 100_000.0
+    equity = initial * np.cumprod(1.0 + daily_returns)
+    trades: list[TradeRecord] = []
+    prev = initial
+    for i in range(n_days):
+        day_pnl = float(equity[i]) - prev
+        prev = float(equity[i])
+        ts_ms = (base_ts_s + i * 86_400) * 1000
+        trades.append(_make_trade(day_pnl, ts_ms))
+    return trades, initial
+
+
+def _full_report_from_seeded_strategy(
+    n_days: int = 60,
+    win_rate: float = 0.6,
+    mean_return: float = 0.003,
+    loss_size: float = 0.003,
+    seed: int = 42,
+    n_trials: int = 1,
+) -> dict[str, object]:
+    trades, initial = _seeded_equity_curve(
+        n_days=n_days,
+        win_rate=win_rate,
+        mean_return=mean_return,
+        loss_size=loss_size,
+        seed=seed,
+    )
+    return full_report(trades=trades, initial_capital=initial, n_trials=n_trials)
+
+
+def test_psr_in_unit_interval() -> None:
+    """PSR is a probability so it must live in [0, 1]."""
+    report = _full_report_from_seeded_strategy(win_rate=0.6, seed=42)
+    psr = float(report["psr"])  # type: ignore[arg-type]
+    assert 0.0 <= psr <= 1.0
+
+
+def test_psr_monotonic_in_sharpe() -> None:
+    """Higher Sharpe ⇒ higher PSR, ceteris paribus."""
+    weak = _full_report_from_seeded_strategy(mean_return=0.001, seed=42)
+    strong = _full_report_from_seeded_strategy(mean_return=0.005, seed=42)
+    assert float(strong["sharpe"]) > float(weak["sharpe"])  # type: ignore[arg-type]
+    assert float(strong["psr"]) >= float(weak["psr"])  # type: ignore[arg-type]
+
+
+def test_dsr_strictly_less_than_psr_under_multiple_trials() -> None:
+    """DSR deflates PSR when multiple trials are tested."""
+    single = _full_report_from_seeded_strategy(seed=42, n_trials=1)
+    multi = _full_report_from_seeded_strategy(seed=42, n_trials=50)
+    assert float(multi["dsr"]) < float(single["psr"])  # type: ignore[arg-type]
+
+
+def test_bootstrap_ci_contains_point_sharpe() -> None:
+    """The 95% bootstrap CI must straddle the point estimate."""
+    report = _full_report_from_seeded_strategy(seed=42)
+    lo = float(report["sharpe_ci_95_low"])  # type: ignore[arg-type]
+    hi = float(report["sharpe_ci_95_high"])  # type: ignore[arg-type]
+    sharpe = float(report["sharpe"])  # type: ignore[arg-type]
+    assert lo <= sharpe <= hi
+
+
+def test_bootstrap_ci_width_shrinks_with_sample_size() -> None:
+    """Law of large numbers: larger samples yield tighter CIs."""
+    short = _full_report_from_seeded_strategy(n_days=30, seed=42)
+    long = _full_report_from_seeded_strategy(n_days=300, seed=42)
+    short_w = float(short["sharpe_ci_95_high"]) - float(short["sharpe_ci_95_low"])  # type: ignore[arg-type]
+    long_w = float(long["sharpe_ci_95_high"]) - float(long["sharpe_ci_95_low"])  # type: ignore[arg-type]
+    assert long_w < short_w
+
+
+def test_profitable_strategy_has_high_psr() -> None:
+    """An 85% winrate strategy with mean daily return 0.5% must get PSR > 0.90."""
+    report = _full_report_from_seeded_strategy(
+        n_days=120,
+        win_rate=0.85,
+        mean_return=0.005,
+        loss_size=0.003,
+        seed=42,
+    )
+    psr = float(report["psr"])  # type: ignore[arg-type]
+    assert psr > 0.90, f"got PSR={psr}"
