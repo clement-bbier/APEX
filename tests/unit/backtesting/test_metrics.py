@@ -515,3 +515,35 @@ def test_cost_sensitivity_does_not_mutate_input_trades() -> None:
     _ = cost_sensitivity_report(trades=trades, initial_capital=initial, realistic_cost_bps=10.0)
     assert [t.net_pnl for t in trades] == snapshot_pnls
     assert [id(t) for t in trades] == snapshot_ids
+
+
+def test_cost_sensitivity_empty_trades_returns_error_dict() -> None:
+    """Regression: empty trades must not raise KeyError.
+
+    Bug from PR #26 Copilot review: full_report() early-returns an
+    error dict on empty trades, so reading report_zero["sharpe"] would
+    raise KeyError. cost_sensitivity_report now mirrors the error path.
+    """
+    report = cost_sensitivity_report(trades=[], initial_capital=100_000.0, realistic_cost_bps=10.0)
+    assert "error" in report
+    assert report["profitable_under_realistic"] is False
+    assert report["profitable_under_stress"] is False
+
+
+def test_cost_sensitivity_rejects_invalid_bps() -> None:
+    """Regression: negative / NaN / inf bps must raise ValueError."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        cost_sensitivity_report(trades=trades, initial_capital=initial, realistic_cost_bps=-5.0)
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        cost_sensitivity_report(
+            trades=trades,
+            initial_capital=initial,
+            realistic_cost_bps=float("nan"),
+        )
+    with pytest.raises(ValueError, match="finite and non-negative"):
+        cost_sensitivity_report(
+            trades=trades,
+            initial_capital=initial,
+            realistic_cost_bps=float("inf"),
+        )
