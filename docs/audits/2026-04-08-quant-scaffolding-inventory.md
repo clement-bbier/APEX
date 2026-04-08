@@ -180,7 +180,7 @@ dependency is noted. Labels assume the canonical 13-label set
 - **Labels:** `alpha`, `quant`, `methodology`, `backtest`, `P0`
 - **Scope:** `metrics.py::backtest_overfitting_probability` is a
   closed-form proxy that takes `(IS_sharpe, OOS_sharpe, n_trials)`
-  scalars. ADR-0002 #5 + Bailey 2015 Eq. 11 require the rank-based
+  scalars. ADR-0002 #12 + Bailey 2015 Eq. 11 require the rank-based
   PBO computed over a CPCV OOS distribution. CPCV already exists in
   `walk_forward.py:374` but is not invoked anywhere outside its unit
   test. This issue:
