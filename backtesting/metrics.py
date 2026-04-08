@@ -717,6 +717,155 @@ def _stationary_bootstrap_sharpe_ci(
     return float(np.percentile(finite, lo_pct)), float(np.percentile(finite, hi_pct))
 
 
+# ---------------------------------------------------------------------------
+# Drawdown and tail-risk metrics (ADR-0002 Section A item 6)
+# ---------------------------------------------------------------------------
+
+
+def _max_drawdown_absolute(
+    equity_values: np.ndarray[Any, np.dtype[np.float64]],
+) -> float:
+    """Peak-to-trough absolute loss in monetary units.
+
+    Returns a non-positive float: the most negative ``equity - peak``
+    value across the curve, i.e. the worst monetary loss from a
+    running peak. Returns ``0.0`` for monotonically non-decreasing
+    series and for series shorter than 2 points.
+    """
+    if equity_values.size < 2:
+        return 0.0
+    running_peak = np.maximum.accumulate(equity_values)
+    return float(np.min(equity_values - running_peak))
+
+
+def _ulcer_index(
+    equity_values: np.ndarray[Any, np.dtype[np.float64]],
+) -> float:
+    """Ulcer Index: RMS of percentage drawdowns from running peak.
+
+    Formula: ``UI = sqrt( mean( DD_i^2 ) )`` with
+    ``DD_i = 100 * (equity_i - peak_i) / peak_i``.
+
+    Captures BOTH the depth and the duration of drawdowns, unlike
+    max-drawdown which only sees the worst single point. A strictly
+    monotonic equity curve yields ``UI = 0`` exactly.
+
+    Reference:
+        Martin, P. G., & McCann, B. B. (1989). The Investor's Guide
+        to Fidelity Funds. Wiley.
+    """
+    if equity_values.size < 2:
+        return 0.0
+    running_peak = np.maximum.accumulate(equity_values)
+    safe_peak = np.where(running_peak > 0, running_peak, 1.0)
+    dd_pct = np.where(
+        running_peak > 0,
+        100.0 * (equity_values - running_peak) / safe_peak,
+        0.0,
+    )
+    return float(math.sqrt(float(np.mean(dd_pct**2))))
+
+
+def _martin_ratio(
+    cagr: float,
+    risk_free_rate: float,
+    ulcer_index: float,
+) -> float:
+    """Martin ratio = ``(CAGR - rf) / Ulcer Index``.
+
+    Drawdown-pain analogue of the Sharpe ratio. Preferred by
+    practitioners who care about the duration (not just depth) of
+    drawdowns. Returns ``0.0`` when ``ulcer_index <= 0`` to avoid
+    division by zero on monotonic equity curves.
+
+    Reference:
+        Martin, P. G., & McCann, B. B. (1989). The Investor's Guide
+        to Fidelity Funds. Wiley.
+    """
+    if ulcer_index <= 0.0:
+        return 0.0
+    return (cagr - risk_free_rate) / ulcer_index
+
+
+def _calmar_ratio(cagr: float, max_drawdown_pct: float) -> float:
+    """Calmar ratio = ``CAGR / |max drawdown percentage|``.
+
+    Returns ``0.0`` when ``max_drawdown_pct == 0`` to avoid division
+    by zero.
+
+    Reference:
+        Young, T. W. (1991). Calmar Ratio: A Smoother Tool. Futures
+        Magazine.
+    """
+    if max_drawdown_pct == 0.0:
+        return 0.0
+    return cagr / abs(max_drawdown_pct)
+
+
+def _sortino_ratio(
+    returns: np.ndarray[Any, np.dtype[np.float64]],
+    risk_free_rate: float,
+    annual_factor: float,
+    target_return: float = 0.0,
+) -> float:
+    """Sortino ratio: excess return over downside semi-deviation.
+
+    Formula: ``Sortino = mean(excess) / downside_dev * annual_factor``
+    with ``downside_dev = sqrt( mean( min(excess - target, 0)^2 ) )``.
+
+    Uses the semi-deviation below ``target_return`` (default 0), not
+    the full standard deviation. A right-skewed strategy (more upside
+    than downside) has Sortino > Sharpe.
+
+    Reference:
+        Sortino, F. A., & Price, L. N. (1994). Performance Measurement
+        in a Downside Risk Framework. Journal of Investing, 3(3),
+        59-64.
+    """
+    if returns.size < 2:
+        return 0.0
+    rf_per_period = risk_free_rate / (annual_factor**2)
+    excess = returns - rf_per_period
+    downside = np.minimum(excess - target_return, 0.0)
+    dd_var = float(np.mean(downside**2))
+    if dd_var <= 0.0:
+        return 0.0
+    dd_dev = math.sqrt(dd_var)
+    return float(np.mean(excess)) / dd_dev * annual_factor
+
+
+def _return_distribution_stats(
+    returns: np.ndarray[Any, np.dtype[np.float64]],
+) -> dict[str, float]:
+    """Skewness, excess kurtosis, and tail ratio of a return series.
+
+    - ``skewness``: ``scipy.stats.skew(returns, bias=False)``.
+    - ``excess_kurtosis``: ``scipy.stats.kurtosis(returns, fisher=True,
+      bias=False)`` — Fisher's definition where a normal distribution
+      has excess kurtosis 0.
+    - ``tail_ratio``: ``|P95(returns)| / |P5(returns)|``. Values > 1
+      indicate right-tail dominance. Returns ``inf`` when ``|P5|`` is
+      below numerical noise.
+
+    Returns a dict with zeros (and ``tail_ratio = 0.0``) for series
+    too short or with vanishing variance — see PSR/DSR for the same
+    catastrophic-cancellation guard.
+    """
+    if returns.size < 4:
+        return {"skewness": 0.0, "excess_kurtosis": 0.0, "tail_ratio": 0.0}
+    if float(np.std(returns, ddof=1)) < 1e-12:
+        return {"skewness": 0.0, "excess_kurtosis": 0.0, "tail_ratio": 0.0}
+    skew = float(scipy_stats.skew(returns, bias=False))
+    kurt = float(scipy_stats.kurtosis(returns, fisher=True, bias=False))
+    p95 = float(np.percentile(returns, 95))
+    p5 = float(np.percentile(returns, 5))
+    if abs(p5) < 1e-12:
+        tail = float("inf")
+    else:
+        tail = abs(p95) / abs(p5)
+    return {"skewness": skew, "excess_kurtosis": kurt, "tail_ratio": tail}
+
+
 def full_report(
     trades: list[TradeRecord],
     initial_capital: float = 100_000.0,
@@ -752,9 +901,6 @@ def full_report(
         return {"error": "no trades"}
 
     curve = equity_curve_from_trades(initial_capital, trades)
-    period_returns = [
-        (curve[i] - curve[i - 1]) / curve[i - 1] for i in range(1, len(curve)) if curve[i - 1] > 0
-    ]
     # Sharpe is computed on daily-resampled equity curve returns (not
     # per-trade returns), per Lopez de Prado (2018) Ch. 14. Per-trade
     # returns of magnitude ~1e-5 (HFT) are dominated by the annualised
@@ -763,7 +909,6 @@ def full_report(
     daily_curve = daily_equity_curve_from_trades(initial_capital, trades)
     daily_returns = daily_returns_from_equity(daily_curve)
     final_equity = curve[-1]
-    annual_return = final_equity / initial_capital - 1  # simplified single-period
 
     dd, dd_dur = max_drawdown(curve)
     avg_w, avg_l = avg_win_loss(trades)
@@ -795,6 +940,27 @@ def full_report(
         annual_factor=_ANNUAL_FACTOR_DAILY,
     )
 
+    # Drawdown / tail-risk metrics (ADR-0002 Section A item 6).
+    equity_values = np.asarray(daily_curve, dtype=float)
+    daily_returns_arr = np.asarray(daily_returns, dtype=float)
+    n_active_days = max(1, len(daily_curve) - 1)
+    years = n_active_days / 365.25
+    total_return = final_equity / initial_capital - 1.0
+    if years > 0 and (1.0 + total_return) > 0:
+        cagr = (1.0 + total_return) ** (1.0 / years) - 1.0
+    else:
+        cagr = 0.0
+    ulcer = _ulcer_index(equity_values)
+    max_dd_abs = _max_drawdown_absolute(equity_values)
+    martin = _martin_ratio(cagr, risk_free_rate, ulcer)
+    calmar_new = _calmar_ratio(cagr, abs(dd))
+    sortino_new = _sortino_ratio(
+        daily_excess_returns_arr,
+        risk_free_rate=0.0,  # already excess
+        annual_factor=_ANNUAL_FACTOR_DAILY,
+    )
+    dist_stats = _return_distribution_stats(daily_returns_arr)
+
     pbo: float | None = None
     if strategy_returns_matrix is not None:
         from backtesting.walk_forward import CombinatorialPurgedCV
@@ -820,10 +986,17 @@ def full_report(
         "dsr": float(dsr),
         "sharpe_ci_95_low": float(ci_low),
         "sharpe_ci_95_high": float(ci_high),
-        "sortino": sortino_ratio(period_returns, risk_free_rate),
-        "calmar": calmar_ratio(annual_return, dd),
+        "sortino": float(sortino_new),
+        "calmar": float(calmar_new),
+        "cagr": float(cagr),
         "max_drawdown": dd,
+        "max_drawdown_absolute": float(max_dd_abs),
         "max_drawdown_duration_bars": dd_dur,
+        "ulcer_index": float(ulcer),
+        "martin_ratio": float(martin),
+        "return_skewness": float(dist_stats["skewness"]),
+        "return_excess_kurtosis": float(dist_stats["excess_kurtosis"]),
+        "tail_ratio": float(dist_stats["tail_ratio"]),
         "win_rate": win_rate(trades),
         "profit_factor": profit_factor(trades),
         "avg_win": avg_w,
