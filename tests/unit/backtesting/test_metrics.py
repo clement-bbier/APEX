@@ -371,8 +371,8 @@ def test_ulcer_index_positive_on_drawdown() -> None:
     )
     assert report["ulcer_index"] > 0.0
     assert report["max_drawdown"] > 0.0
-    # max_drawdown_absolute is monetary and non-positive on any non-monotonic curve.
-    assert report["max_drawdown_absolute"] < 0.0
+    # max_drawdown_absolute is a non-negative monetary magnitude.
+    assert report["max_drawdown_absolute"] > 0.0
 
 
 def test_calmar_matches_manual_computation() -> None:
@@ -431,3 +431,19 @@ def test_martin_ratio_handles_zero_ulcer() -> None:
     assert report["ulcer_index"] == 0.0
     assert report["martin_ratio"] == 0.0
     assert math.isfinite(report["martin_ratio"])
+
+
+def test_ulcer_and_martin_ratio_share_fractional_units() -> None:
+    """Regression: Ulcer Index must be in the same unit system as CAGR.
+
+    Bug discovered in PR #24 Copilot review: Ulcer was in percent
+    while CAGR / risk_free_rate are fractions, making martin_ratio
+    silently off by ~100x. Realistic strategies have drawdowns of a
+    few percent, so the Ulcer Index in fractional units must stay
+    well below 1.0.
+    """
+    report = _full_report_from_seeded_strategy(n_days=60, win_rate=0.6, seed=42)
+    assert 0.0 <= report["ulcer_index"] < 1.0, (
+        f"Ulcer Index {report['ulcer_index']} looks like percent, "
+        f"not fraction — did the 100x multiplier come back?"
+    )
