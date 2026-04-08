@@ -1058,8 +1058,8 @@ def _apply_cost_to_trades(
     Cost model: ``cost_per_trade = 2 * notional * (total_bps / 1e4)``
     where ``notional = abs(entry_price * size)``. Falls back to
     ``abs(net_pnl)`` as a notional proxy when entry_price or size are
-    missing or zero (synthetic fixture trades sometimes omit price
-    information).
+    zero (synthetic fixture trades sometimes use zero-price PnL-only
+    records).
 
     Does **not** mutate the input list or any of its frozen
     ``TradeRecord`` instances; new records are produced via
@@ -1073,7 +1073,7 @@ def _apply_cost_to_trades(
     if total_bps <= 0.0:
         return list(trades)
 
-    cost_fraction = Decimal(str(2.0 * total_bps / 10_000.0))
+    cost_fraction = Decimal(str(total_bps)) * Decimal("2") / Decimal("10000")
     adjusted: list[TradeRecord] = []
     for trade in trades:
         notional = abs(trade.entry_price * trade.size)
@@ -1132,7 +1132,26 @@ def cost_sensitivity_report(
         Learning. Chapter 14.
         ADR-0002 Quant Methodology Charter, Section A item 7.
     """
+    if not math.isfinite(realistic_cost_bps) or realistic_cost_bps < 0.0:
+        raise ValueError(
+            f"realistic_cost_bps must be finite and non-negative, got {realistic_cost_bps!r}"
+        )
+
     stress_bps = 2.0 * realistic_cost_bps
+
+    if not trades:
+        return {
+            "error": "no trades",
+            "zero": {"error": "no trades"},
+            "realistic": {"error": "no trades"},
+            "stress": {"error": "no trades"},
+            "realistic_cost_bps": float(realistic_cost_bps),
+            "stress_cost_bps": float(stress_bps),
+            "sharpe_degradation_zero_to_realistic": 0.0,
+            "sharpe_degradation_zero_to_stress": 0.0,
+            "profitable_under_realistic": False,
+            "profitable_under_stress": False,
+        }
 
     trades_zero = _apply_cost_to_trades(trades, 0.0)
     trades_realistic = _apply_cost_to_trades(trades, realistic_cost_bps)
