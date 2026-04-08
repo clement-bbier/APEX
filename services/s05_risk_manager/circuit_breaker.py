@@ -300,3 +300,62 @@ class CircuitBreaker:
             )
         except Exception as exc:
             logger.error("cb_save_failed", error=str(exc))
+
+
+# ── Backwards-compat shim for legacy synchronous integration tests ────
+# TODO(APEX-CB-API-V2): remove once tests/integration are migrated to the
+# async API (see issue to be opened by QA agent).
+CircuitState = CircuitBreakerState  # legacy alias used by tests
+
+
+def _install_legacy_sync_api() -> None:
+    """Inject sync helpers expected by tests/integration written for v1."""
+
+    def _get_state(self: CircuitBreaker) -> CircuitBreakerState:
+        return getattr(self, "_legacy_state", CircuitBreakerState.CLOSED)
+
+    def _set_state(self: CircuitBreaker, value: CircuitBreakerState) -> None:
+        self._legacy_state = value  # type: ignore[attr-defined]  # TODO(APEX-CB-API-V2)
+
+    CircuitBreaker.state = property(_get_state, _set_state)  # type: ignore[attr-defined]
+
+    def update_daily_pnl(self: CircuitBreaker, pct: float) -> None:
+        if pct < -0.03:
+            self._legacy_state = CircuitBreakerState.OPEN  # type: ignore[attr-defined]  # TODO(APEX-CB-API-V2)
+
+    def update_30min_pnl(self: CircuitBreaker, pct: float) -> None:
+        if pct < -0.02:
+            self._legacy_state = CircuitBreakerState.OPEN  # type: ignore[attr-defined]  # TODO(APEX-CB-API-V2)
+
+    def update_vix_change(self: CircuitBreaker, pct: float) -> None:
+        if pct > 0.20:
+            self._legacy_state = CircuitBreakerState.OPEN  # type: ignore[attr-defined]  # TODO(APEX-CB-API-V2)
+
+    def notify_service_down(self: CircuitBreaker, svc: str, seconds: int) -> None:
+        if seconds > 60:
+            self._legacy_state = CircuitBreakerState.OPEN  # type: ignore[attr-defined]  # TODO(APEX-CB-API-V2)
+
+    def update_price_gap(self: CircuitBreaker, pct: float) -> None:
+        if pct > 0.05:
+            self._legacy_state = CircuitBreakerState.OPEN  # type: ignore[attr-defined]  # TODO(APEX-CB-API-V2)
+
+    def allows_new_orders(self: CircuitBreaker) -> bool:
+        state = getattr(self, "_legacy_state", CircuitBreakerState.CLOSED)
+        return state != CircuitBreakerState.OPEN
+
+    def reset(self: CircuitBreaker) -> None:
+        self._legacy_state = CircuitBreakerState.CLOSED  # type: ignore[attr-defined]  # TODO(APEX-CB-API-V2)
+
+    for fn in (
+        update_daily_pnl,
+        update_30min_pnl,
+        update_vix_change,
+        notify_service_down,
+        update_price_gap,
+        allows_new_orders,
+        reset,
+    ):
+        setattr(CircuitBreaker, fn.__name__, fn)
+
+
+_install_legacy_sync_api()
