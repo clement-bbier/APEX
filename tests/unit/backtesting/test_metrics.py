@@ -8,6 +8,7 @@ WR > 80% and PF > 2 must yield a strictly positive Sharpe.
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 import numpy as np
 
@@ -128,7 +129,8 @@ def _full_report_from_seeded_strategy(
     loss_size: float = 0.003,
     seed: int = 42,
     n_trials: int = 1,
-) -> dict[str, object]:
+    risk_free_rate: float = 0.05,
+) -> dict[str, Any]:
     trades, initial = _seeded_equity_curve(
         n_days=n_days,
         win_rate=win_rate,
@@ -136,13 +138,18 @@ def _full_report_from_seeded_strategy(
         loss_size=loss_size,
         seed=seed,
     )
-    return full_report(trades=trades, initial_capital=initial, n_trials=n_trials)
+    return full_report(
+        trades=trades,
+        initial_capital=initial,
+        risk_free_rate=risk_free_rate,
+        n_trials=n_trials,
+    )
 
 
 def test_psr_in_unit_interval() -> None:
     """PSR is a probability so it must live in [0, 1]."""
     report = _full_report_from_seeded_strategy(win_rate=0.6, seed=42)
-    psr = float(report["psr"])  # type: ignore[arg-type]
+    psr = float(report["psr"])
     assert 0.0 <= psr <= 1.0
 
 
@@ -150,23 +157,23 @@ def test_psr_monotonic_in_sharpe() -> None:
     """Higher Sharpe ⇒ higher PSR, ceteris paribus."""
     weak = _full_report_from_seeded_strategy(mean_return=0.001, seed=42)
     strong = _full_report_from_seeded_strategy(mean_return=0.005, seed=42)
-    assert float(strong["sharpe"]) > float(weak["sharpe"])  # type: ignore[arg-type]
-    assert float(strong["psr"]) >= float(weak["psr"])  # type: ignore[arg-type]
+    assert float(strong["sharpe"]) > float(weak["sharpe"])
+    assert float(strong["psr"]) >= float(weak["psr"])
 
 
 def test_dsr_strictly_less_than_psr_under_multiple_trials() -> None:
     """DSR deflates PSR when multiple trials are tested."""
     single = _full_report_from_seeded_strategy(seed=42, n_trials=1)
     multi = _full_report_from_seeded_strategy(seed=42, n_trials=50)
-    assert float(multi["dsr"]) < float(single["psr"])  # type: ignore[arg-type]
+    assert float(multi["dsr"]) < float(single["psr"])
 
 
 def test_bootstrap_ci_contains_point_sharpe() -> None:
     """The 95% bootstrap CI must straddle the point estimate."""
     report = _full_report_from_seeded_strategy(seed=42)
-    lo = float(report["sharpe_ci_95_low"])  # type: ignore[arg-type]
-    hi = float(report["sharpe_ci_95_high"])  # type: ignore[arg-type]
-    sharpe = float(report["sharpe"])  # type: ignore[arg-type]
+    lo = float(report["sharpe_ci_95_low"])
+    hi = float(report["sharpe_ci_95_high"])
+    sharpe = float(report["sharpe"])
     assert lo <= sharpe <= hi
 
 
@@ -174,8 +181,8 @@ def test_bootstrap_ci_width_shrinks_with_sample_size() -> None:
     """Law of large numbers: larger samples yield tighter CIs."""
     short = _full_report_from_seeded_strategy(n_days=30, seed=42)
     long = _full_report_from_seeded_strategy(n_days=300, seed=42)
-    short_w = float(short["sharpe_ci_95_high"]) - float(short["sharpe_ci_95_low"])  # type: ignore[arg-type]
-    long_w = float(long["sharpe_ci_95_high"]) - float(long["sharpe_ci_95_low"])  # type: ignore[arg-type]
+    short_w = float(short["sharpe_ci_95_high"]) - float(short["sharpe_ci_95_low"])
+    long_w = float(long["sharpe_ci_95_high"]) - float(long["sharpe_ci_95_low"])
     assert long_w < short_w
 
 
@@ -188,5 +195,25 @@ def test_profitable_strategy_has_high_psr() -> None:
         loss_size=0.003,
         seed=42,
     )
-    psr = float(report["psr"])  # type: ignore[arg-type]
+    psr = float(report["psr"])
     assert psr > 0.90, f"got PSR={psr}"
+
+
+def test_psr_and_sharpe_are_mutually_consistent_at_nonzero_rf() -> None:
+    """PSR and Sharpe must both see the same excess-return series.
+
+    Regression test for a bug discovered in PR #20 Copilot review: PSR
+    was computed on raw daily returns while Sharpe was computed on
+    excess returns, making them silently inconsistent whenever
+    risk_free_rate > 0.
+    """
+    report_rf0 = _full_report_from_seeded_strategy(
+        win_rate=0.70, mean_return=0.004, seed=42, risk_free_rate=0.0
+    )
+    report_rf5 = _full_report_from_seeded_strategy(
+        win_rate=0.70, mean_return=0.004, seed=42, risk_free_rate=0.05
+    )
+    # Sharpe must drop when rf increases.
+    assert report_rf5["sharpe"] < report_rf0["sharpe"]
+    # PSR must also drop (not stay constant — that was the bug).
+    assert report_rf5["psr"] < report_rf0["psr"]
