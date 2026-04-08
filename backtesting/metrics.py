@@ -727,15 +727,15 @@ def _max_drawdown_absolute(
 ) -> float:
     """Peak-to-trough absolute loss in monetary units.
 
-    Returns a non-positive float: the most negative ``equity - peak``
-    value across the curve, i.e. the worst monetary loss from a
-    running peak. Returns ``0.0`` for monotonically non-decreasing
-    series and for series shorter than 2 points.
+    Returns the peak-to-trough loss as a **non-negative magnitude** in
+    monetary units (e.g. ``1250.00`` means a $1250 drawdown). Returns
+    ``0.0`` for monotonically non-decreasing series and for series
+    shorter than 2 points.
     """
     if equity_values.size < 2:
         return 0.0
     running_peak = np.maximum.accumulate(equity_values)
-    return float(np.min(equity_values - running_peak))
+    return float(-np.min(equity_values - running_peak))
 
 
 def _ulcer_index(
@@ -744,11 +744,16 @@ def _ulcer_index(
     """Ulcer Index: RMS of percentage drawdowns from running peak.
 
     Formula: ``UI = sqrt( mean( DD_i^2 ) )`` with
-    ``DD_i = 100 * (equity_i - peak_i) / peak_i``.
+    ``DD_i = (equity_i - peak_i) / peak_i``.
 
-    Captures BOTH the depth and the duration of drawdowns, unlike
-    max-drawdown which only sees the worst single point. A strictly
-    monotonic equity curve yields ``UI = 0`` exactly.
+    The classical Martin & McCann definition uses percentage points
+    (``× 100``); we deliberately keep ``DD_i`` as a fraction so that
+    the Ulcer Index lives in the same unit system as ``CAGR`` and
+    ``risk_free_rate`` (both fractions) and the Martin ratio
+    ``(CAGR - rf) / UI`` is dimensionally consistent across the
+    report. Captures BOTH the depth and the duration of drawdowns,
+    unlike max-drawdown which only sees the worst single point. A
+    strictly monotonic equity curve yields ``UI = 0`` exactly.
 
     Reference:
         Martin, P. G., & McCann, B. B. (1989). The Investor's Guide
@@ -758,12 +763,12 @@ def _ulcer_index(
         return 0.0
     running_peak = np.maximum.accumulate(equity_values)
     safe_peak = np.where(running_peak > 0, running_peak, 1.0)
-    dd_pct = np.where(
+    drawdowns = np.where(
         running_peak > 0,
-        100.0 * (equity_values - running_peak) / safe_peak,
+        (equity_values - running_peak) / safe_peak,
         0.0,
     )
-    return float(math.sqrt(float(np.mean(dd_pct**2))))
+    return float(math.sqrt(float(np.mean(drawdowns**2))))
 
 
 def _martin_ratio(
@@ -829,6 +834,14 @@ def _sortino_ratio(
     downside = np.minimum(excess - target_return, 0.0)
     dd_var = float(np.mean(downside**2))
     if dd_var <= 0.0:
+        # Aligned with the public ``sortino_ratio()``: sign-aware
+        # infinity for zero-downside series so callers can still order
+        # strategies (consistent gains -> +inf, losses -> -inf).
+        mean_excess = float(np.mean(excess))
+        if mean_excess > 0:
+            return float("inf")
+        if mean_excess < 0:
+            return float("-inf")
         return 0.0
     dd_dev = math.sqrt(dd_var)
     return float(np.mean(excess)) / dd_dev * annual_factor
@@ -910,7 +923,12 @@ def full_report(
     daily_returns = daily_returns_from_equity(daily_curve)
     final_equity = curve[-1]
 
-    dd, dd_dur = max_drawdown(curve)
+    # Drawdown metrics are computed on the daily-resampled equity
+    # curve so they share the same time basis as the Sharpe / PSR /
+    # DSR / bootstrap CI block (which already uses daily returns).
+    # Mixing per-trade and daily curves silently desynchronises
+    # max_drawdown from ulcer_index — see PR #24 review.
+    dd, dd_dur = max_drawdown(daily_curve)
     avg_w, avg_l = avg_win_loss(trades)
 
     # Per Bailey & Lopez de Prado (2012, 2014), PSR and DSR must be computed
@@ -943,8 +961,20 @@ def full_report(
     # Drawdown / tail-risk metrics (ADR-0002 Section A item 6).
     equity_values = np.asarray(daily_curve, dtype=float)
     daily_returns_arr = np.asarray(daily_returns, dtype=float)
-    n_active_days = max(1, len(daily_curve) - 1)
-    years = n_active_days / 365.25
+    # CAGR must be annualised on calendar time, not on the count of
+    # active trading days. A strategy that fires once per week over a
+    # year would otherwise report ~52 "days" -> 0.14 years -> wildly
+    # inflated CAGR. Use first/last trade timestamps for the span.
+    sorted_trades = sorted(trades, key=lambda t: t.exit_timestamp_ms)
+    if len(sorted_trades) >= 2:
+        span_ms = max(
+            sorted_trades[-1].exit_timestamp_ms - sorted_trades[0].entry_timestamp_ms,
+            1,
+        )
+        years = span_ms / (365.25 * 24.0 * 3600.0 * 1000.0)
+    else:
+        years = 1.0 / 365.25
+    years = max(years, 1.0 / 365.25)  # one-day floor to avoid div-by-near-zero
     total_return = final_equity / initial_capital - 1.0
     if years > 0 and (1.0 + total_return) > 0:
         cagr = (1.0 + total_return) ** (1.0 / years) - 1.0
@@ -991,7 +1021,7 @@ def full_report(
         "cagr": float(cagr),
         "max_drawdown": dd,
         "max_drawdown_absolute": float(max_dd_abs),
-        "max_drawdown_duration_bars": dd_dur,
+        "max_drawdown_duration_days": dd_dur,
         "ulcer_index": float(ulcer),
         "martin_ratio": float(martin),
         "return_skewness": float(dist_stats["skewness"]),
