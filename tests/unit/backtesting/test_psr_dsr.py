@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
@@ -145,6 +146,7 @@ class TestMinTRL:
         assert result >= 1
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 class TestPBO:
     def test_no_degradation_low(self) -> None:
         # PBO formula: d=0 (no degradation), log_f=log(10)/log(100)=0.5
