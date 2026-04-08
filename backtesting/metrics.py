@@ -1042,3 +1042,147 @@ def full_report(
     if pbo is not None:
         report["pbo"] = float(pbo)
     return report
+
+
+# ---------------------------------------------------------------------------
+# Cost sensitivity analysis (ADR-0002 Section A item 7)
+# ---------------------------------------------------------------------------
+
+
+def _apply_cost_to_trades(
+    trades: list[TradeRecord],
+    total_bps: float,
+) -> list[TradeRecord]:
+    """Return a new trade list with round-trip costs applied to net PnL.
+
+    Cost model: ``cost_per_trade = 2 * notional * (total_bps / 1e4)``
+    where ``notional = abs(entry_price * size)``. Falls back to
+    ``abs(net_pnl)`` as a notional proxy when entry_price or size are
+    missing or zero (synthetic fixture trades sometimes omit price
+    information).
+
+    Does **not** mutate the input list or any of its frozen
+    ``TradeRecord`` instances; new records are produced via
+    ``model_copy(update=...)``. Returning a verbatim copy when
+    ``total_bps <= 0`` keeps the no-mutation contract uniform.
+
+    Reference:
+        Pardo, R. (2008). The Evaluation and Optimization of Trading
+        Strategies. Chapter 7 (transaction costs).
+    """
+    if total_bps <= 0.0:
+        return list(trades)
+
+    cost_fraction = Decimal(str(2.0 * total_bps / 10_000.0))
+    adjusted: list[TradeRecord] = []
+    for trade in trades:
+        notional = abs(trade.entry_price * trade.size)
+        if notional == 0:
+            notional = abs(trade.net_pnl)
+        cost = notional * cost_fraction
+        new_net = trade.net_pnl - cost
+        adjusted.append(trade.model_copy(update={"net_pnl": new_net}))
+    return adjusted
+
+
+def cost_sensitivity_report(
+    trades: list[TradeRecord],
+    initial_capital: float,
+    realistic_cost_bps: float,
+    *,
+    risk_free_rate: float = 0.05,
+    n_trials: int = 1,
+) -> dict[str, Any]:
+    """Evaluate a strategy under 3 cost regimes per ADR-0002 item 7.
+
+    Runs :func:`full_report` three times with zero, realistic, and
+    stress (``2x`` realistic) round-trip transaction costs and returns
+    a comparison dict with Sharpe-degradation percentages and binary
+    profitability flags.
+
+    Per ADR-0002 Section A item 7, a strategy that is profitable under
+    zero cost but fails under the realistic regime must be rejected.
+    The realistic ``bps`` value is split evenly into commission /
+    spread / impact components for the metadata field; this split is
+    informational only — the cost is applied as a single scalar to
+    ``net_pnl``.
+
+    Args:
+        trades: List of :class:`~core.models.order.TradeRecord` to
+            evaluate. The list is not mutated.
+        initial_capital: Starting capital in monetary units.
+        realistic_cost_bps: Realistic round-trip cost in basis points
+            (``10.0`` = ``0.10%`` per round trip).
+        risk_free_rate: Annualised risk-free rate forwarded to
+            :func:`full_report`.
+        n_trials: Number of strategy variants tested (forwarded to
+            DSR via :func:`full_report`).
+
+    Returns:
+        Dict with keys ``zero``, ``realistic``, ``stress`` (each a
+        full ``full_report`` dict), the input cost bps,
+        ``cost_split_metadata``, the two
+        ``sharpe_degradation_zero_to_*`` percentages, and the
+        ``profitable_under_*`` flags.
+
+    Reference:
+        Pardo, R. (2008). The Evaluation and Optimization of Trading
+        Strategies. Chapter 7.
+        Lopez de Prado, M. (2018). Advances in Financial Machine
+        Learning. Chapter 14.
+        ADR-0002 Quant Methodology Charter, Section A item 7.
+    """
+    stress_bps = 2.0 * realistic_cost_bps
+
+    trades_zero = _apply_cost_to_trades(trades, 0.0)
+    trades_realistic = _apply_cost_to_trades(trades, realistic_cost_bps)
+    trades_stress = _apply_cost_to_trades(trades, stress_bps)
+
+    report_zero = full_report(
+        trades=trades_zero,
+        initial_capital=initial_capital,
+        risk_free_rate=risk_free_rate,
+        n_trials=n_trials,
+    )
+    report_realistic = full_report(
+        trades=trades_realistic,
+        initial_capital=initial_capital,
+        risk_free_rate=risk_free_rate,
+        n_trials=n_trials,
+    )
+    report_stress = full_report(
+        trades=trades_stress,
+        initial_capital=initial_capital,
+        risk_free_rate=risk_free_rate,
+        n_trials=n_trials,
+    )
+
+    sharpe_z = float(report_zero["sharpe"])
+    sharpe_r = float(report_realistic["sharpe"])
+    sharpe_s = float(report_stress["sharpe"])
+
+    def _degradation(a: float, b: float) -> float:
+        if a == 0.0 or not math.isfinite(a) or not math.isfinite(b):
+            return 0.0
+        return (a - b) / abs(a) * 100.0
+
+    cost_split = {
+        "commission_bps": realistic_cost_bps / 3.0,
+        "spread_bps": realistic_cost_bps / 3.0,
+        "impact_bps": realistic_cost_bps / 3.0,
+    }
+
+    return {
+        "zero": report_zero,
+        "realistic": report_realistic,
+        "stress": report_stress,
+        "realistic_cost_bps": float(realistic_cost_bps),
+        "stress_cost_bps": float(stress_bps),
+        "cost_split_metadata": cost_split,
+        "sharpe_degradation_zero_to_realistic": _degradation(sharpe_z, sharpe_r),
+        "sharpe_degradation_zero_to_stress": _degradation(sharpe_z, sharpe_s),
+        "profitable_under_realistic": (
+            sharpe_r > 0.0 and float(report_realistic["total_pnl"]) > 0.0
+        ),
+        "profitable_under_stress": (sharpe_s > 0.0 and float(report_stress["total_pnl"]) > 0.0),
+    }
