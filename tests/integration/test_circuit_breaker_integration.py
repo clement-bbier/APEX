@@ -1,64 +1,181 @@
 """
 Integration test: circuit breaker prevents execution when triggered.
-Tests the safety invariant: once open, NO orders can be submitted.
+Tests the safety invariant: once OPEN, NO orders can be submitted.
+
+Migrated from the legacy synchronous v1 API to the canonical async v2
+``CircuitBreaker.check()`` / ``get_snapshot()`` surface (issue #9).
 """
 
 from __future__ import annotations
 
-import fakeredis.aioredis
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker, CircuitState
+import fakeredis.aioredis
+import pytest
+
+from services.s05_risk_manager.circuit_breaker import CircuitBreaker
+from services.s05_risk_manager.models import (
+    HALF_OPEN_RECOVERY_MINUTES,
+    BlockReason,
+    CircuitBreakerSnapshot,
+    CircuitBreakerState,
+)
 
 
 def make_cb() -> CircuitBreaker:
-    """Return a fresh CircuitBreaker backed by fakeredis."""
+    """Return a fresh CircuitBreaker backed by an isolated fakeredis."""
     return CircuitBreaker(fakeredis.aioredis.FakeRedis())
 
 
+# ── neutral inputs that never trip any trigger ─────────────────────────
+NEUTRAL_KWARGS: dict[str, object] = {
+    "current_daily_pnl": Decimal("0"),
+    "starting_capital": Decimal("100000"),
+    "intraday_loss_30m": Decimal("0"),
+    "vix_current": 20.0,
+    "vix_1h_ago": 20.0,
+    "service_last_seen": {},
+}
+
+
+def _kwargs(**overrides: object) -> dict[str, object]:
+    return {**NEUTRAL_KWARGS, **overrides}
+
+
 class TestCircuitBreakerIntegration:
-    def test_all_triggers_open_breaker(self) -> None:
-        """All six trigger paths must trip the breaker."""
-        triggers = [
-            lambda cb: cb.update_daily_pnl(-0.031),  # -3.1% > 3% threshold
-            lambda cb: cb.update_30min_pnl(-0.025),  # 2.5% rolling loss > 2%
-            lambda cb: cb.update_vix_change(0.21),  # 21% VIX spike > 20%
-            lambda cb: cb.notify_service_down("s01", 65),  # 65s > 60s timeout
-            lambda cb: cb.update_price_gap(0.06),  # 6% gap > 5% threshold
+    @pytest.mark.asyncio
+    async def test_all_triggers_open_breaker(self) -> None:
+        """Each v2 trigger path must trip the breaker to OPEN."""
+        # Map: human label -> kwargs override that should trip the CB.
+        # NB: the legacy "price gap" trigger does not exist in the v2 API
+        # (see circuit_breaker.py docstring -- only 4 triggers are wired).
+        triggers: list[tuple[str, dict[str, object], BlockReason]] = [
+            (
+                "daily_drawdown",
+                {
+                    "current_daily_pnl": Decimal("-3100"),  # -3.1% of 100k
+                    "starting_capital": Decimal("100000"),
+                },
+                BlockReason.DAILY_DRAWDOWN_EXCEEDED,
+            ),
+            (
+                "intraday_30m",
+                {
+                    "intraday_loss_30m": Decimal("-2500"),  # -2.5% of 100k
+                    "starting_capital": Decimal("100000"),
+                },
+                BlockReason.INTRADAY_LOSS_EXCEEDED,
+            ),
+            (
+                "vix_spike",
+                {"vix_current": 24.2, "vix_1h_ago": 20.0},  # +21%
+                BlockReason.VIX_SPIKE,
+            ),
+            (
+                "service_down",
+                {
+                    "service_last_seen": {
+                        "s01": datetime.now(UTC) - timedelta(seconds=65),
+                    },
+                },
+                BlockReason.SERVICE_DOWN,
+            ),
         ]
-        for i, trigger in enumerate(triggers):
+
+        for label, override, expected_reason in triggers:
             cb = make_cb()
-            assert cb.state == CircuitState.CLOSED, f"Trigger {i}: should start CLOSED"
-            trigger(cb)
-            assert cb.state == CircuitState.OPEN, f"Trigger {i}: should be OPEN after trigger"
-            assert cb.allows_new_orders() is False, f"Trigger {i}: must block orders"
+            initial = await cb.get_snapshot()
+            assert initial.state == CircuitBreakerState.CLOSED, f"{label}: should start CLOSED"
 
-    def test_open_breaker_blocks_all_orders(self) -> None:
+            result = await cb.check(**_kwargs(**override))  # type: ignore[arg-type]
+            assert result.passed is False, f"{label}: check() must fail"
+            assert result.block_reason == expected_reason, (
+                f"{label}: wrong block reason {result.block_reason}"
+            )
+
+            snap = await cb.get_snapshot()
+            assert snap.state == CircuitBreakerState.OPEN, (
+                f"{label}: state should be OPEN, got {snap.state}"
+            )
+
+    @pytest.mark.asyncio
+    async def test_open_breaker_blocks_all_orders(self) -> None:
         cb = make_cb()
-        cb.update_daily_pnl(-0.04)  # trigger
-        assert cb.state == CircuitState.OPEN
+        # Trip via daily drawdown (-4%).
+        await cb.check(
+            **_kwargs(
+                current_daily_pnl=Decimal("-4000"),
+                starting_capital=Decimal("100000"),
+            )  # type: ignore[arg-type]
+        )
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitBreakerState.OPEN
 
-        # Verify 100 consecutive order checks all fail
+        # 100 consecutive checks with neutral inputs must all be blocked.
         for _ in range(100):
-            assert cb.allows_new_orders() is False
+            result = await cb.check(**NEUTRAL_KWARGS)  # type: ignore[arg-type]
+            assert result.passed is False
+            assert result.block_reason == BlockReason.CIRCUIT_BREAKER_OPEN
 
-    def test_breaker_recovers_after_reset(self) -> None:
+    @pytest.mark.asyncio
+    async def test_breaker_recovers_after_reset(self) -> None:
+        """OPEN -> HALF_OPEN (after cooldown) -> CLOSED (probe success)."""
         cb = make_cb()
-        cb.update_daily_pnl(-0.04)
-        assert cb.state == CircuitState.OPEN
+        await cb.check(
+            **_kwargs(
+                current_daily_pnl=Decimal("-4000"),
+                starting_capital=Decimal("100000"),
+            )  # type: ignore[arg-type]
+        )
+        tripped = await cb.get_snapshot()
+        assert tripped.state == CircuitBreakerState.OPEN
 
-        # Manual reset (used at start of new trading day)
-        cb.reset()
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        # Simulate cooldown elapsing by rewriting tripped_at into the past.
+        past = datetime.now(UTC) - timedelta(minutes=HALF_OPEN_RECOVERY_MINUTES + 1)
+        rewound = CircuitBreakerSnapshot(
+            state=CircuitBreakerState.OPEN,
+            tripped_at=past,
+            tripped_reason=tripped.tripped_reason,
+            daily_pnl=tripped.daily_pnl,
+            daily_loss_pct=tripped.daily_loss_pct,
+            intraday_loss_30m=tripped.intraday_loss_30m,
+            consecutive_losses=tripped.consecutive_losses,
+            recovery_attempts=tripped.recovery_attempts,
+            last_updated=past,
+        )
+        await cb._save_snapshot(rewound)
 
-    def test_starts_closed(self) -> None:
+        # Next check() transitions OPEN -> HALF_OPEN and lets a probe through.
+        probe_result = await cb.check(**NEUTRAL_KWARGS)  # type: ignore[arg-type]
+        assert probe_result.passed is True
+        half_open = await cb.get_snapshot()
+        assert half_open.state == CircuitBreakerState.HALF_OPEN
+
+        # A successful probe trade closes the breaker.
+        await cb.record_trade_result(Decimal("100"))
+        closed = await cb.get_snapshot()
+        assert closed.state == CircuitBreakerState.CLOSED
+
+    @pytest.mark.asyncio
+    async def test_starts_closed(self) -> None:
         cb = make_cb()
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitBreakerState.CLOSED
 
-    def test_below_threshold_does_not_trip(self) -> None:
-        """Losses below threshold must not trip the breaker."""
+        result = await cb.check(**NEUTRAL_KWARGS)  # type: ignore[arg-type]
+        assert result.passed is True
+
+    @pytest.mark.asyncio
+    async def test_below_threshold_does_not_trip(self) -> None:
+        """Losses below thresholds must not trip the breaker."""
         cb = make_cb()
-        cb.update_daily_pnl(-0.025)  # -2.5% < 3% threshold
-        assert cb.state == CircuitState.CLOSED
-        assert cb.allows_new_orders() is True
+        result = await cb.check(
+            **_kwargs(
+                current_daily_pnl=Decimal("-2500"),  # -2.5% < 3% threshold
+                starting_capital=Decimal("100000"),
+            )  # type: ignore[arg-type]
+        )
+        assert result.passed is True
+        snap = await cb.get_snapshot()
+        assert snap.state == CircuitBreakerState.CLOSED

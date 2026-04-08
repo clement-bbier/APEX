@@ -6,20 +6,10 @@ Run: docker compose -f docker/docker-compose.test.yml up -d
 
 from __future__ import annotations
 
-import asyncio
 import os
 
-import pytest
 import pytest_asyncio
 import redis.asyncio as aioredis
-
-
-@pytest.fixture(scope="session")
-def event_loop():  # type: ignore[override]
-    """Session-scoped event loop for all integration tests."""
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
 
 
 @pytest_asyncio.fixture(scope="session")
