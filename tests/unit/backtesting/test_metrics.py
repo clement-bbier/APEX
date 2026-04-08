@@ -16,6 +16,7 @@ import pytest
 
 from backtesting.metrics import (
     backtest_overfitting_probability,
+    cost_sensitivity_report,
     full_report,
     probability_of_backtest_overfitting_cpcv,
 )
@@ -447,3 +448,70 @@ def test_ulcer_and_martin_ratio_share_fractional_units() -> None:
         f"Ulcer Index {report['ulcer_index']} looks like percent, "
         f"not fraction — did the 100x multiplier come back?"
     )
+
+
+# ---------------------------------------------------------------------------
+# Cost sensitivity report (issue #25 — ADR-0002 Section A item 7)
+# ---------------------------------------------------------------------------
+
+
+def test_cost_sensitivity_zero_scenario_matches_bare_full_report() -> None:
+    """Zero cost scenario must equal a bare full_report() call."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    cost_report = cost_sensitivity_report(
+        trades=trades, initial_capital=initial, realistic_cost_bps=10.0
+    )
+    bare = full_report(trades=trades, initial_capital=initial)
+    assert cost_report["zero"]["sharpe"] == pytest.approx(bare["sharpe"], rel=1e-9)
+    assert cost_report["zero"]["total_pnl"] == pytest.approx(bare["total_pnl"], rel=1e-9)
+
+
+def test_cost_sensitivity_realistic_sharpe_less_than_zero_cost() -> None:
+    """Adding costs must reduce (or keep equal) the Sharpe ratio."""
+    trades, initial = _seeded_equity_curve(n_days=60, win_rate=0.7, mean_return=0.004, seed=42)
+    cost_report = cost_sensitivity_report(
+        trades=trades, initial_capital=initial, realistic_cost_bps=20.0
+    )
+    assert cost_report["realistic"]["sharpe"] <= cost_report["zero"]["sharpe"]
+
+
+def test_cost_sensitivity_stress_sharpe_less_than_realistic() -> None:
+    """Stress (2x) cost must degrade further than realistic."""
+    trades, initial = _seeded_equity_curve(n_days=60, win_rate=0.7, mean_return=0.004, seed=42)
+    cost_report = cost_sensitivity_report(
+        trades=trades, initial_capital=initial, realistic_cost_bps=20.0
+    )
+    assert cost_report["stress"]["sharpe"] <= cost_report["realistic"]["sharpe"]
+
+
+def test_cost_sensitivity_profitability_flags_consistent() -> None:
+    """Profitability flag must agree with Sharpe sign and total_pnl sign."""
+    trades, initial = _seeded_equity_curve(n_days=60, win_rate=0.7, mean_return=0.005, seed=42)
+    cost_report = cost_sensitivity_report(
+        trades=trades, initial_capital=initial, realistic_cost_bps=15.0
+    )
+    flag_r = cost_report["profitable_under_realistic"]
+    sharpe_r = cost_report["realistic"]["sharpe"]
+    pnl_r = cost_report["realistic"]["total_pnl"]
+    assert flag_r == (sharpe_r > 0 and pnl_r > 0)
+
+
+def test_cost_sensitivity_sharpe_degradation_non_negative() -> None:
+    """Degradation % must be non-negative when zero-cost Sharpe is positive."""
+    trades, initial = _seeded_equity_curve(n_days=60, win_rate=0.7, mean_return=0.005, seed=42)
+    cost_report = cost_sensitivity_report(
+        trades=trades, initial_capital=initial, realistic_cost_bps=10.0
+    )
+    if cost_report["zero"]["sharpe"] > 0:
+        assert cost_report["sharpe_degradation_zero_to_realistic"] >= 0.0
+        assert cost_report["sharpe_degradation_zero_to_stress"] >= 0.0
+
+
+def test_cost_sensitivity_does_not_mutate_input_trades() -> None:
+    """The original trades list and its frozen records must be untouched."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    snapshot_pnls = [t.net_pnl for t in trades]
+    snapshot_ids = [id(t) for t in trades]
+    _ = cost_sensitivity_report(trades=trades, initial_capital=initial, realistic_cost_bps=10.0)
+    assert [t.net_pnl for t in trades] == snapshot_pnls
+    assert [id(t) for t in trades] == snapshot_ids
