@@ -652,21 +652,30 @@ def full_report(
     dd, dd_dur = max_drawdown(curve)
     avg_w, avg_l = avg_win_loss(trades)
 
-    daily_returns_arr = np.asarray(daily_returns, dtype=float)
+    # Per Bailey & Lopez de Prado (2012, 2014), PSR and DSR must be computed
+    # on the same excess-return series that the headline Sharpe is built from
+    # — otherwise PSR/DSR would be silently inconsistent with Sharpe whenever
+    # risk_free_rate != 0. sharpe_ratio() subtracts ``rf / annual_factor**2``
+    # internally; we mirror that here exactly.
+    rf_per_period = risk_free_rate / (_ANNUAL_FACTOR_DAILY**2)
+    daily_excess_returns = [r - rf_per_period for r in daily_returns]
+    daily_excess_returns_arr = np.asarray(daily_excess_returns, dtype=float)
     psr = probabilistic_sharpe_ratio(
-        daily_returns,
+        daily_excess_returns,
         benchmark_sharpe=0.0,
         annual_factor=_ANNUAL_FACTOR_DAILY,
     )
     dsr = deflated_sharpe_ratio(
-        daily_returns,
+        daily_excess_returns,
         n_trials=n_trials,
         annual_factor=_ANNUAL_FACTOR_DAILY,
         benchmark_sharpe=0.0,
     )
+    # Excess returns are already net of rf, so pass rf=0 to avoid double
+    # subtraction inside sharpe_ratio() within the bootstrap.
     ci_low, ci_high = _stationary_bootstrap_sharpe_ci(
-        daily_returns_arr,
-        risk_free_rate=risk_free_rate,
+        daily_excess_returns_arr,
+        risk_free_rate=0.0,
         annual_factor=_ANNUAL_FACTOR_DAILY,
     )
 
