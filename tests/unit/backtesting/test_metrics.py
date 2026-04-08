@@ -7,12 +7,19 @@ WR > 80% and PF > 2 must yield a strictly positive Sharpe.
 
 from __future__ import annotations
 
+import math
 from decimal import Decimal
 from typing import Any
 
 import numpy as np
+import pytest
 
-from backtesting.metrics import full_report
+from backtesting.metrics import (
+    backtest_overfitting_probability,
+    full_report,
+    probability_of_backtest_overfitting_cpcv,
+)
+from backtesting.walk_forward import CombinatorialPurgedCV
 from core.models.order import TradeRecord
 from core.models.signal import Direction
 
@@ -217,3 +224,125 @@ def test_psr_and_sharpe_are_mutually_consistent_at_nonzero_rf() -> None:
     assert report_rf5["sharpe"] < report_rf0["sharpe"]
     # PSR must also drop (not stay constant — that was the bug).
     assert report_rf5["psr"] < report_rf0["psr"]
+
+
+# ---------------------------------------------------------------------------
+# Rank-PBO via CPCV (issue #21) — Bailey, Borwein, Lopez de Prado, Zhu (2014)
+# ---------------------------------------------------------------------------
+
+
+class _MockCV:
+    """Minimal CV stub yielding hand-crafted (train_idx, test_idx) splits."""
+
+    def __init__(self, splits: list[tuple[list[int], list[int]]]) -> None:
+        self._splits = splits
+
+    def split(self, n_samples: int) -> list[tuple[list[int], list[int]]]:
+        del n_samples
+        return self._splits
+
+
+def test_pbo_perfect_overfit_returns_one() -> None:
+    """When IS-best is always OOS-worst, PBO must equal 1.0.
+
+    Two designed splits over 20 observations and 3 strategies. In each
+    split the strategy that wins on training is constructed to lose on
+    test, so its OOS rank is 1, omega = 1.5/4 = 0.375 and lambda < 0.
+    """
+    n_obs = 20
+    half = n_obs // 2
+    # strat 0: high in [0..9], low in [10..19] → wins train A, loses test A
+    # strat 1: low in [0..9], high in [10..19] → wins train B, loses test B
+    # strat 2: flat — never IS-best, irrelevant for the assertion
+    returns = np.zeros((n_obs, 3), dtype=float)
+    returns[:half, 0] = 0.02
+    returns[half:, 0] = -0.02
+    returns[:half, 1] = -0.02
+    returns[half:, 1] = 0.02
+    returns[:, 2] = 0.0001  # tiny constant noise floor
+    splits = [
+        (list(range(0, half)), list(range(half, n_obs))),
+        (list(range(half, n_obs)), list(range(0, half))),
+    ]
+    cv = _MockCV(splits)
+    pbo = probability_of_backtest_overfitting_cpcv(returns, cv)  # type: ignore[arg-type]
+    assert pbo == 1.0, f"expected PBO=1.0 for perfect overfit, got {pbo}"
+
+
+def test_pbo_no_overfit_returns_zero() -> None:
+    """When the IS-best is also the OOS-best on every split, PBO = 0.0.
+
+    Strategy 0 has uniformly positive returns; all other strategies have
+    flat or strictly worse returns. On every CPCV split strategy 0 is
+    both IS-best and OOS-best, so its OOS rank is N (top), omega is
+    close to 1 and lambda > 0 — never counted in PBO.
+    """
+    rng = np.random.default_rng(7)
+    n_obs, n_strats = 60, 5
+    returns = rng.normal(0.0, 0.001, size=(n_obs, n_strats))
+    returns[:, 0] = 0.01  # strategy 0 dominates uniformly
+    cv = CombinatorialPurgedCV(n_splits=6, n_test_splits=2, embargo_pct=0.0)
+    pbo = probability_of_backtest_overfitting_cpcv(returns, cv)
+    assert pbo == 0.0, f"expected PBO=0.0 for no overfit, got {pbo}"
+
+
+def test_pbo_random_strategies_around_half() -> None:
+    """20 uncorrelated random strategies should yield PBO ~ 0.5."""
+    rng = np.random.default_rng(42)
+    n_obs, n_strats = 500, 20
+    returns = rng.normal(0.0, 0.01, size=(n_obs, n_strats))
+    cv = CombinatorialPurgedCV(n_splits=10, n_test_splits=2, embargo_pct=0.0)
+    pbo = probability_of_backtest_overfitting_cpcv(returns, cv)
+    assert 0.35 <= pbo <= 0.65, f"expected ~0.5, got {pbo}"
+
+
+def test_pbo_logit_handles_boundary_ranks() -> None:
+    """omega at the rank-1 and rank-N extremes must yield finite logits.
+
+    With ``omega = (rank + 0.5) / (N + 1)`` the boundary values are
+    ``1.5/(N+1)`` and ``(N+0.5)/(N+1)`` — both strictly inside (0, 1)
+    so the logit is finite (no inf, no nan) regardless of N.
+    """
+    # rank=1 case (worst): build a matrix where strat 0 is always worst.
+    rng = np.random.default_rng(123)
+    n_obs, n_strats = 60, 4
+    returns = rng.normal(0.005, 0.001, size=(n_obs, n_strats))
+    returns[:, 0] = -0.01  # strategy 0 strictly worst (and lowest IS too)
+    cv = CombinatorialPurgedCV(n_splits=6, n_test_splits=2, embargo_pct=0.0)
+    pbo = probability_of_backtest_overfitting_cpcv(returns, cv)
+    assert math.isfinite(pbo)
+    assert 0.0 <= pbo <= 1.0
+
+
+def test_pbo_raises_on_single_strategy() -> None:
+    """PBO is undefined for fewer than 2 strategies."""
+    returns = np.ones((50, 1), dtype=float) * 0.01
+    cv = CombinatorialPurgedCV(n_splits=6, n_test_splits=2, embargo_pct=0.0)
+    with pytest.raises(ValueError, match="at least 2 strategies"):
+        probability_of_backtest_overfitting_cpcv(returns, cv)
+
+
+def test_pbo_deprecated_scalar_still_callable() -> None:
+    """Old scalar API still works but emits DeprecationWarning."""
+    with pytest.warns(DeprecationWarning, match="deprecated"):
+        result = backtest_overfitting_probability(1.5, 0.8, 10)
+    assert isinstance(result, float)
+    assert 0.0 <= result <= 1.0
+
+
+def test_full_report_pbo_field_present_when_matrix_provided() -> None:
+    """full_report() exposes a `pbo` field iff a returns matrix is given."""
+    trades, initial = _seeded_equity_curve(n_days=60, win_rate=0.65, seed=11)
+    rng = np.random.default_rng(11)
+    returns_matrix = rng.normal(0.0, 0.01, size=(120, 5))
+    report_no_matrix = full_report(trades=trades, initial_capital=initial)
+    report_with = full_report(
+        trades=trades,
+        initial_capital=initial,
+        strategy_returns_matrix=returns_matrix,
+        n_cv_splits=6,
+        n_cv_test_splits=2,
+    )
+    assert "pbo" not in report_no_matrix
+    assert "pbo" in report_with
+    assert 0.0 <= float(report_with["pbo"]) <= 1.0
