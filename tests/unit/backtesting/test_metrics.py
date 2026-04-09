@@ -547,3 +547,89 @@ def test_cost_sensitivity_rejects_invalid_bps() -> None:
             initial_capital=initial,
             realistic_cost_bps=float("inf"),
         )
+
+
+# ---------------------------------------------------------------------------
+# Regime decomposition (ADR-0002 Section A item 10)
+# ---------------------------------------------------------------------------
+
+
+def test_regime_breakdown_has_all_fields_per_regime() -> None:
+    """Every regime must have the 8 fields."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    half = len(trades) // 2
+    trades_tagged = [t.model_copy(update={"regime_at_entry": "low_vol"}) for t in trades[:half]] + [
+        t.model_copy(update={"regime_at_entry": "high_vol"}) for t in trades[half:]
+    ]
+    report = full_report(trades=trades_tagged, initial_capital=initial)
+    by_regime = report["by_regime"]
+    assert "low_vol" in by_regime
+    assert "high_vol" in by_regime
+    for regime_stats in by_regime.values():
+        for field in [
+            "trade_count",
+            "win_rate",
+            "hit_rate",
+            "total_pnl",
+            "avg_pnl",
+            "sharpe",
+            "max_drawdown",
+            "ulcer_index",
+        ]:
+            assert field in regime_stats, f"missing {field}"
+
+
+def test_regime_concentration_one_on_single_regime() -> None:
+    """All PnL in one regime -> HHI = 1.0."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    trades_tagged = [t.model_copy(update={"regime_at_entry": "only"}) for t in trades]
+    report = full_report(trades=trades_tagged, initial_capital=initial)
+    assert report["regime_concentration"] == pytest.approx(1.0, abs=1e-9)
+
+
+def test_regime_concentration_balanced_three_regimes() -> None:
+    """Three regimes with approximately equal PnL -> HHI near 1/3."""
+    trades, initial = _seeded_equity_curve(seed=42, n_days=90, win_rate=0.7, mean_return=0.004)
+    third = len(trades) // 3
+    trades_tagged = (
+        [t.model_copy(update={"regime_at_entry": "a"}) for t in trades[:third]]
+        + [t.model_copy(update={"regime_at_entry": "b"}) for t in trades[third : 2 * third]]
+        + [t.model_copy(update={"regime_at_entry": "c"}) for t in trades[2 * third :]]
+    )
+    report = full_report(trades=trades_tagged, initial_capital=initial)
+    hhi = report["regime_concentration"]
+    assert 0.20 <= hhi <= 0.60, f"HHI={hhi} outside expected range for ~balanced 3 regimes"
+
+
+def test_regime_with_one_trade_returns_zero_metrics() -> None:
+    """A regime with a single trade gets zero Sharpe/DD/Ulcer (not raise)."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    tagged = [
+        (
+            t.model_copy(update={"regime_at_entry": "singleton"})
+            if i == 0
+            else t.model_copy(update={"regime_at_entry": "bulk"})
+        )
+        for i, t in enumerate(trades)
+    ]
+    report = full_report(trades=tagged, initial_capital=initial)
+    singleton = report["by_regime"]["singleton"]
+    assert singleton["trade_count"] == 1
+    assert singleton["sharpe"] == 0.0
+    assert singleton["max_drawdown"] == 0.0
+    assert singleton["ulcer_index"] == 0.0
+
+
+def test_regime_sharpe_preserved_under_reordering() -> None:
+    """Shuffling trades within a regime doesn't change its per-regime Sharpe."""
+    import random as _random
+
+    trades, initial = _seeded_equity_curve(seed=42)
+    tagged = [t.model_copy(update={"regime_at_entry": "only"}) for t in trades]
+    report1 = full_report(trades=tagged, initial_capital=initial)
+    shuffled = list(tagged)
+    _random.Random(99).shuffle(shuffled)
+    report2 = full_report(trades=shuffled, initial_capital=initial)
+    assert report1["by_regime"]["only"]["sharpe"] == pytest.approx(
+        report2["by_regime"]["only"]["sharpe"], rel=1e-9
+    )
