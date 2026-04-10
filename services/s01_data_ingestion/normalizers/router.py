@@ -38,9 +38,7 @@ class NormalizerRouter:
             raise KeyError(f"No normalizer registered for {key}")
         return self._registry[key]
 
-    def normalize(
-        self, connector: str, data_type: str, raw: object, asset: Asset
-    ) -> object:
+    def normalize(self, connector: str, data_type: str, raw: object, asset: Asset) -> object:
         """Normalize a single raw record via the registered strategy."""
         return self.get(connector, data_type).normalize(raw, asset)
 
