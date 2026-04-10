@@ -63,6 +63,7 @@ module = [
     "zmq.*",
     "fredapi.*",
     "fakeredis.*",
+    "tqdm.*",
     "apex_mc.*",
     "scipy.*",
     "defusedxml.*",
@@ -84,7 +85,10 @@ ignore_errors = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-markers = ["integration: tests requiring external services (TimescaleDB, etc.)"]
+markers = [
+    "integration: tests requiring external services (TimescaleDB, etc.)",
+    "network: tests requiring network access (downloads, API calls)",
+]
 addopts = "-ra --strict-markers --strict-config"
 filterwarnings = [
     "error",
