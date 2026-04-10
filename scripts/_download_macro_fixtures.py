@@ -24,7 +24,7 @@ FIXTURES = Path(__file__).resolve().parent.parent / "tests" / "fixtures"
 def download_fred_fixture() -> None:
     """Download FEDFUNDS 2024 from FRED and save as JSON fixture."""
     try:
-        from fredapi import Fred  # type: ignore[import-untyped]
+        from fredapi import Fred
 
         from core.config import get_settings
 
