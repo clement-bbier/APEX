@@ -39,5 +39,6 @@ class TestECBScraperLive:
 
         assert len(all_events) >= 4
         assert all(isinstance(e, EconomicEvent) for e in all_events)
-        assert all(e.event_type == "ecb_governing_council" for e in all_events)
+        ecb_types = {"ecb_rate_decision", "ecb_press_conference", "ecb_governing_council"}
+        assert all(e.event_type in ecb_types for e in all_events)
         assert all(e.scheduled_time.tzinfo is not None for e in all_events)

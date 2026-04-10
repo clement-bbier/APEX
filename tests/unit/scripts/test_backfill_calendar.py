@@ -76,13 +76,13 @@ class TestDryRun:
             mock_connector = MagicMock()
             mock_connector.connector_name = "fomc_scraper"
 
-            # Simulate an async generator that yields no events
+            # Empty async generator for testing
             async def _empty_gen(
                 start: datetime,
                 end: datetime,
-            ):  # type: ignore[override]
+            ) -> None:
                 return
-                yield  # make it an async generator
+                yield  # pragma: no cover
 
             mock_connector.fetch_events = _empty_gen
             mock_build.return_value = mock_connector
@@ -103,10 +103,14 @@ class TestDefaultDates:
     """Test default end date includes forward window."""
 
     def test_default_dates_includes_forward_window(self) -> None:
-        """Default end should be ~2 years in the future."""
-        # This is validated by checking the argparse default
-        # The default is datetime.now(UTC) + timedelta(days=730)
-        from scripts.backfill_calendar import main
+        """Verify that --end default is at least 1 year in the future."""
+        from scripts.backfill_calendar import _build_arg_parser
 
-        # Verify the function exists and is callable
-        assert callable(main)
+        parser = _build_arg_parser()
+        args = parser.parse_args(["--provider", "fomc"])
+
+        now = datetime.now(UTC)
+        delta = args.end - now
+        assert delta.days > 365, (
+            f"Default --end should be at least 1 year ahead, got {delta.days} days"
+        )

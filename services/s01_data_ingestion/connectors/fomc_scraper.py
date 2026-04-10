@@ -54,8 +54,13 @@ _MONTH_MAP: dict[str, int] = {
     "december": 12,
 }
 
-# Pattern for date ranges like "January 28-29" or "March 17-18*"
-_DATE_RANGE_RE = re.compile(
+# Cross-month pattern: "April 30 - May 1" or "April 30-May 1"
+_CROSS_MONTH_RE = re.compile(
+    r"([A-Za-z]+)\s+(\d{1,2})\s*[-\u2013]\s*([A-Za-z]+)\s+(\d{1,2})",
+)
+
+# Same-month pattern: "January 28-29" or "March 17-18*" or "June 11"
+_SAME_MONTH_RE = re.compile(
     r"([A-Za-z]+)\s+(\d{1,2})(?:\s*[-\u2013]\s*(\d{1,2}))?\s*\*?",
 )
 
@@ -111,7 +116,7 @@ class FOMCScraper(CalendarConnector):
                 timeout=_REQUEST_TIMEOUT,
             )
         else:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(
                     _FOMC_CALENDAR_URL,
                     timeout=_REQUEST_TIMEOUT,
@@ -139,9 +144,7 @@ class FOMCScraper(CalendarConnector):
         # The page uses div.panel with year headers and meeting rows.
         # Each year section has class "panel panel-default".
         found_panels = soup.find_all("div", class_="panel")
-        panel_tags: list[Tag] = [
-            p for p in found_panels if isinstance(p, Tag)
-        ]
+        panel_tags: list[Tag] = [p for p in found_panels if isinstance(p, Tag)]
         if not panel_tags:
             # Fallback: treat the whole document as a single panel
             panel_tags = [soup]
@@ -207,33 +210,49 @@ class FOMCScraper(CalendarConnector):
         end: datetime,
         events: list[EconomicEvent],
     ) -> None:
-        """Parse a single meeting row text into EconomicEvent(s)."""
-        # Try to match date range pattern: "January 28-29"
-        match = _DATE_RANGE_RE.search(text)
-        if not match:
-            return
+        """Parse a single meeting row text into EconomicEvent(s).
 
-        month_name = match.group(1).lower()
-        month = _MONTH_MAP.get(month_name)
-        if month is None:
-            return
-
-        day_start = int(match.group(2))
-        day_end = int(match.group(3)) if match.group(3) else day_start
-
-        # Use the last day of the meeting for the statement date
-        meeting_date = day_end
-
-        # Check for unscheduled / notation meeting (typically marked "unscheduled")
+        Handles three date formats:
+        - Cross-month: ``April 30 - May 1`` → statement on May 1
+        - Same-month range: ``January 30-31`` → statement on Jan 31
+        - Single day: ``June 11`` → statement on Jun 11
+        """
+        # Check for unscheduled / notation meeting
         lower_text = text.lower()
         if "unscheduled" in lower_text or "notation" in lower_text:
             return
 
-        # Statement event
+        # Try cross-month pattern first: "April 30 - May 1"
+        cross = _CROSS_MONTH_RE.search(text)
+        if cross:
+            end_month_name = cross.group(3).lower()
+            end_month = _MONTH_MAP.get(end_month_name)
+            if end_month is None:
+                return
+            end_day = int(cross.group(4))
+            stmt_month = end_month
+            stmt_day = end_day
+            match_end_pos = cross.end()
+        else:
+            # Same-month pattern: "January 28-29" or "June 11"
+            same = _SAME_MONTH_RE.search(text)
+            if not same:
+                return
+            month_name = same.group(1).lower()
+            month = _MONTH_MAP.get(month_name)
+            if month is None:
+                return
+            stmt_day = int(same.group(3)) if same.group(3) else int(same.group(2))
+            stmt_month = month
+            match_end_pos = same.end()
+
+        has_press_conf = "*" in text
+
+        # Statement event — always on the LAST day of the meeting
         stmt_time = datetime(
             year,
-            month,
-            meeting_date,
+            stmt_month,
+            stmt_day,
             _STATEMENT_HOUR,
             _STATEMENT_MINUTE,
             tzinfo=UTC,
@@ -249,12 +268,11 @@ class FOMCScraper(CalendarConnector):
             )
 
         # Press conference — indicated by asterisk (*) in the text
-        has_press_conf = "*" in text
         if has_press_conf:
             pc_time = datetime(
                 year,
-                month,
-                meeting_date,
+                stmt_month,
+                stmt_day,
                 _PRESS_CONF_HOUR,
                 _PRESS_CONF_MINUTE,
                 tzinfo=UTC,
@@ -269,8 +287,8 @@ class FOMCScraper(CalendarConnector):
                     )
                 )
 
-        # Minutes release — look for "Minutes released" or a date after the meeting
-        minutes_match = _MINUTES_DATE_RE.search(text[match.end() :])
+        # Minutes release — look for a date pattern after the meeting dates
+        minutes_match = _MINUTES_DATE_RE.search(text[match_end_pos:])
         if minutes_match:
             min_month_name = minutes_match.group(1).lower()
             min_month = _MONTH_MAP.get(min_month_name)

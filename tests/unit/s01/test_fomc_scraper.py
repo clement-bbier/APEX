@@ -106,6 +106,16 @@ class TestFOMCScraperParseFixture:
         for e in events:
             assert e.impact_score == 3
 
+    def test_cross_month_meeting_uses_last_day(self, scraper: FOMCScraper, html: str) -> None:
+        """'April 30 - May 1' must produce statement on May 1, not April 30."""
+        start = datetime(2024, 1, 1, tzinfo=UTC)
+        end = datetime(2024, 12, 31, tzinfo=UTC)
+        events = scraper._parse_events(html, start, end)
+        statements = [e for e in events if e.event_type == "fomc_statement"]
+        may_stmts = [s for s in statements if s.scheduled_time.month == 5]
+        assert len(may_stmts) == 1
+        assert may_stmts[0].scheduled_time.day == 1
+
     def test_date_range_filtering(self, scraper: FOMCScraper, html: str) -> None:
         start = datetime(2024, 6, 1, tzinfo=UTC)
         end = datetime(2024, 7, 1, tzinfo=UTC)

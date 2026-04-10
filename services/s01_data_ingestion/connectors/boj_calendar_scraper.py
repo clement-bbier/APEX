@@ -110,7 +110,7 @@ class BoJCalendarScraper(CalendarConnector):
                 timeout=_REQUEST_TIMEOUT,
             )
         else:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(
                     _BOJ_SCHEDULE_URL,
                     timeout=_REQUEST_TIMEOUT,
@@ -211,8 +211,7 @@ class BoJCalendarScraper(CalendarConnector):
             if month is None:
                 continue
 
-            day_start = int(match.group(2))
-            day_end = int(match.group(3)) if match.group(3) else day_start
+            day_end = int(match.group(3)) if match.group(3) else int(match.group(2))
 
             # Use the last day of the meeting for the announcement
             event_time = datetime(
