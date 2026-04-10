@@ -1012,6 +1012,173 @@ def _return_distribution_stats(
 
 
 # ---------------------------------------------------------------------------
+# Turnover, alpha decay, capacity (ADR-0002 Section A item 9)
+# ---------------------------------------------------------------------------
+
+
+def _annualized_turnover(
+    trades: list[TradeRecord],
+    years: float,
+    avg_capital: float,
+) -> float:
+    """Annualized portfolio turnover ratio.
+
+    Turnover = total_notional_traded / years / avg_capital.
+
+    A turnover of 50 means the portfolio is fully rotated 50x per
+    year. High turnover strategies are more sensitive to transaction
+    costs and market impact.
+
+    Args:
+        trades: Completed trade records.
+        years: Holding period in calendar years (same basis as CAGR).
+        avg_capital: Average capital deployed (e.g. mean of initial
+            and final equity).
+
+    Returns:
+        Annualized turnover ratio, 0.0 if years or avg_capital is zero.
+
+    Reference:
+        Grinold, R. C., & Kahn, R. N. (1999). Active Portfolio
+        Management, Chapter 14.
+    """
+    if years <= 0 or avg_capital <= 0:
+        return 0.0
+    total_notional = sum(abs(float(t.entry_price * t.size)) for t in trades)
+    return total_notional / years / avg_capital
+
+
+def _alpha_decay_half_life(
+    trades: list[TradeRecord],
+    min_trades: int = 10,
+) -> float | None:
+    """Estimate the half-life of the strategy's per-trade edge decay.
+
+    Fits an exponential decay model to the rolling mean of per-trade
+    returns (net_pnl / notional) ordered chronologically:
+        edge(i) = edge_0 * exp(-lambda * i)
+
+    The half-life is ln(2) / lambda. Returns None if:
+    - Fewer than min_trades trades
+    - The fit is poor (R^2 < 0.3)
+    - lambda <= 0 (no decay or growing edge — suspicious)
+
+    This metric answers: "how quickly does my strategy's edge erode
+    as more trades are placed?" A half-life of 30 days means the
+    edge halves every month — the strategy needs constant renewal.
+
+    Reference:
+        Lopez de Prado (2018). AFML Chapter 14 (backtest statistics).
+        Grinold (1989). Fundamental Law of Active Management.
+    """
+    if len(trades) < min_trades:
+        return None
+
+    sorted_trades = sorted(trades, key=lambda t: t.exit_timestamp_ms)
+    returns = np.array(
+        [
+            float(t.net_pnl) / abs(float(t.entry_price * t.size))
+            if abs(float(t.entry_price * t.size)) > 0
+            else 0.0
+            for t in sorted_trades
+        ],
+        dtype=float,
+    )
+
+    # Use rolling mean of per-trade returns as a proxy for edge decay
+    window = max(3, len(returns) // 10)
+    rolling_edge = np.convolve(returns, np.ones(window) / window, mode="valid")
+
+    if len(rolling_edge) < 3:
+        return None
+
+    # Fit exponential decay: log(rolling_edge) = log(edge_0) - lambda * t
+    # Only fit on positive values (can't log negative edge)
+    positive_mask = rolling_edge > 0
+    if np.sum(positive_mask) < 3:
+        return None
+
+    t_vals = np.arange(len(rolling_edge), dtype=float)[positive_mask]
+    y_vals = np.log(rolling_edge[positive_mask])
+
+    # Linear regression on log-transformed data
+    if len(t_vals) < 3:
+        return None
+
+    coeffs = np.polyfit(t_vals, y_vals, 1)
+    lam = -coeffs[0]  # slope = -lambda
+
+    if lam <= 0:
+        return None  # no decay or growing — suspicious
+
+    # R^2 check
+    y_pred = np.polyval(coeffs, t_vals)
+    ss_res = float(np.sum((y_vals - y_pred) ** 2))
+    ss_tot = float(np.sum((y_vals - np.mean(y_vals)) ** 2))
+    r_squared = 1.0 - ss_res / ss_tot if ss_tot > 0 else 0.0
+
+    if r_squared < 0.3:
+        return None
+
+    # Convert from trade-index to days
+    span_ms = sorted_trades[-1].exit_timestamp_ms - sorted_trades[0].exit_timestamp_ms
+    if span_ms <= 0:
+        return None  # all trades on same timestamp, cannot estimate time decay
+    days_per_trade = (span_ms / 1000 / 86400) / max(1, len(sorted_trades) - 1)
+    half_life_trades = math.log(2) / lam
+    half_life_days = half_life_trades * days_per_trade
+
+    return float(half_life_days) if math.isfinite(half_life_days) else None
+
+
+def _capacity_estimate_usd(
+    trades: list[TradeRecord],
+    gross_edge_bps: float,
+    impact_k_bps: float = 10.0,
+    adv_usd: float = 1_000_000.0,
+) -> float | None:
+    """Estimate the AUM at which market impact consumes 25% of edge.
+
+    Uses a simplified square-root impact model:
+        impact_bps = k * sqrt(order_size / ADV)
+
+    Capacity is the AUM where impact >= 0.25 * gross_edge:
+        AUM_max = ADV * (0.25 * gross_edge_bps / k)^2
+
+    Returns None if gross_edge_bps <= 0 (no edge to consume) or
+    if fewer than 2 trades.
+
+    Args:
+        trades: Trade records (used only for validation).
+        gross_edge_bps: Strategy's gross edge in basis points,
+            computed as total_pnl / total_notional * 10000
+            (notional-weighted average across all trades).
+        impact_k_bps: Market impact constant (10 bps typical for
+            crypto, 5 bps for liquid equities).
+        adv_usd: Average daily volume in USD for the traded asset.
+
+    Returns:
+        Capacity in USD, or None if not estimable.
+
+    Reference:
+        Almgren, R., & Chriss, N. (2001). Optimal execution of
+        portfolio transactions. Journal of Risk, 3(2), 5-40.
+        Perold, A. F. (1988). The Implementation Shortfall. JPM.
+    """
+    if len(trades) < 2 or gross_edge_bps <= 0 or impact_k_bps <= 0 or adv_usd <= 0:
+        return None
+
+    # AUM where impact = 25% of edge:
+    # k * sqrt(AUM / ADV) = 0.25 * edge
+    # sqrt(AUM / ADV) = 0.25 * edge / k
+    # AUM = ADV * (0.25 * edge / k)^2
+    ratio = (0.25 * gross_edge_bps) / impact_k_bps
+    capacity = adv_usd * ratio**2
+
+    return float(capacity) if math.isfinite(capacity) else None
+
+
+# ---------------------------------------------------------------------------
 # OOS walk-forward split (ADR-0002 Section A item 2)
 # ---------------------------------------------------------------------------
 
@@ -1073,6 +1240,8 @@ def full_report(
     n_trials: int = 1,
     oos_fraction: float = 0.0,
     embargo_days: int = 5,
+    impact_k_bps: float = 10.0,
+    adv_usd: float = 1_000_000.0,
     strategy_returns_matrix: np.ndarray[Any, np.dtype[np.float64]] | None = None,
     n_cv_splits: int = 10,
     n_cv_test_splits: int = 2,
@@ -1084,6 +1253,9 @@ def full_report(
     Sharpe Ratio (Bailey and López de Prado, 2014) computed against the
     caller-provided ``n_trials`` count, and a 95% stationary-bootstrap
     confidence interval on the Sharpe ratio (Politis and Romano, 1994).
+
+    Also computes turnover, alpha decay, and capacity metrics per
+    ADR-0002 Section A item 9.
 
     Args:
         trades: All completed trade records.
@@ -1099,11 +1271,18 @@ def full_report(
         embargo_days: Calendar days to remove from the IS tail to
             prevent information leakage across the IS/OOS boundary.
             Per Lopez de Prado (2018, Ch. 7). Default 5.
+        impact_k_bps: Market impact constant in basis points for the
+            capacity estimate. 10 bps typical for crypto, 5 bps for
+            liquid equities. Per Almgren & Chriss (2001).
+        adv_usd: Average daily volume in USD for the traded asset.
+            Used by the capacity estimate. Default 1M USD.
 
     Returns:
         Dict with all metrics: sharpe, sortino, calmar, max_dd, win_rate,
         profit_factor, avg_win, avg_loss, psr, dsr, sharpe_ci_95_low,
-        sharpe_ci_95_high, by_session, by_regime, by_signal, equity_curve.
+        sharpe_ci_95_high, annualized_turnover, alpha_decay_half_life_days,
+        capacity_estimate_usd, by_session, by_regime, by_signal,
+        equity_curve.
     """
     if oos_fraction != 0.0:
         if not math.isfinite(oos_fraction) or oos_fraction < 0.0 or oos_fraction >= 1.0:
@@ -1248,6 +1427,24 @@ def full_report(
     if pbo is not None:
         report["pbo"] = float(pbo)
 
+    # Turnover, alpha decay, capacity (ADR-0002 Section A item 9)
+    avg_capital = (initial_capital + final_equity) / 2.0
+    turnover = _annualized_turnover(trades, years, avg_capital)
+    decay = _alpha_decay_half_life(trades)
+
+    # Gross edge in bps for capacity estimation
+    total_notional = sum(abs(float(t.entry_price * t.size)) for t in trades)
+    if total_notional > 0:
+        gross_edge_bps = (final_equity - initial_capital) / total_notional * 10000
+    else:
+        gross_edge_bps = 0.0
+
+    capacity = _capacity_estimate_usd(trades, gross_edge_bps, impact_k_bps, adv_usd)
+
+    report["annualized_turnover"] = float(turnover)
+    report["alpha_decay_half_life_days"] = float(decay) if decay is not None else None
+    report["capacity_estimate_usd"] = float(capacity) if capacity is not None else None
+
     # OOS walk-forward split (ADR-0002 Section A item 2).
     if oos_fraction > 0.0:
         is_trades, oos_trades = _split_trades_is_oos(trades, oos_fraction, embargo_days)
@@ -1257,6 +1454,8 @@ def full_report(
                 initial_capital=initial_capital,
                 risk_free_rate=risk_free_rate,
                 n_trials=n_trials,
+                impact_k_bps=impact_k_bps,
+                adv_usd=adv_usd,
             )
             if is_trades
             else {"error": "no IS trades after embargo"}
@@ -1267,6 +1466,8 @@ def full_report(
                 initial_capital=initial_capital,
                 risk_free_rate=risk_free_rate,
                 n_trials=n_trials,
+                impact_k_bps=impact_k_bps,
+                adv_usd=adv_usd,
             )
             if oos_trades
             else {"error": "no OOS trades"}
