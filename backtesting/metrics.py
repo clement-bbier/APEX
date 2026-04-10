@@ -288,19 +288,151 @@ def by_session_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]
     return _group_stats(groups)
 
 
-def by_regime_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
-    """Group trades by regime label and compute stats per group.
+def _regime_stats(
+    regime_trades: list[TradeRecord],
+    initial_capital: float,
+    risk_free_rate: float = 0.05,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
+) -> dict[str, Any]:
+    """Compute rich per-regime performance statistics.
+
+    Builds a regime-local daily equity curve seeded at ``initial_capital``
+    (use ``1.0`` for scale-invariant returns) and derives Sharpe, max
+    drawdown, and Ulcer Index on that isolated curve. Sharpe requires at
+    least 2 daily returns (for variance); DD and Ulcer require at least
+    2 equity-curve points.
+
+    Args:
+        regime_trades: Trades belonging to a single regime.
+        initial_capital: Nominal starting capital for the regime-local
+            equity curve.
+        risk_free_rate: Annualised risk-free rate forwarded to
+            ``sharpe_ratio``.
+        annual_factor: Annualisation factor forwarded to
+            ``sharpe_ratio``.
+
+    Returns:
+        Dict with keys: trade_count, win_rate, hit_rate, total_pnl,
+        avg_pnl, sharpe, max_drawdown, ulcer_index.
+
+    Reference:
+        Lopez de Prado (2018). AFML Ch. 14.
+        ADR-0002 Section A item 10.
+    """
+    n = len(regime_trades)
+    if n == 0:
+        return {
+            "trade_count": 0,
+            "win_rate": 0.0,
+            "hit_rate": 0.0,
+            "total_pnl": 0.0,
+            "avg_pnl": 0.0,
+            "sharpe": 0.0,
+            "max_drawdown": 0.0,
+            "ulcer_index": 0.0,
+        }
+
+    pnls = [_to_float(t.net_pnl) for t in regime_trades]
+    total_pnl = sum(pnls)
+    wr = win_rate(regime_trades)
+
+    # Build regime-local daily equity curve for risk metrics.
+    regime_curve = daily_equity_curve_from_trades(initial_capital, regime_trades)
+    regime_returns = daily_returns_from_equity(regime_curve)
+
+    n_returns = len(regime_returns)
+    n_curve = len(regime_curve)
+
+    regime_sharpe = (
+        sharpe_ratio(regime_returns, risk_free_rate, annual_factor) if n_returns >= 2 else 0.0
+    )
+    regime_dd, _ = max_drawdown(regime_curve) if n_curve >= 2 else (0.0, 0)
+    regime_ulcer = (
+        float(_ulcer_index(np.asarray(regime_curve, dtype=float))) if n_curve >= 2 else 0.0
+    )
+
+    return {
+        "trade_count": n,
+        "win_rate": wr,
+        "hit_rate": wr,
+        "total_pnl": total_pnl,
+        "avg_pnl": total_pnl / n,
+        "sharpe": regime_sharpe,
+        "max_drawdown": regime_dd,
+        "ulcer_index": regime_ulcer,
+    }
+
+
+def _regime_concentration_hhi(
+    by_regime: dict[str, dict[str, Any]],
+) -> float:
+    """Herfindahl-Hirschman concentration index over |total_pnl| per regime.
+
+    HHI = sum( w_i^2 ) where w_i = |pnl_i| / sum(|pnl|).
+
+    - HHI = 1.0 means all PnL comes from one regime (concentrated)
+    - HHI = 1/N means equal contribution across N regimes (diversified)
+    - HHI = 0.0 means no PnL anywhere (empty or flat strategy)
+
+    A strategy with HHI > 0.8 across 3+ regimes is a red flag per
+    ADR-0002 item 10 — the edge is likely regime-dependent.
+
+    Reference:
+        Hirschman, A. O. (1964). The Paternity of an Index.
+        American Economic Review, 54(5), 761-762.
+    """
+    if not by_regime:
+        return 0.0
+    pnls = np.array(
+        [abs(float(stats.get("total_pnl", 0.0))) for stats in by_regime.values()],
+        dtype=float,
+    )
+    total = float(np.sum(pnls))
+    if total <= 0.0:
+        return 0.0
+    weights = pnls / total
+    return float(np.sum(weights**2))
+
+
+def by_regime_breakdown(
+    trades: list[TradeRecord],
+    initial_capital: float = 1.0,
+    risk_free_rate: float = 0.05,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
+) -> dict[str, dict[str, Any]]:
+    """Group trades by regime label and compute rich per-regime stats.
+
+    Per ADR-0002 Section A item 10, every regime gets its own Sharpe,
+    max drawdown, Ulcer Index, and hit rate. A strategy whose edge
+    lives in a single regime must declare it — use the top-level
+    ``regime_concentration`` field from full_report() to quantify.
 
     Args:
         trades: List of completed trade records.
+        initial_capital: Nominal capital to seed per-regime equity curves.
+            Default 1.0 for scale-invariant returns. Using the real
+            portfolio capital would dilute per-regime drawdowns when
+            regime PnL is small relative to the total.
+        risk_free_rate: Annualised risk-free rate forwarded to
+            ``sharpe_ratio`` via ``_regime_stats``.
+        annual_factor: Annualisation factor forwarded to
+            ``sharpe_ratio`` via ``_regime_stats``.
 
     Returns:
-        Dict of {regime_label: {trade_count, win_rate, avg_pnl, total_pnl}}.
+        Dict of {regime_label: _regime_stats output}. Regimes with
+        fewer than 2 trades get zero-filled Sharpe / DD / Ulcer.
+
+    Reference:
+        Lopez de Prado (2018). AFML Ch. 14.
+        ADR-0002 Section A item 10.
     """
     groups: dict[str, list[TradeRecord]] = defaultdict(list)
     for t in trades:
         groups[t.regime_at_entry or "unknown"].append(t)
-    return _group_stats(groups)
+    return {
+        label: _regime_stats(group_trades, initial_capital, risk_free_rate, annual_factor)
+        for label, group_trades in groups.items()
+    }
 
 
 def by_signal_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]:
@@ -1006,6 +1138,12 @@ def full_report(
             annual_factor=_ANNUAL_FACTOR_DAILY,
         )
 
+    by_regime_enriched = by_regime_breakdown(
+        trades,
+        initial_capital=1.0,
+        risk_free_rate=risk_free_rate,
+    )
+
     report: dict[str, Any] = {
         "sharpe": sharpe_ratio(
             daily_returns,
@@ -1035,7 +1173,8 @@ def full_report(
         "final_equity": final_equity,
         "total_pnl": final_equity - initial_capital,
         "by_session": by_session_breakdown(trades),
-        "by_regime": by_regime_breakdown(trades),
+        "by_regime": by_regime_enriched,
+        "regime_concentration": float(_regime_concentration_hhi(by_regime_enriched)),
         "by_signal": by_signal_breakdown(trades),
         "equity_curve": curve,
     }
