@@ -291,19 +291,25 @@ def by_session_breakdown(trades: list[TradeRecord]) -> dict[str, dict[str, Any]]
 def _regime_stats(
     regime_trades: list[TradeRecord],
     initial_capital: float,
+    risk_free_rate: float = 0.05,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
 ) -> dict[str, Any]:
     """Compute rich per-regime performance statistics.
 
     Builds a regime-local daily equity curve seeded at ``initial_capital``
     (use ``1.0`` for scale-invariant returns) and derives Sharpe, max
-    drawdown, and Ulcer Index on that isolated curve. Regimes with fewer
-    than 2 trades get zero-filled risk metrics because a single daily
-    return point is insufficient for standard-deviation estimation.
+    drawdown, and Ulcer Index on that isolated curve. Sharpe requires at
+    least 2 daily returns (for variance); DD and Ulcer require at least
+    2 equity-curve points.
 
     Args:
         regime_trades: Trades belonging to a single regime.
         initial_capital: Nominal starting capital for the regime-local
             equity curve.
+        risk_free_rate: Annualised risk-free rate forwarded to
+            ``sharpe_ratio``.
+        annual_factor: Annualisation factor forwarded to
+            ``sharpe_ratio``.
 
     Returns:
         Dict with keys: trade_count, win_rate, hit_rate, total_pnl,
@@ -334,14 +340,16 @@ def _regime_stats(
     regime_curve = daily_equity_curve_from_trades(initial_capital, regime_trades)
     regime_returns = daily_returns_from_equity(regime_curve)
 
-    if len(regime_returns) < 2:
-        regime_sharpe = 0.0
-        regime_dd = 0.0
-        regime_ulcer = 0.0
-    else:
-        regime_sharpe = sharpe_ratio(regime_returns)
-        regime_dd, _ = max_drawdown(regime_curve)
-        regime_ulcer = _ulcer_index(np.asarray(regime_curve, dtype=float))
+    n_returns = len(regime_returns)
+    n_curve = len(regime_curve)
+
+    regime_sharpe = (
+        sharpe_ratio(regime_returns, risk_free_rate, annual_factor) if n_returns >= 2 else 0.0
+    )
+    regime_dd, _ = max_drawdown(regime_curve) if n_curve >= 2 else (0.0, 0)
+    regime_ulcer = (
+        float(_ulcer_index(np.asarray(regime_curve, dtype=float))) if n_curve >= 2 else 0.0
+    )
 
     return {
         "trade_count": n,
@@ -389,6 +397,8 @@ def _regime_concentration_hhi(
 def by_regime_breakdown(
     trades: list[TradeRecord],
     initial_capital: float = 1.0,
+    risk_free_rate: float = 0.05,
+    annual_factor: float = _ANNUAL_FACTOR_DAILY,
 ) -> dict[str, dict[str, Any]]:
     """Group trades by regime label and compute rich per-regime stats.
 
@@ -399,8 +409,14 @@ def by_regime_breakdown(
 
     Args:
         trades: List of completed trade records.
-        initial_capital: Nominal capital used to seed the per-regime
-            equity curve (default 1.0; returns are scale-invariant).
+        initial_capital: Nominal capital to seed per-regime equity curves.
+            Default 1.0 for scale-invariant returns. Using the real
+            portfolio capital would dilute per-regime drawdowns when
+            regime PnL is small relative to the total.
+        risk_free_rate: Annualised risk-free rate forwarded to
+            ``sharpe_ratio`` via ``_regime_stats``.
+        annual_factor: Annualisation factor forwarded to
+            ``sharpe_ratio`` via ``_regime_stats``.
 
     Returns:
         Dict of {regime_label: _regime_stats output}. Regimes with
@@ -414,7 +430,7 @@ def by_regime_breakdown(
     for t in trades:
         groups[t.regime_at_entry or "unknown"].append(t)
     return {
-        label: _regime_stats(group_trades, initial_capital)
+        label: _regime_stats(group_trades, initial_capital, risk_free_rate, annual_factor)
         for label, group_trades in groups.items()
     }
 
@@ -1122,7 +1138,11 @@ def full_report(
             annual_factor=_ANNUAL_FACTOR_DAILY,
         )
 
-    by_regime_enriched = by_regime_breakdown(trades, initial_capital=initial_capital)
+    by_regime_enriched = by_regime_breakdown(
+        trades,
+        initial_capital=1.0,
+        risk_free_rate=risk_free_rate,
+    )
 
     report: dict[str, Any] = {
         "sharpe": sharpe_ratio(
