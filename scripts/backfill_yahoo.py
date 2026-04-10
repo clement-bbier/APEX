@@ -36,6 +36,16 @@ from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
 
 logger = structlog.get_logger(__name__)
 
+_INTERVAL_MAP: dict[str, BarSize] = {
+    "1m": BarSize.M1,
+    "5m": BarSize.M5,
+    "15m": BarSize.M15,
+    "1h": BarSize.H1,
+    "1d": BarSize.D1,
+    "1wk": BarSize.W1,
+    "1mo": BarSize.MO1,
+}
+
 _ASSET_CLASS_MAP: dict[str, AssetClass] = {
     "equity": AssetClass.EQUITY,
     "index": AssetClass.INDEX,
@@ -87,7 +97,9 @@ async def run_backfill(
         total_inserted = 0
         try:
             with tqdm(unit="bars", desc=f"{symbol} {interval}") as pbar:
-                async for batch in connector.fetch_bars(symbol, BarSize(interval), start, end):
+                async for batch in connector.fetch_bars(
+                    symbol, _INTERVAL_MAP[interval], start, end
+                ):
                     # Re-assign real asset_id
                     batch = [b.model_copy(update={"asset_id": asset.asset_id}) for b in batch]
                     report = checker.validate_bars(batch, asset)
@@ -135,7 +147,8 @@ def main() -> None:
     parser.add_argument(
         "--interval",
         default="1d",
-        help="Bar interval (default: 1d)",
+        choices=list(_INTERVAL_MAP.keys()),
+        help="Yahoo interval (default: 1d)",
     )
     parser.add_argument(
         "--asset-class",

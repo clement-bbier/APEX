@@ -15,7 +15,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import AsyncIterator
-from datetime import datetime
+from datetime import UTC, datetime
 
 import pandas as pd
 import structlog
@@ -112,6 +112,12 @@ class YahooHistoricalConnector(DataConnector):
 
         batch: list[Bar] = []
         for ts, row in df.iterrows():
+            # Filter to requested [start, end) window after Yahoo returns
+            bar_ts: datetime = ts.to_pydatetime() if hasattr(ts, "to_pydatetime") else ts
+            if bar_ts.tzinfo is None:
+                bar_ts = bar_ts.replace(tzinfo=UTC)
+            if bar_ts < start or bar_ts >= end:
+                continue
             payload = (ts, row.to_dict())
             bar = normalizer.normalize(payload, placeholder)
             batch.append(bar)
@@ -178,8 +184,8 @@ class YahooHistoricalConnector(DataConnector):
         """
         ticker = yf.Ticker(symbol)
         df: pd.DataFrame = ticker.history(
-            start=start.strftime("%Y-%m-%d"),
-            end=end.strftime("%Y-%m-%d"),
+            start=start,
+            end=end,
             interval=interval,
             auto_adjust=False,
             actions=False,

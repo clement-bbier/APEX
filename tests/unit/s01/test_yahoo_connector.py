@@ -9,7 +9,7 @@ import uuid
 from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
 import pytest
@@ -129,7 +129,13 @@ class TestYahooHistoricalConnector:
         mock_ticker = MagicMock()
         mock_ticker.history.return_value = pd.DataFrame()
 
-        with patch("services.s01_data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf:
+        with (
+            patch("services.s01_data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf,
+            patch(
+                "services.s01_data_ingestion.connectors.yahoo_historical.asyncio.sleep",
+                new=AsyncMock(),
+            ),
+        ):
             mock_yf.return_value = mock_ticker
             connector = YahooHistoricalConnector()
             start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -149,7 +155,13 @@ class TestYahooHistoricalConnector:
             df,
         ]
 
-        with patch("services.s01_data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf:
+        with (
+            patch("services.s01_data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf,
+            patch(
+                "services.s01_data_ingestion.connectors.yahoo_historical.asyncio.sleep",
+                new=AsyncMock(),
+            ),
+        ):
             mock_yf.return_value = mock_ticker
             connector = YahooHistoricalConnector()
             start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -242,8 +254,7 @@ class TestYahooBarNormalizer:
 
     def test_normalize_with_fixture(self) -> None:
         """Load real fixture and verify normalization."""
-        if not FIXTURE_PATH.exists():
-            pytest.skip("fixture not found")
+        assert FIXTURE_PATH.exists(), f"fixture missing: {FIXTURE_PATH} — repo packaging error"
         df = pd.read_json(FIXTURE_PATH, orient="table")
         normalizer = YahooBarNormalizer(BarSize.D1)
         bars: list[Bar] = []
