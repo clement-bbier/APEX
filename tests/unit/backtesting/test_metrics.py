@@ -15,6 +15,7 @@ import numpy as np
 import pytest
 
 from backtesting.metrics import (
+    almgren_chriss_impact,
     backtest_overfitting_probability,
     cost_sensitivity_report,
     full_report,
@@ -864,3 +865,78 @@ def test_oos_sub_reports_use_caller_impact_params() -> None:
     # With different impact_k and adv, capacity should differ
     if is_cap is not None and is_cap_default is not None:
         assert is_cap != pytest.approx(is_cap_default, rel=0.01)
+
+
+# ---------------------------------------------------------------------------
+# Almgren-Chriss market impact model (ADR-0002 Section A item 8)
+# ---------------------------------------------------------------------------
+
+
+def test_ac_impact_increases_with_order_size() -> None:
+    """Larger orders have more impact."""
+    small = almgren_chriss_impact(10_000, 1_000_000, 0.02)
+    large = almgren_chriss_impact(100_000, 1_000_000, 0.02)
+    assert small is not None
+    assert large is not None
+    assert large["total_impact_bps"] > small["total_impact_bps"]
+
+
+def test_ac_impact_decreases_with_higher_adv() -> None:
+    """More liquid markets absorb orders with less impact."""
+    illiquid = almgren_chriss_impact(50_000, 500_000, 0.02)
+    liquid = almgren_chriss_impact(50_000, 5_000_000, 0.02)
+    assert illiquid is not None
+    assert liquid is not None
+    assert liquid["total_impact_bps"] < illiquid["total_impact_bps"]
+
+
+def test_ac_impact_scales_with_volatility() -> None:
+    """Higher volatility amplifies impact."""
+    calm = almgren_chriss_impact(50_000, 1_000_000, 0.01)
+    volatile = almgren_chriss_impact(50_000, 1_000_000, 0.04)
+    assert calm is not None
+    assert volatile is not None
+    assert volatile["total_impact_bps"] > calm["total_impact_bps"]
+
+
+def test_ac_impact_zero_on_zero_order() -> None:
+    """Zero order size produces zero impact."""
+    result = almgren_chriss_impact(0.0, 1_000_000, 0.02)
+    assert result is not None
+    assert result["total_impact_bps"] == 0.0
+
+
+def test_ac_impact_none_on_zero_adv() -> None:
+    """Zero ADV returns None (cannot estimate impact)."""
+    result = almgren_chriss_impact(50_000, 0.0, 0.02)
+    assert result is None
+
+
+def test_ac_temporary_less_than_permanent_with_defaults() -> None:
+    """With default eta=0.01 and gamma=0.1, permanent > temporary."""
+    result = almgren_chriss_impact(50_000, 1_000_000, 0.02)
+    assert result is not None
+    assert result["permanent_impact_bps"] > result["temporary_impact_bps"]
+
+
+def test_avg_slippage_present_in_full_report() -> None:
+    """avg_slippage_bps must be present in every non-error report."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    report = full_report(trades=trades, initial_capital=initial)
+    assert "avg_slippage_bps" in report
+    assert isinstance(report["avg_slippage_bps"], float)
+
+
+def test_avg_slippage_positive_on_active_strategy() -> None:
+    """An active strategy with trades must have slippage > 0."""
+    trades, initial = _seeded_equity_curve(n_days=60, seed=42)
+    report = full_report(trades=trades, initial_capital=initial)
+    assert report["avg_slippage_bps"] > 0.0
+
+
+def test_avg_slippage_increases_with_volatility() -> None:
+    """Higher daily_volatility produces higher avg slippage."""
+    trades, initial = _seeded_equity_curve(n_days=60, seed=42)
+    report_calm = full_report(trades=trades, initial_capital=initial, daily_volatility=0.01)
+    report_vol = full_report(trades=trades, initial_capital=initial, daily_volatility=0.05)
+    assert report_vol["avg_slippage_bps"] > report_calm["avg_slippage_bps"]
