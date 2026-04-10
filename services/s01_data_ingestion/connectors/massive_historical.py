@@ -21,6 +21,7 @@ from typing import Any
 
 import httpx
 import structlog
+from botocore.exceptions import ClientError
 
 from core.config import Settings
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
@@ -105,15 +106,12 @@ class MassiveHistoricalConnector(DataConnector):
             s3_key = f"us_stocks_sip/minute_aggs_v1/{year}/{month}/{date_str}.csv.gz"
 
             async with self._semaphore:
-                rows = await self._download_s3_csv_gz(s3_key)
+                rows = await self._download_s3_csv_gz_filtered(s3_key, symbol)
                 if rows is None:
                     rows = await self._fallback_rest(symbol, date_str)
 
             batch: list[Bar] = []
             for row in rows:
-                # Filter by symbol (column 0 is ticker)
-                if row[0].upper() != symbol.upper():
-                    continue
                 bar = normalizer.normalize(row, placeholder)
                 if bar.timestamp >= start and bar.timestamp < end:
                     batch.append(bar)
@@ -140,8 +138,13 @@ class MassiveHistoricalConnector(DataConnector):
         raise NotImplementedError("Phase 2.6 deferred — flat file trades > 1GB/day")
         yield  # pragma: no cover — makes this an async generator
 
-    async def _download_s3_csv_gz(self, key: str) -> list[list[str]] | None:
-        """Download and decompress a gzipped CSV from S3.
+    async def _download_s3_csv_gz_filtered(
+        self, key: str, target_symbol: str
+    ) -> list[list[str]] | None:
+        """Stream S3 gzip CSV and return only rows matching target_symbol.
+
+        Streams the gzipped file instead of buffering the entire contents,
+        preventing OOM on multi-GB flat files that contain all US tickers.
 
         Returns None if the key does not exist (NoSuchKey).
         """
@@ -151,25 +154,32 @@ class MassiveHistoricalConnector(DataConnector):
                 Bucket=self._bucket,
                 Key=key,
             )
-            body_bytes: bytes = await asyncio.to_thread(response["Body"].read)
-            decompressed = gzip.decompress(body_bytes)
-            text = io.StringIO(decompressed.decode("utf-8"))
-            reader = csv.reader(text)
-            # Skip header row
-            header = next(reader, None)
-            if header is None:
-                return []
-            return list(reader)
-        except Exception as exc:
-            error_code = getattr(getattr(exc, "response", None), "Error", {})
-            if isinstance(error_code, dict):
-                code = error_code.get("Code", "")
-            else:
-                code = str(error_code)
-            if "NoSuchKey" in str(code) or "NoSuchKey" in str(exc):
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code == "NoSuchKey":
                 logger.debug("s3_key_not_found", key=key)
                 return None
-            raise MassiveFetchError(f"S3 download failed for {key}: {exc}") from exc
+            raise MassiveFetchError(f"S3 error {code} on {key}") from exc
+        except Exception as exc:
+            raise MassiveFetchError(f"unexpected S3 error on {key}") from exc
+
+        target_upper = target_symbol.upper()
+
+        def _stream_filter() -> list[list[str]]:
+            body = response["Body"]
+            with gzip.GzipFile(fileobj=body, mode="rb") as gz:
+                text_stream = io.TextIOWrapper(gz, encoding="utf-8")
+                reader = csv.reader(text_stream)
+                header = next(reader, None)
+                if header is None:
+                    return []
+                try:
+                    ticker_idx = header.index("ticker")
+                except ValueError:
+                    ticker_idx = 0
+                return [row for row in reader if row and row[ticker_idx].upper() == target_upper]
+
+        return await asyncio.to_thread(_stream_filter)
 
     async def _fallback_rest(self, symbol: str, date_str: str) -> list[list[str]]:
         """Fetch minute aggs from the Polygon-compatible REST API.

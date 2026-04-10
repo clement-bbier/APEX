@@ -14,12 +14,12 @@ class TestAlpacaSettings:
 
         mp = monkeypatch  # type: ignore[assignment]
         mp.setenv("ALPACA_API_KEY", "PK_TEST_123")
-        mp.setenv("ALPACA_SECRET_KEY", "SK_TEST_456")
+        mp.setenv("ALPACA_API_SECRET", "SK_TEST_456")
         mp.setenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
-        mp.setenv("ALPACA_DATA_URL", "https://data.alpaca.markets")
+        mp.setenv("ALPACA_DATA_URL", "wss://stream.data.alpaca.markets/v2/iex")
         s = Settings(_env_file=None)  # type: ignore[call-arg]
         assert s.alpaca_api_key == "PK_TEST_123"
-        assert s.alpaca_secret_key == "SK_TEST_456"
+        assert s.alpaca_api_secret == "SK_TEST_456"
         assert "paper-api" in s.alpaca_base_url
 
     def test_alpaca_defaults(self) -> None:

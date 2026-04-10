@@ -22,6 +22,14 @@ pytestmark = [
         not os.environ.get("MASSIVE_API_KEY"),
         reason="MASSIVE_API_KEY not set",
     ),
+    pytest.mark.skipif(
+        not os.environ.get("MASSIVE_S3_ACCESS_KEY"),
+        reason="MASSIVE_S3_ACCESS_KEY not set",
+    ),
+    pytest.mark.skipif(
+        not os.environ.get("MASSIVE_S3_SECRET_KEY"),
+        reason="MASSIVE_S3_SECRET_KEY not set",
+    ),
 ]
 
 

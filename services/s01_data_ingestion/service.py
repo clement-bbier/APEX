@@ -66,7 +66,7 @@ class DataIngestionService(BaseService):
             symbols=_DEFAULT_EQUITY_SYMBOLS,
             on_tick=self._on_alpaca_tick,
             api_key=settings.alpaca_api_key,
-            secret_key=settings.alpaca_secret_key,
+            secret_key=settings.alpaca_api_secret,
             url=settings.alpaca_data_url,
         )
 

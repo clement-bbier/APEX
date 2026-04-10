@@ -38,7 +38,7 @@ def check_env() -> bool:
     """Verify all required environment variables are set."""
     required = [
         "ALPACA_API_KEY",
-        "ALPACA_SECRET_KEY",
+        "ALPACA_API_SECRET",
         "BINANCE_API_KEY",
         "BINANCE_SECRET_KEY",
         "REDIS_URL",
@@ -93,7 +93,7 @@ def check_zmq_ports() -> bool:
 def check_alpaca() -> bool:
     """Test Alpaca API connectivity using alpaca-py."""
     api_key = os.environ.get("ALPACA_API_KEY", "")
-    secret_key = os.environ.get("ALPACA_SECRET_KEY", "")
+    secret_key = os.environ.get("ALPACA_API_SECRET", "")
     if not api_key or not secret_key:
         warn("Alpaca keys not set - skipping")
         return True

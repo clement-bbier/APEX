@@ -2,7 +2,7 @@
 
 Requires:
     - APEX_NETWORK_TESTS=1
-    - Valid ALPACA_API_KEY and ALPACA_SECRET_KEY in environment
+    - Valid ALPACA_API_KEY and ALPACA_API_SECRET in environment
 """
 
 from __future__ import annotations
@@ -21,6 +21,10 @@ pytestmark = [
     pytest.mark.skipif(
         not os.environ.get("ALPACA_API_KEY"),
         reason="ALPACA_API_KEY not set",
+    ),
+    pytest.mark.skipif(
+        not os.environ.get("ALPACA_API_SECRET"),
+        reason="ALPACA_API_SECRET not set",
     ),
 ]
 
