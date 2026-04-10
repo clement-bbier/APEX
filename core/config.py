@@ -228,6 +228,23 @@ class Settings(BaseSettings):
     twilio_from_number: str = Field(default="", description="Twilio sender phone number")
     alert_phone_number: str = Field(default="", description="SMS recipient phone number")
 
+    # ── TimescaleDB ─────────────────────────────────────────────────────────────
+    timescale_host: str = Field(default="localhost", description="TimescaleDB host")
+    timescale_port: int = Field(default=5432, description="TimescaleDB port")
+    timescale_db: str = Field(default="apex", description="TimescaleDB database name")
+    timescale_user: str = Field(default="apex", description="TimescaleDB user")
+    timescale_password: str = Field(default="apex_secret", description="TimescaleDB password")
+    timescale_pool_min: int = Field(default=2, description="Min asyncpg pool size")
+    timescale_pool_max: int = Field(default=10, description="Max asyncpg pool size")
+
+    @property
+    def timescale_dsn(self) -> str:
+        """Build PostgreSQL DSN from individual components."""
+        return (
+            f"postgresql://{self.timescale_user}:{self.timescale_password}"
+            f"@{self.timescale_host}:{self.timescale_port}/{self.timescale_db}"
+        )
+
     # ── Database (optional persistence layer) ─────────────────────────────────
     db_password: str = Field(
         default="",

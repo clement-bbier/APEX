@@ -14,7 +14,7 @@ build/
 .coverage
 coverage.xml
 htmlcov/
-data/
+/data/
 logs/
 *.log
 .DS_Store
