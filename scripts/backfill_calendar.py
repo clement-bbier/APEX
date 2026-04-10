@@ -159,8 +159,8 @@ async def run_backfill(
             await repo.close()
 
 
-def main() -> None:
-    """CLI entry point for the calendar events backfill script."""
+def _build_arg_parser() -> argparse.ArgumentParser:
+    """Build the argument parser for the calendar backfill CLI."""
     parser = argparse.ArgumentParser(
         description="APEX Calendar events backfill (FOMC/ECB/BoJ/US releases)",
     )
@@ -187,6 +187,12 @@ def main() -> None:
         action="store_true",
         help="Fetch and log only, do not insert into database",
     )
+    return parser
+
+
+def main() -> None:
+    """CLI entry point for the calendar events backfill script."""
+    parser = _build_arg_parser()
     args = parser.parse_args()
 
     if args.provider == "all":

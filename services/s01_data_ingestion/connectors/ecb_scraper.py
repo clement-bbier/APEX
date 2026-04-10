@@ -63,6 +63,21 @@ _MONTH_MAP: dict[str, int] = {
 _DATE_RE = re.compile(r"(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})")
 
 
+def _is_monetary_meeting(row_text: str) -> bool:
+    """Detect if an ECB Governing Council row is a monetary policy meeting.
+
+    Monetary meetings explicitly mention "monetary policy".
+    Non-monetary meetings are labeled "non-monetary" or "non monetary".
+    """
+    text_lower = row_text.lower()
+    if "non-monetary" in text_lower or "non monetary" in text_lower:
+        return False
+    if "monetary policy" in text_lower:
+        return True
+    # Default: assume monetary if it mentions Governing Council
+    return "governing council" in text_lower
+
+
 class ECBCalendarFetchError(Exception):
     """Raised when ECB calendar scraping fails."""
 
@@ -109,7 +124,7 @@ class ECBScraper(CalendarConnector):
                 timeout=_REQUEST_TIMEOUT,
             )
         else:
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(follow_redirects=True) as client:
                 resp = await client.get(
                     _ECB_CALENDAR_URL,
                     timeout=_REQUEST_TIMEOUT,
@@ -158,9 +173,7 @@ class ECBScraper(CalendarConnector):
         """Extract events from table rows."""
         for row in soup.find_all("tr"):
             text = row.get_text(" ", strip=True)
-            lower = text.lower()
-            # Skip non-monetary-policy rows
-            is_monetary = "monetary" in lower or "interest" in lower or "governing" in lower
+            is_monetary = _is_monetary_meeting(text)
             self._extract_dates_from_text(text, start, end, events, is_monetary)
 
     def _extract_from_text(
@@ -188,7 +201,12 @@ class ECBScraper(CalendarConnector):
         events: list[EconomicEvent],
         is_monetary: bool,
     ) -> None:
-        """Extract date patterns from a text string and create events."""
+        """Extract date patterns from a text string and create events.
+
+        For monetary policy meetings, emits both a rate decision event and
+        a press conference event. For non-monetary meetings, emits a single
+        governing council event.
+        """
         for match in _DATE_RE.finditer(text):
             day = int(match.group(1))
             month_name = match.group(2).lower()
@@ -197,7 +215,7 @@ class ECBScraper(CalendarConnector):
                 continue
             year = int(match.group(3))
 
-            event_time = datetime(
+            decision_time = datetime(
                 year,
                 month,
                 day,
@@ -205,22 +223,46 @@ class ECBScraper(CalendarConnector):
                 _ECB_DECISION_MINUTE,
                 tzinfo=UTC,
             )
-            if not (start <= event_time < end):
+            if not (start <= decision_time < end):
                 continue
 
-            # Avoid duplicates
-            if any(
-                e.event_type == "ecb_governing_council" and e.scheduled_time == event_time
-                for e in events
-            ):
+            # Avoid duplicates (check any event at the same time)
+            if any(e.scheduled_time == decision_time for e in events):
                 continue
 
-            impact = 3 if is_monetary else 2
-            events.append(
-                EconomicEvent(
-                    event_type="ecb_governing_council",
-                    scheduled_time=event_time,
-                    impact_score=impact,
-                    source="ecb_scraper",
+            if is_monetary:
+                # Monetary meeting → rate decision + press conference
+                events.append(
+                    EconomicEvent(
+                        event_type="ecb_rate_decision",
+                        scheduled_time=decision_time,
+                        impact_score=3,
+                        source="ecb_scraper",
+                    )
                 )
-            )
+                pc_time = datetime(
+                    year,
+                    month,
+                    day,
+                    _ECB_PRESS_CONF_HOUR,
+                    _ECB_PRESS_CONF_MINUTE,
+                    tzinfo=UTC,
+                )
+                events.append(
+                    EconomicEvent(
+                        event_type="ecb_press_conference",
+                        scheduled_time=pc_time,
+                        impact_score=3,
+                        source="ecb_scraper",
+                    )
+                )
+            else:
+                # Non-monetary Governing Council meeting
+                events.append(
+                    EconomicEvent(
+                        event_type="ecb_governing_council",
+                        scheduled_time=decision_time,
+                        impact_score=2,
+                        source="ecb_scraper",
+                    )
+                )

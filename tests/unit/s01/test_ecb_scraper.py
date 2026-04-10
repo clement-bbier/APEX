@@ -62,15 +62,30 @@ class TestECBScraperParseFixture:
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 12, 31, tzinfo=UTC)
         events = scraper._parse_events(html, start, end)
-        # Synthetic fixture has 8 meetings
-        assert len(events) >= 6
+        # 7 monetary meetings × 2 events + 1 non-monetary × 1 event = 15
+        assert len(events) == 15
 
-    def test_all_events_ecb_type(self, scraper: ECBScraper, html: str) -> None:
+    def test_monetary_meetings_emit_two_events(self, scraper: ECBScraper, html: str) -> None:
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 12, 31, tzinfo=UTC)
         events = scraper._parse_events(html, start, end)
-        for e in events:
-            assert e.event_type == "ecb_governing_council"
+        rate_decisions = [e for e in events if e.event_type == "ecb_rate_decision"]
+        press_confs = [e for e in events if e.event_type == "ecb_press_conference"]
+        assert len(rate_decisions) == 7
+        assert len(press_confs) == 7
+
+    def test_non_monetary_excluded_from_rate_decision(
+        self,
+        scraper: ECBScraper,
+        html: str,
+    ) -> None:
+        start = datetime(2024, 1, 1, tzinfo=UTC)
+        end = datetime(2024, 12, 31, tzinfo=UTC)
+        events = scraper._parse_events(html, start, end)
+        gc_only = [e for e in events if e.event_type == "ecb_governing_council"]
+        # Only 1 non-monetary GC meeting in the fixture (July 17)
+        assert len(gc_only) == 1
+        assert gc_only[0].impact_score == 2
 
     def test_date_range_filtering(self, scraper: ECBScraper, html: str) -> None:
         start = datetime(2024, 6, 1, tzinfo=UTC)
