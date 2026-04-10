@@ -74,10 +74,8 @@ ignore_missing_imports = true
 module = [
     "core.models.*",
     "core.config",
-    "core.data.*",
     "tests.*",
     "services.s10_monitor.dashboard",
-    "scripts.*",
 ]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false

@@ -22,6 +22,7 @@ from core.models.data import (
     BarType,
     DataQualityEntry,
     DbTick,
+    IngestionStatus,
     MacroPoint,
     MacroSeriesMeta,
     Severity,
@@ -253,7 +254,7 @@ class TestMacro:
         ]
         repo._pool.copy_records_to_table = AsyncMock(return_value="COPY 1")
 
-        count = await repo.insert_macro_points("VIXCLS", points)
+        count = await repo.insert_macro_points(points)
         assert count == 1
 
     @pytest.mark.asyncio
@@ -281,7 +282,7 @@ class TestIngestionTracking:
     async def test_finish_ingestion_run(self, repo):
         repo._pool.execute = AsyncMock()
         run_id = uuid.uuid4()
-        await repo.finish_ingestion_run(run_id, "success", 1000)
+        await repo.finish_ingestion_run(run_id, IngestionStatus.SUCCESS, 1000)
         repo._pool.execute.assert_called_once()
 
 
