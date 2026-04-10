@@ -66,6 +66,7 @@ module = [
     "botocore.*",
     "fakeredis.*",
     "tqdm.*",
+    "yfinance.*",
     "apex_mc.*",
     "scipy.*",
     "defusedxml.*",

@@ -30,3 +30,6 @@ from services.s01_data_ingestion.normalizers.router import (
 from services.s01_data_ingestion.normalizers.session_tagger import (
     SessionTagger as SessionTagger,
 )
+from services.s01_data_ingestion.normalizers.yahoo_bar import (
+    YahooBarNormalizer as YahooBarNormalizer,
+)
