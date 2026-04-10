@@ -1011,12 +1011,66 @@ def _return_distribution_stats(
     return {"skewness": skew, "excess_kurtosis": kurt, "tail_ratio": tail}
 
 
+# ---------------------------------------------------------------------------
+# OOS walk-forward split (ADR-0002 Section A item 2)
+# ---------------------------------------------------------------------------
+
+
+def _split_trades_is_oos(
+    trades: list[TradeRecord],
+    oos_fraction: float,
+    embargo_days: int,
+) -> tuple[list[TradeRecord], list[TradeRecord]]:
+    """Split trades into in-sample and out-of-sample sets with embargo.
+
+    Trades are sorted by ``exit_timestamp_ms``. The last
+    ``oos_fraction`` of trades become OOS. An embargo gap of
+    ``embargo_days`` calendar days is removed from the IS tail
+    to prevent information leakage across the boundary.
+
+    Args:
+        trades: All trades (any order, will be sorted internally).
+        oos_fraction: Fraction of trades reserved for OOS (e.g. 0.3).
+        embargo_days: Calendar days to remove from IS tail.
+
+    Returns:
+        Tuple ``(is_trades, oos_trades)``. Embargo trades are excluded
+        from both sets.
+
+    Raises:
+        ValueError: If ``oos_fraction`` is not in the open interval (0, 1).
+
+    Reference:
+        Lopez de Prado (2018). AFML Chapter 7.
+        Pardo (2008). Chapter 5.
+    """
+    if oos_fraction <= 0.0 or oos_fraction >= 1.0:
+        msg = f"oos_fraction must be in (0, 1), got {oos_fraction}"
+        raise ValueError(msg)
+
+    sorted_trades = sorted(trades, key=lambda t: t.exit_timestamp_ms)
+    split_idx = int(len(sorted_trades) * (1.0 - oos_fraction))
+    oos_trades = sorted_trades[split_idx:]
+
+    if not oos_trades:
+        return sorted_trades[:split_idx], []
+
+    oos_start_ms = oos_trades[0].exit_timestamp_ms
+    embargo_ms = embargo_days * 24 * 3600 * 1000
+    is_trades = [
+        t for t in sorted_trades[:split_idx] if t.exit_timestamp_ms < oos_start_ms - embargo_ms
+    ]
+    return is_trades, oos_trades
+
+
 def full_report(
     trades: list[TradeRecord],
     initial_capital: float = 100_000.0,
     risk_free_rate: float = 0.05,
     *,
     n_trials: int = 1,
+    oos_fraction: float = 0.0,
+    embargo_days: int = 5,
     strategy_returns_matrix: np.ndarray[Any, np.dtype[np.float64]] | None = None,
     n_cv_splits: int = 10,
     n_cv_test_splits: int = 2,
@@ -1036,6 +1090,13 @@ def full_report(
         n_trials: Number of independent strategy variants tested. Used by
             the Deflated Sharpe Ratio to correct for selection bias.
             Defaults to 1 for backward compatibility.
+        oos_fraction: Fraction of trades reserved for out-of-sample
+            evaluation (e.g. 0.3). When > 0, the report includes
+            ``is_report``, ``oos_report``, and ``oos_sharpe_degradation``.
+            Default 0.0 disables the split (backward compatible).
+        embargo_days: Calendar days to remove from the IS tail to
+            prevent information leakage across the IS/OOS boundary.
+            Per Lopez de Prado (2018, Ch. 7). Default 5.
 
     Returns:
         Dict with all metrics: sharpe, sortino, calmar, max_dd, win_rate,
@@ -1180,6 +1241,50 @@ def full_report(
     }
     if pbo is not None:
         report["pbo"] = float(pbo)
+
+    # OOS walk-forward split (ADR-0002 Section A item 2).
+    if oos_fraction > 0.0:
+        is_trades, oos_trades = _split_trades_is_oos(trades, oos_fraction, embargo_days)
+        is_sub: dict[str, Any] = (
+            full_report(
+                trades=is_trades,
+                initial_capital=initial_capital,
+                risk_free_rate=risk_free_rate,
+                n_trials=n_trials,
+            )
+            if is_trades
+            else {"error": "no IS trades after embargo"}
+        )
+        oos_sub: dict[str, Any] = (
+            full_report(
+                trades=oos_trades,
+                initial_capital=initial_capital,
+                risk_free_rate=risk_free_rate,
+                n_trials=n_trials,
+            )
+            if oos_trades
+            else {"error": "no OOS trades"}
+        )
+
+        # Sharpe degradation IS → OOS.
+        if isinstance(is_sub.get("sharpe"), (int, float)) and isinstance(
+            oos_sub.get("sharpe"), (int, float)
+        ):
+            s_is = float(is_sub["sharpe"])
+            s_oos = float(oos_sub["sharpe"])
+            if s_is != 0.0 and math.isfinite(s_is) and math.isfinite(s_oos):
+                oos_deg = (s_is - s_oos) / abs(s_is) * 100.0
+            else:
+                oos_deg = 0.0
+        else:
+            oos_deg = 0.0
+
+        report["is_report"] = is_sub
+        report["oos_report"] = oos_sub
+        report["oos_sharpe_degradation"] = oos_deg
+        report["oos_fraction"] = oos_fraction
+        report["embargo_days"] = embargo_days
+
     return report
 
 
