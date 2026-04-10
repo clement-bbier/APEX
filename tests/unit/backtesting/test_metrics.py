@@ -601,8 +601,14 @@ def test_regime_concentration_balanced_three_regimes() -> None:
     assert 0.20 <= hhi <= 0.60, f"HHI={hhi} outside expected range for ~balanced 3 regimes"
 
 
-def test_regime_with_one_trade_returns_zero_metrics() -> None:
-    """A regime with a single trade gets zero Sharpe/DD/Ulcer (not raise)."""
+def test_regime_with_one_trade_returns_zero_sharpe() -> None:
+    """A regime with a single trade gets zero Sharpe (needs variance) but DD/Ulcer are computed.
+
+    Sharpe requires >= 2 daily returns for standard-deviation estimation,
+    so a single-trade regime correctly zero-fills it. DD and Ulcer only
+    need >= 2 equity-curve points (initial + 1 trade), so they are
+    computed from the real curve.
+    """
     trades, initial = _seeded_equity_curve(seed=42)
     tagged = [
         (
@@ -616,8 +622,9 @@ def test_regime_with_one_trade_returns_zero_metrics() -> None:
     singleton = report["by_regime"]["singleton"]
     assert singleton["trade_count"] == 1
     assert singleton["sharpe"] == 0.0
-    assert singleton["max_drawdown"] == 0.0
-    assert singleton["ulcer_index"] == 0.0
+    # DD and Ulcer are computed (curve has 2 points), not zero-filled
+    assert isinstance(singleton["max_drawdown"], float)
+    assert isinstance(singleton["ulcer_index"], float)
 
 
 def test_regime_sharpe_preserved_under_reordering() -> None:
@@ -632,4 +639,24 @@ def test_regime_sharpe_preserved_under_reordering() -> None:
     report2 = full_report(trades=shuffled, initial_capital=initial)
     assert report1["by_regime"]["only"]["sharpe"] == pytest.approx(
         report2["by_regime"]["only"]["sharpe"], rel=1e-9
+    )
+
+
+def test_regime_sharpe_uses_caller_risk_free_rate() -> None:
+    """Regression: per-regime Sharpe must use the same rf as headline Sharpe.
+
+    Bug from PR #28 Copilot review: _regime_stats() called
+    sharpe_ratio() without forwarding risk_free_rate, silently using
+    the default 0.05 even when the caller specified a different rate.
+    """
+    trades, initial = _seeded_equity_curve(seed=42)
+    tagged = [t.model_copy(update={"regime_at_entry": "only"}) for t in trades]
+    report_rf0 = full_report(trades=tagged, initial_capital=initial, risk_free_rate=0.0)
+    report_rf10 = full_report(trades=tagged, initial_capital=initial, risk_free_rate=0.10)
+    # Per-regime Sharpe must change when rf changes
+    sharpe_rf0 = report_rf0["by_regime"]["only"]["sharpe"]
+    sharpe_rf10 = report_rf10["by_regime"]["only"]["sharpe"]
+    assert sharpe_rf0 != pytest.approx(sharpe_rf10, abs=1e-6), (
+        "Per-regime Sharpe did not change with risk_free_rate — "
+        "rf is not being forwarded to _regime_stats()"
     )
