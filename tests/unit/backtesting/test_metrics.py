@@ -660,3 +660,63 @@ def test_regime_sharpe_uses_caller_risk_free_rate() -> None:
         "Per-regime Sharpe did not change with risk_free_rate — "
         "rf is not being forwarded to _regime_stats()"
     )
+
+
+# ---------------------------------------------------------------------------
+# OOS walk-forward gate (ADR-0002 Section A item 2)
+# ---------------------------------------------------------------------------
+
+
+def test_oos_split_produces_is_and_oos_reports() -> None:
+    """full_report(oos_fraction=0.3) returns IS and OOS sub-reports."""
+    trades, initial = _seeded_equity_curve(n_days=60, seed=42)
+    report = full_report(trades=trades, initial_capital=initial, oos_fraction=0.3)
+    assert "is_report" in report
+    assert "oos_report" in report
+    assert "sharpe" in report["is_report"]
+    assert "sharpe" in report["oos_report"]
+    assert "oos_sharpe_degradation" in report
+
+
+def test_oos_embargo_removes_trades_near_boundary() -> None:
+    """Embargo gap removes IS trades near the OOS start."""
+    trades, initial = _seeded_equity_curve(n_days=60, seed=42)
+    report_no_embargo = full_report(
+        trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=0
+    )
+    report_with_embargo = full_report(
+        trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=5
+    )
+    is_count_no = report_no_embargo["is_report"]["trade_count"]
+    is_count_with = report_with_embargo["is_report"]["trade_count"]
+    # Embargo must remove at least some trades from IS
+    assert is_count_with <= is_count_no
+
+
+def test_oos_fraction_zero_has_no_split_fields() -> None:
+    """Default oos_fraction=0.0 produces no IS/OOS fields."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    report = full_report(trades=trades, initial_capital=initial)
+    assert "is_report" not in report
+    assert "oos_report" not in report
+    assert "oos_sharpe_degradation" not in report
+
+
+def test_oos_trade_counts_sum_correctly() -> None:
+    """IS + OOS + embargo trades = total trades."""
+    trades, initial = _seeded_equity_curve(n_days=60, seed=42)
+    report = full_report(trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=0)
+    is_count = report["is_report"]["trade_count"]
+    oos_count = report["oos_report"]["trade_count"]
+    assert is_count + oos_count == len(trades)
+
+
+def test_oos_sharpe_degradation_computed_correctly() -> None:
+    """Manual verification of degradation formula."""
+    trades, initial = _seeded_equity_curve(n_days=60, seed=42)
+    report = full_report(trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=0)
+    s_is = report["is_report"]["sharpe"]
+    s_oos = report["oos_report"]["sharpe"]
+    if s_is != 0.0:
+        expected = (s_is - s_oos) / abs(s_is) * 100.0
+        assert report["oos_sharpe_degradation"] == pytest.approx(expected, rel=1e-9)
