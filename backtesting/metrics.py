@@ -1179,6 +1179,98 @@ def _capacity_estimate_usd(
 
 
 # ---------------------------------------------------------------------------
+# Almgren-Chriss market impact model (ADR-0002 Section A item 8)
+# ---------------------------------------------------------------------------
+
+
+def almgren_chriss_impact(
+    order_size_usd: float,
+    adv_usd: float,
+    daily_volatility: float,
+    eta: float = 0.01,
+    gamma: float = 0.1,
+) -> dict[str, float] | None:
+    """Estimate market impact using the Almgren-Chriss square-root model.
+
+    Decomposes total execution cost into temporary and permanent
+    components:
+
+        temporary_impact = eta * sigma * sqrt(Q / V)
+        permanent_impact = gamma * sigma * sqrt(Q / V)
+        total_impact = temporary + permanent
+
+    where Q is the order size in USD, V is the average daily volume
+    in USD, sigma is the daily volatility (as a fraction, e.g. 0.02
+    for 2%), and eta/gamma are calibration constants.
+
+    The temporary component represents the immediate price
+    displacement that recovers after execution. The permanent
+    component represents the information content of the trade that
+    shifts the equilibrium price.
+
+    Typical calibration values from Almgren et al. (2005):
+    - eta ~ 0.01 for temporary impact
+    - gamma ~ 0.1 for permanent impact
+    These values are for US large-cap equities; crypto markets
+    typically have 2-5x higher impact.
+
+    Args:
+        order_size_usd: Trade notional in USD.
+        adv_usd: Average daily volume of the asset in USD.
+        daily_volatility: Daily return volatility as a fraction.
+        eta: Temporary impact coefficient (default 0.01).
+        gamma: Permanent impact coefficient (default 0.1).
+
+    Returns:
+        Dict with temporary_impact_bps, permanent_impact_bps,
+        total_impact_bps. Returns None if adv_usd <= 0.
+        Returns all zeros if order_size_usd == 0 or
+        daily_volatility <= 0.
+
+    Raises:
+        ValueError: If eta or gamma is negative, or any numeric
+            parameter is non-finite (NaN/inf).
+
+    Reference:
+        Almgren, R., & Chriss, N. (2001). Optimal execution of
+        portfolio transactions. Journal of Risk, 3(2), 5-40.
+        Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005).
+        Equity market impact. Risk, July, 57-62.
+    """
+    if (
+        not math.isfinite(order_size_usd)
+        or not math.isfinite(adv_usd)
+        or not math.isfinite(daily_volatility)
+        or not math.isfinite(eta)
+        or not math.isfinite(gamma)
+        or eta < 0
+        or gamma < 0
+    ):
+        raise ValueError(
+            f"almgren_chriss_impact requires finite non-negative calibration "
+            f"params, got eta={eta!r}, gamma={gamma!r}, vol={daily_volatility!r}, "
+            f"order={order_size_usd!r}, adv={adv_usd!r}"
+        )
+    if adv_usd <= 0:
+        return None
+    if order_size_usd == 0.0 or daily_volatility <= 0:
+        return {
+            "temporary_impact_bps": 0.0,
+            "permanent_impact_bps": 0.0,
+            "total_impact_bps": 0.0,
+        }
+
+    participation = math.sqrt(abs(order_size_usd) / adv_usd)
+    temp = eta * daily_volatility * participation * 10_000  # convert to bps
+    perm = gamma * daily_volatility * participation * 10_000
+    return {
+        "temporary_impact_bps": float(temp),
+        "permanent_impact_bps": float(perm),
+        "total_impact_bps": float(temp + perm),
+    }
+
+
+# ---------------------------------------------------------------------------
 # OOS walk-forward split (ADR-0002 Section A item 2)
 # ---------------------------------------------------------------------------
 
@@ -1242,6 +1334,7 @@ def full_report(
     embargo_days: int = 5,
     impact_k_bps: float = 10.0,
     adv_usd: float = 1_000_000.0,
+    daily_volatility: float = 0.02,
     strategy_returns_matrix: np.ndarray[Any, np.dtype[np.float64]] | None = None,
     n_cv_splits: int = 10,
     n_cv_test_splits: int = 2,
@@ -1275,14 +1368,18 @@ def full_report(
             capacity estimate. 10 bps typical for crypto, 5 bps for
             liquid equities. Per Almgren & Chriss (2001).
         adv_usd: Average daily volume in USD for the traded asset.
-            Used by the capacity estimate. Default 1M USD.
+            Used by the capacity estimate and Almgren-Chriss slippage
+            model. Default 1M USD.
+        daily_volatility: Daily return volatility as a fraction
+            (e.g. 0.02 = 2%). Used by the Almgren-Chriss slippage
+            model (ADR-0002 Section A item 8). Default 0.02.
 
     Returns:
         Dict with all metrics: sharpe, sortino, calmar, max_dd, win_rate,
         profit_factor, avg_win, avg_loss, psr, dsr, sharpe_ci_95_low,
         sharpe_ci_95_high, annualized_turnover, alpha_decay_half_life_days,
-        capacity_estimate_usd, by_session, by_regime, by_signal,
-        equity_curve.
+        capacity_estimate_usd, avg_slippage_bps, by_session, by_regime,
+        by_signal, equity_curve.
     """
     if oos_fraction != 0.0:
         if not math.isfinite(oos_fraction) or oos_fraction < 0.0 or oos_fraction >= 1.0:
@@ -1445,6 +1542,23 @@ def full_report(
     report["alpha_decay_half_life_days"] = float(decay) if decay is not None else None
     report["capacity_estimate_usd"] = float(capacity) if capacity is not None else None
 
+    # Almgren-Chriss slippage estimation (ADR-0002 Section A item 8)
+    slippage_estimates: list[float] = []
+    for trade in trades:
+        notional = abs(float(trade.entry_price * trade.size))
+        if notional <= 0:
+            notional = abs(float(trade.net_pnl))
+        impact = almgren_chriss_impact(
+            order_size_usd=notional,
+            adv_usd=adv_usd,
+            daily_volatility=daily_volatility,
+        )
+        if impact is not None:
+            slippage_estimates.append(impact["total_impact_bps"])
+
+    avg_slippage = float(np.mean(slippage_estimates)) if slippage_estimates else 0.0
+    report["avg_slippage_bps"] = avg_slippage
+
     # OOS walk-forward split (ADR-0002 Section A item 2).
     if oos_fraction > 0.0:
         is_trades, oos_trades = _split_trades_is_oos(trades, oos_fraction, embargo_days)
@@ -1456,6 +1570,7 @@ def full_report(
                 n_trials=n_trials,
                 impact_k_bps=impact_k_bps,
                 adv_usd=adv_usd,
+                daily_volatility=daily_volatility,
             )
             if is_trades
             else {"error": "no IS trades after embargo"}
@@ -1468,6 +1583,7 @@ def full_report(
                 n_trials=n_trials,
                 impact_k_bps=impact_k_bps,
                 adv_usd=adv_usd,
+                daily_volatility=daily_volatility,
             )
             if oos_trades
             else {"error": "no OOS trades"}
