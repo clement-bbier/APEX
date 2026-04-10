@@ -1054,8 +1054,8 @@ def _alpha_decay_half_life(
 ) -> float | None:
     """Estimate the half-life of the strategy's per-trade edge decay.
 
-    Fits an exponential decay model to the cumulative per-trade
-    returns ordered chronologically:
+    Fits an exponential decay model to the rolling mean of per-trade
+    returns (net_pnl / notional) ordered chronologically:
         edge(i) = edge_0 * exp(-lambda * i)
 
     The half-life is ln(2) / lambda. Returns None if:
@@ -1075,11 +1075,19 @@ def _alpha_decay_half_life(
         return None
 
     sorted_trades = sorted(trades, key=lambda t: t.exit_timestamp_ms)
-    pnls = np.array([float(t.net_pnl) for t in sorted_trades], dtype=float)
+    returns = np.array(
+        [
+            float(t.net_pnl) / abs(float(t.entry_price * t.size))
+            if abs(float(t.entry_price * t.size)) > 0
+            else 0.0
+            for t in sorted_trades
+        ],
+        dtype=float,
+    )
 
-    # Use rolling mean of per-trade PnL as a proxy for edge decay
-    window = max(3, len(pnls) // 10)
-    rolling_edge = np.convolve(pnls, np.ones(window) / window, mode="valid")
+    # Use rolling mean of per-trade returns as a proxy for edge decay
+    window = max(3, len(returns) // 10)
+    rolling_edge = np.convolve(returns, np.ones(window) / window, mode="valid")
 
     if len(rolling_edge) < 3:
         return None
@@ -1114,6 +1122,8 @@ def _alpha_decay_half_life(
 
     # Convert from trade-index to days
     span_ms = sorted_trades[-1].exit_timestamp_ms - sorted_trades[0].exit_timestamp_ms
+    if span_ms <= 0:
+        return None  # all trades on same timestamp, cannot estimate time decay
     days_per_trade = (span_ms / 1000 / 86400) / max(1, len(sorted_trades) - 1)
     half_life_trades = math.log(2) / lam
     half_life_days = half_life_trades * days_per_trade
@@ -1141,7 +1151,8 @@ def _capacity_estimate_usd(
     Args:
         trades: Trade records (used only for validation).
         gross_edge_bps: Strategy's gross edge in basis points,
-            computed as mean(net_pnl / notional) * 10000.
+            computed as total_pnl / total_notional * 10000
+            (notional-weighted average across all trades).
         impact_k_bps: Market impact constant (10 bps typical for
             crypto, 5 bps for liquid equities).
         adv_usd: Average daily volume in USD for the traded asset.
@@ -1154,7 +1165,7 @@ def _capacity_estimate_usd(
         portfolio transactions. Journal of Risk, 3(2), 5-40.
         Perold, A. F. (1988). The Implementation Shortfall. JPM.
     """
-    if len(trades) < 2 or gross_edge_bps <= 0 or impact_k_bps <= 0:
+    if len(trades) < 2 or gross_edge_bps <= 0 or impact_k_bps <= 0 or adv_usd <= 0:
         return None
 
     # AUM where impact = 25% of edge:
@@ -1443,6 +1454,8 @@ def full_report(
                 initial_capital=initial_capital,
                 risk_free_rate=risk_free_rate,
                 n_trials=n_trials,
+                impact_k_bps=impact_k_bps,
+                adv_usd=adv_usd,
             )
             if is_trades
             else {"error": "no IS trades after embargo"}
@@ -1453,6 +1466,8 @@ def full_report(
                 initial_capital=initial_capital,
                 risk_free_rate=risk_free_rate,
                 n_trials=n_trials,
+                impact_k_bps=impact_k_bps,
+                adv_usd=adv_usd,
             )
             if oos_trades
             else {"error": "no OOS trades"}
