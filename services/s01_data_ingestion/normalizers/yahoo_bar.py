@@ -10,7 +10,7 @@ References:
 
 from __future__ import annotations
 
-import math
+from collections.abc import Mapping
 from decimal import Decimal
 
 import pandas as pd
@@ -18,7 +18,7 @@ import pandas as pd
 from core.models.data import Asset, Bar, BarSize, BarType
 from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
 
-type YahooBarPayload = tuple[pd.Timestamp, dict[str, float]]
+type YahooBarPayload = tuple[pd.Timestamp, Mapping[str, object]]
 
 
 class YahooBarNormalizer(NormalizerStrategy[YahooBarPayload, Bar]):
@@ -57,8 +57,9 @@ class YahooBarNormalizer(NormalizerStrategy[YahooBarPayload, Bar]):
             ts = ts.tz_convert("UTC")
 
         # Volume can be NaN for indices/FX — default to 0
+        # pd.isna handles both Python float NaN and numpy.float64 NaN
         volume = row.get("Volume", 0)
-        if volume is None or (isinstance(volume, float) and math.isnan(volume)):
+        if volume is None or pd.isna(volume):
             volume = 0
 
         return Bar(
