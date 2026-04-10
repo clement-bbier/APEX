@@ -32,10 +32,10 @@ class AssetResolver:
         Raises:
             ValueError: If the asset is not found.
         """
-        key = (symbol.upper(), exchange)
+        key = (symbol.upper(), exchange.upper())
         if key in self._cache:
             return self._cache[key]
-        asset = await self._repo.get_asset(symbol, exchange)
+        asset = await self._repo.get_asset(symbol.upper(), exchange.upper())
         if asset is None:
             raise ValueError(f"Asset not found: {symbol} on {exchange}")
         self._cache[key] = asset
@@ -48,7 +48,7 @@ class AssetResolver:
 
         Args:
             symbol: Trading symbol (uppercased internally).
-            exchange: Exchange name.
+            exchange: Exchange name (uppercased internally).
             defaults: Default field values passed to
                 :class:`~core.models.data.Asset` if creating a new entry.
 
@@ -58,14 +58,14 @@ class AssetResolver:
         Raises:
             RuntimeError: If asset creation fails.
         """
-        key = (symbol.upper(), exchange)
+        key = (symbol.upper(), exchange.upper())
         if key in self._cache:
             return self._cache[key]
-        asset = await self._repo.get_asset(symbol, exchange)
+        asset = await self._repo.get_asset(symbol.upper(), exchange.upper())
         if asset is None:
             new_asset = Asset(
                 symbol=symbol.upper(),
-                exchange=exchange,
+                exchange=exchange.upper(),
                 **defaults,
             )
             asset_id = await self._repo.upsert_asset(new_asset)
