@@ -6,6 +6,7 @@ Implements the Repository pattern (Fowler 2002, Ch. 18).
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
 
@@ -41,11 +42,28 @@ class TimescaleRepository:
         self._pool: asyncpg.Pool[asyncpg.Record] | None = None
 
     async def connect(self) -> None:
-        """Create the connection pool."""
+        """Create the connection pool with JSON/JSONB codec registration."""
         self._pool = await asyncpg.create_pool(
             self._dsn,
             min_size=self._pool_min,
             max_size=self._pool_max,
+            init=self._init_connection,
+        )
+
+    @staticmethod
+    async def _init_connection(conn: asyncpg.Connection[asyncpg.Record]) -> None:
+        """Register JSON/JSONB codecs so asyncpg auto-serializes dicts."""
+        await conn.set_type_codec(
+            "jsonb",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema="pg_catalog",
+        )
+        await conn.set_type_codec(
+            "json",
+            encoder=json.dumps,
+            decoder=json.loads,
+            schema="pg_catalog",
         )
 
     async def close(self) -> None:

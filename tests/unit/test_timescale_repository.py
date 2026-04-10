@@ -62,6 +62,7 @@ class TestConnection:
                 "postgresql://x:x@localhost/x",
                 min_size=2,
                 max_size=10,
+                init=TimescaleRepository._init_connection,
             )
             assert repo._pool is not None
 
