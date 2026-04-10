@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # ── Alpaca ────────────────────────────────────────────────────────────────
     alpaca_api_key: str = Field(default="", description="Alpaca API key")
-    alpaca_secret_key: str = Field(default="", description="Alpaca secret key")
+    alpaca_api_secret: str = Field(default="", description="Alpaca API secret")
     alpaca_base_url: str = Field(
         default="https://paper-api.alpaca.markets",
         description="Alpaca REST base URL",

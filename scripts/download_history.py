@@ -161,7 +161,7 @@ def cli() -> None:
     args = parser.parse_args()
 
     alpaca_key = os.environ.get("ALPACA_API_KEY", "")
-    alpaca_secret = os.environ.get("ALPACA_SECRET_KEY", "")
+    alpaca_secret = os.environ.get("ALPACA_API_SECRET", "")
 
     asyncio.run(
         main(args.years, args.days, args.symbol, args.output_dir, alpaca_key, alpaca_secret)

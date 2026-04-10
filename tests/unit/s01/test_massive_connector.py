@@ -16,9 +16,11 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 import pytest
+from botocore.exceptions import ClientError
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType
 from services.s01_data_ingestion.connectors.massive_historical import (
+    MassiveFetchError,
     MassiveHistoricalConnector,
     _placeholder_asset,
 )
@@ -67,6 +69,11 @@ def _make_csv_gz_bytes(rows: list[list[str]], include_header: bool = True) -> by
     return gzip.compress(buf.getvalue().encode("utf-8"))
 
 
+def _make_s3_body(csv_gz_bytes: bytes) -> io.BytesIO:
+    """Create a file-like S3 Body from gzipped CSV bytes."""
+    return io.BytesIO(csv_gz_bytes)
+
+
 class TestMassiveBarNormalizer:
     """Tests for MassiveBarNormalizer."""
 
@@ -105,7 +112,7 @@ class TestMassiveBarNormalizer:
         with gzip.open(FIXTURE_PATH, "rt") as f:
             reader = csv.reader(f)
             next(reader)  # skip header
-            rows = list(reader)
+            rows = [r for r in reader if r[0] == "AAPL"]
         normalizer = MassiveBarNormalizer(BarSize.M1)
         bars = [normalizer.normalize(row, _DUMMY_ASSET) for row in rows]
         assert len(bars) == 10
@@ -149,9 +156,7 @@ class TestMassiveHistoricalConnector:
         rows = [_make_csv_row()]
         csv_gz = _make_csv_gz_bytes(rows)
 
-        mock_body = MagicMock()
-        mock_body.read = MagicMock(return_value=csv_gz)
-        connector._s3_client.get_object = MagicMock(return_value={"Body": mock_body})
+        connector._s3_client.get_object = MagicMock(return_value={"Body": _make_s3_body(csv_gz)})
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)
@@ -166,15 +171,10 @@ class TestMassiveHistoricalConnector:
     async def test_fetch_bars_s3_not_found_falls_back_to_rest(self) -> None:
         connector = self._make_connector()
 
-        # S3 raises NoSuchKey
-        error_response = {"Error": {"Code": "NoSuchKey"}}
-        from botocore.exceptions import ClientError
-
         connector._s3_client.get_object = MagicMock(
-            side_effect=ClientError(error_response, "GetObject")
+            side_effect=ClientError({"Error": {"Code": "NoSuchKey"}}, "GetObject")
         )
 
-        # REST fallback returns one bar
         rest_data = {
             "results": [
                 {
@@ -210,6 +210,7 @@ class TestMassiveHistoricalConnector:
 
     @pytest.mark.asyncio
     async def test_fetch_bars_filters_by_symbol(self) -> None:
+        """Streaming filter returns only AAPL rows from mixed-ticker file."""
         connector = self._make_connector()
         rows = [
             _make_csv_row(ticker="AAPL"),
@@ -218,9 +219,7 @@ class TestMassiveHistoricalConnector:
         ]
         csv_gz = _make_csv_gz_bytes(rows)
 
-        mock_body = MagicMock()
-        mock_body.read = MagicMock(return_value=csv_gz)
-        connector._s3_client.get_object = MagicMock(return_value={"Body": mock_body})
+        connector._s3_client.get_object = MagicMock(return_value={"Body": _make_s3_body(csv_gz)})
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)
@@ -246,9 +245,7 @@ class TestMassiveHistoricalConnector:
         connector = self._make_connector()
         csv_gz = _make_csv_gz_bytes([], include_header=True)
 
-        mock_body = MagicMock()
-        mock_body.read = MagicMock(return_value=csv_gz)
-        connector._s3_client.get_object = MagicMock(return_value={"Body": mock_body})
+        connector._s3_client.get_object = MagicMock(return_value={"Body": _make_s3_body(csv_gz)})
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)
@@ -257,3 +254,39 @@ class TestMassiveHistoricalConnector:
             batches.append(batch)
 
         assert len(batches) == 0
+
+    @pytest.mark.asyncio
+    async def test_s3_download_filters_by_symbol(self) -> None:
+        """_download_s3_csv_gz_filtered returns only target symbol rows."""
+        connector = self._make_connector()
+        rows = [
+            _make_csv_row(ticker="AAPL"),
+            _make_csv_row(ticker="MSFT"),
+            _make_csv_row(ticker="GOOGL"),
+            _make_csv_row(ticker="AAPL"),
+            _make_csv_row(ticker="MSFT"),
+        ]
+        csv_gz = _make_csv_gz_bytes(rows)
+
+        connector._s3_client.get_object = MagicMock(return_value={"Body": _make_s3_body(csv_gz)})
+
+        result = await connector._download_s3_csv_gz_filtered(
+            "us_stocks_sip/minute_aggs_v1/2024/01/2024-01-02.csv.gz", "AAPL"
+        )
+        assert result is not None
+        assert len(result) == 2
+        assert all(row[0] == "AAPL" for row in result)
+
+    @pytest.mark.asyncio
+    async def test_s3_client_error_non_nosuchkey_raises(self) -> None:
+        """ClientError with code != NoSuchKey should raise MassiveFetchError."""
+        connector = self._make_connector()
+
+        connector._s3_client.get_object = MagicMock(
+            side_effect=ClientError({"Error": {"Code": "AccessDenied"}}, "GetObject")
+        )
+
+        with pytest.raises(MassiveFetchError, match="S3 error AccessDenied"):
+            await connector._download_s3_csv_gz_filtered(
+                "us_stocks_sip/minute_aggs_v1/2024/01/2024-01-02.csv.gz", "AAPL"
+            )
