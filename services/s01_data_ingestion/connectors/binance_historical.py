@@ -29,6 +29,11 @@ from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormal
 
 logger = structlog.get_logger(__name__)
 
+
+class BinanceFetchError(Exception):
+    """Raised when Binance download retries are exhausted."""
+
+
 _VISION_BASE = "https://data.binance.vision/data/spot"
 _REST_BASE = "https://api.binance.com/api/v3"
 _BATCH_SIZE = 1000
@@ -111,19 +116,16 @@ class BinanceHistoricalConnector(DataConnector):
         use_monthly = (end - start).days > 30
 
         async with httpx.AsyncClient(timeout=60.0) as client:
-            if use_monthly:
-                date_urls = list(self._monthly_kline_urls(symbol, interval, start, end))
-            else:
-                date_urls = list(self._daily_kline_urls(symbol, interval, start, end))
-
             batch: list[Bar] = []
-            for url in date_urls:
+            for url, period_start, period_end in self._kline_periods(
+                symbol, interval, start, end, use_monthly
+            ):
                 async with self._semaphore:
                     raw_rows = await self._download_zip_csv(client, url)
                     if raw_rows is None:
-                        # Fallback to REST for this period
+                        # 404 — fallback REST on THIS period only
                         raw_rows = await self._fallback_rest_klines(
-                            client, symbol, interval, start, end
+                            client, symbol, interval, period_start, period_end
                         )
                     for row in raw_rows:
                         kline = self._csv_row_to_kline(row)
@@ -166,16 +168,20 @@ class BinanceHistoricalConnector(DataConnector):
                     f"{_VISION_BASE}/daily/aggTrades/{symbol.upper()}"
                     f"/{symbol.upper()}-aggTrades-{date_str}.zip"
                 )
+                next_day = current + timedelta(days=1)
                 async with self._semaphore:
                     raw_rows = await self._download_zip_csv(client, url)
-                    if raw_rows is not None:
-                        for row in raw_rows:
-                            tick = self._parse_agg_trade(row, placeholder)
-                            if tick.timestamp >= start and tick.timestamp < end:
-                                batch.append(tick)
-                                if len(batch) >= _BATCH_SIZE:
-                                    yield batch
-                                    batch = []
+                    if raw_rows is None:
+                        raw_rows = await self._fallback_rest_agg_trades(
+                            client, symbol, current, next_day
+                        )
+                    for row in raw_rows:
+                        tick = self._parse_agg_trade(row, placeholder)
+                        if tick.timestamp >= start and tick.timestamp < end:
+                            batch.append(tick)
+                            if len(batch) >= _BATCH_SIZE:
+                                yield batch
+                                batch = []
                     await asyncio.sleep(0.1)
                 current += timedelta(days=1)
 
@@ -215,6 +221,41 @@ class BinanceHistoricalConnector(DataConnector):
                 f"/{interval}/{symbol.upper()}-{interval}-{date_str}.zip"
             )
             current += timedelta(days=1)
+
+    def _kline_periods(
+        self,
+        symbol: str,
+        interval: str,
+        start: datetime,
+        end: datetime,
+        monthly: bool,
+    ) -> Iterator[tuple[str, datetime, datetime]]:
+        """Yield (url, period_start, period_end) tuples for each archive file."""
+        if monthly:
+            current = start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            while current < end:
+                if current.month == 12:
+                    next_period = current.replace(year=current.year + 1, month=1)
+                else:
+                    next_period = current.replace(month=current.month + 1)
+                year_month = current.strftime("%Y-%m")
+                url = (
+                    f"{_VISION_BASE}/monthly/klines/{symbol.upper()}"
+                    f"/{interval}/{symbol.upper()}-{interval}-{year_month}.zip"
+                )
+                yield url, current, next_period
+                current = next_period
+        else:
+            current = start.replace(hour=0, minute=0, second=0, microsecond=0)
+            while current < end:
+                next_period = current + timedelta(days=1)
+                date_str = current.strftime("%Y-%m-%d")
+                url = (
+                    f"{_VISION_BASE}/daily/klines/{symbol.upper()}"
+                    f"/{interval}/{symbol.upper()}-{interval}-{date_str}.zip"
+                )
+                yield url, current, next_period
+                current = next_period
 
     # ── Download helpers ──────────────────────────────────────────────────────
 
@@ -257,51 +298,105 @@ class BinanceHistoricalConnector(DataConnector):
                 )
                 await asyncio.sleep(wait)
 
-        logger.error("max_retries_exceeded", url=url)
-        return None
+        raise BinanceFetchError(f"max retries exceeded: {url}")
 
     async def _fallback_rest_klines(
         self,
         client: httpx.AsyncClient,
         symbol: str,
         interval: str,
-        start: datetime,
-        end: datetime,
+        period_start: datetime,
+        period_end: datetime,
     ) -> list[list[str]]:
-        """Fetch klines from Binance REST API as fallback.
-
-        Returns rows in the same CSV-like format as the ZIP archives.
-        """
-        params: dict[str, str | int] = {
-            "symbol": symbol.upper(),
-            "interval": interval,
-            "startTime": int(start.timestamp() * 1000),
-            "endTime": int(end.timestamp() * 1000),
-            "limit": 1000,
-        }
+        """Fetch klines from REST API for a specific period, with pagination."""
         all_rows: list[list[str]] = []
+        cursor = int(period_start.timestamp() * 1000)
+        end_ms = int(period_end.timestamp() * 1000)
 
-        for attempt in range(_MAX_RETRIES):
-            try:
-                resp = await client.get(f"{_REST_BASE}/klines", params=params)
-                if resp.status_code == 429 or resp.status_code >= 500:
-                    wait = _BACKOFF_BASE * (2**attempt)
-                    await asyncio.sleep(wait)
-                    continue
-                resp.raise_for_status()
-                data: list[list[Any]] = resp.json()
-                for kline in data:
-                    all_rows.append([str(v) for v in kline])
-                return all_rows
-            except httpx.HTTPError as exc:
-                wait = _BACKOFF_BASE * (2**attempt)
-                logger.warning(
-                    "rest_fallback_error",
-                    error=str(exc),
-                    attempt=attempt + 1,
-                )
-                await asyncio.sleep(wait)
+        while cursor < end_ms:
+            params: dict[str, str | int] = {
+                "symbol": symbol.upper(),
+                "interval": interval,
+                "startTime": cursor,
+                "endTime": end_ms,
+                "limit": 1000,
+            }
+            for attempt in range(_MAX_RETRIES):
+                try:
+                    resp = await client.get(f"{_REST_BASE}/klines", params=params)
+                    if resp.status_code == 429 or resp.status_code >= 500:
+                        await asyncio.sleep(_BACKOFF_BASE * (2**attempt))
+                        continue
+                    resp.raise_for_status()
+                    data: list[list[Any]] = resp.json()
+                    if not data:
+                        return all_rows
+                    for kline in data:
+                        all_rows.append([str(v) for v in kline])
+                    # Advance cursor past the last open_time
+                    last_open_time = int(data[-1][0])
+                    if last_open_time <= cursor:
+                        return all_rows
+                    cursor = last_open_time + 1
+                    break
+                except httpx.HTTPError as exc:
+                    logger.warning("rest_fallback_error", error=str(exc), attempt=attempt + 1)
+                    await asyncio.sleep(_BACKOFF_BASE * (2**attempt))
+            else:
+                raise BinanceFetchError(f"REST fallback exhausted for {symbol}")
+        return all_rows
 
+    async def _fallback_rest_agg_trades(
+        self,
+        client: httpx.AsyncClient,
+        symbol: str,
+        period_start: datetime,
+        period_end: datetime,
+    ) -> list[list[str]]:
+        """Fetch aggTrades from REST API for a specific day."""
+        all_rows: list[list[str]] = []
+        start_ms = int(period_start.timestamp() * 1000)
+        end_ms = int(period_end.timestamp() * 1000)
+        cursor = start_ms
+        while cursor < end_ms:
+            chunk_end = min(cursor + 3600_000, end_ms)
+            params: dict[str, str | int] = {
+                "symbol": symbol.upper(),
+                "startTime": cursor,
+                "endTime": chunk_end,
+                "limit": 1000,
+            }
+            for attempt in range(_MAX_RETRIES):
+                try:
+                    resp = await client.get(f"{_REST_BASE}/aggTrades", params=params)
+                    if resp.status_code == 429 or resp.status_code >= 500:
+                        await asyncio.sleep(_BACKOFF_BASE * (2**attempt))
+                        continue
+                    resp.raise_for_status()
+                    data: list[dict[str, Any]] = resp.json()
+                    if not data:
+                        cursor += 3600_000
+                        break
+                    for trade in data:
+                        all_rows.append(
+                            [
+                                str(trade["a"]),
+                                str(trade["p"]),
+                                str(trade["q"]),
+                                str(trade["f"]),
+                                str(trade["l"]),
+                                str(trade["T"]),
+                                "true" if trade["m"] else "false",
+                                "true",
+                            ]
+                        )
+                    last_ts = int(data[-1]["T"])
+                    cursor = max(cursor + 3600_000, last_ts + 1)
+                    break
+                except httpx.HTTPError:
+                    await asyncio.sleep(_BACKOFF_BASE * (2**attempt))
+            else:
+                raise BinanceFetchError(f"aggTrades REST exhausted for {symbol} {period_start}")
         return all_rows
 
     # ── Parsing helpers ───────────────────────────────────────────────────────

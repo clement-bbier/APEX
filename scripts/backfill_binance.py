@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 
 import structlog
 from tqdm import tqdm
@@ -32,6 +32,14 @@ from services.s01_data_ingestion.quality.checker import DataQualityChecker
 from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
 
 logger = structlog.get_logger(__name__)
+
+
+def _parse_utc_datetime(s: str) -> datetime:
+    """Parse ISO datetime string and ensure UTC tz."""
+    dt = datetime.fromisoformat(s)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt
 
 
 async def run_backfill(
@@ -96,13 +104,13 @@ def main() -> None:
     parser.add_argument(
         "--start",
         required=True,
-        type=lambda s: datetime.fromisoformat(s),
+        type=_parse_utc_datetime,
         help="Start date (ISO format)",
     )
     parser.add_argument(
         "--end",
         required=True,
-        type=lambda s: datetime.fromisoformat(s),
+        type=_parse_utc_datetime,
         help="End date (ISO format)",
     )
     parser.add_argument("--interval", default="1m", help="Bar interval (default: 1m)")

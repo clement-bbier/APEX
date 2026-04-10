@@ -18,6 +18,7 @@ import pytest
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType, DbTick
 from services.s01_data_ingestion.connectors.binance_historical import (
+    BinanceFetchError,
     BinanceHistoricalConnector,
     _bar_size_to_binance_interval,
     _placeholder_asset,
@@ -335,3 +336,152 @@ class TestBackfillScript:
 
         assert issubclass(BinanceHistoricalConnector, DataConnector)
         assert issubclass(BinanceLiveConnector, DataConnector)
+
+
+class TestCopilotFixes:
+    """Tests for Copilot review fixes on PR #43."""
+
+    def test_parse_utc_datetime_naive_input(self) -> None:
+        """Naive ISO string should become UTC-aware."""
+        from scripts.backfill_binance import _parse_utc_datetime
+
+        dt = _parse_utc_datetime("2024-01-01")
+        assert dt.tzinfo is not None
+        assert dt.tzinfo == UTC
+
+    def test_parse_utc_datetime_aware_input(self) -> None:
+        """Already-aware datetime should remain unchanged."""
+        from scripts.backfill_binance import _parse_utc_datetime
+
+        dt = _parse_utc_datetime("2024-01-01T00:00:00+00:00")
+        assert dt.tzinfo is not None
+
+    @pytest.mark.asyncio
+    async def test_download_zip_csv_max_retries_raises(self) -> None:
+        """After exhausting retries on 429, should raise BinanceFetchError."""
+        connector = BinanceHistoricalConnector()
+        resp_429 = MagicMock(spec=httpx.Response)
+        resp_429.status_code = 429
+
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get = AsyncMock(return_value=resp_429)
+
+        with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+            with pytest.raises(BinanceFetchError, match="max retries exceeded"):
+                await connector._download_zip_csv(mock_client, "https://example.com/test.zip")
+
+    @pytest.mark.asyncio
+    async def test_fallback_rest_klines_paginates(self) -> None:
+        """REST fallback should paginate: 1000 + 440 = 1440 total rows."""
+        connector = BinanceHistoricalConnector()
+
+        # First page: 1000 klines, second page: 440 klines, third page: empty
+        page1 = [[str(1704067200000 + i * 60000)] + ["1"] * 11 for i in range(1000)]
+        page2 = [[str(1704067200000 + (1000 + i) * 60000)] + ["1"] * 11 for i in range(440)]
+
+        resp1 = MagicMock(spec=httpx.Response)
+        resp1.status_code = 200
+        resp1.json = MagicMock(return_value=page1)
+        resp1.raise_for_status = MagicMock()
+
+        resp2 = MagicMock(spec=httpx.Response)
+        resp2.status_code = 200
+        resp2.json = MagicMock(return_value=page2)
+        resp2.raise_for_status = MagicMock()
+
+        resp_empty = MagicMock(spec=httpx.Response)
+        resp_empty.status_code = 200
+        resp_empty.json = MagicMock(return_value=[])
+        resp_empty.raise_for_status = MagicMock()
+
+        mock_client = AsyncMock(spec=httpx.AsyncClient)
+        mock_client.get = AsyncMock(side_effect=[resp1, resp2, resp_empty])
+
+        with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+            start = datetime(2024, 1, 1, tzinfo=UTC)
+            end = datetime(2024, 1, 2, tzinfo=UTC)
+            rows = await connector._fallback_rest_klines(mock_client, "BTCUSDT", "1m", start, end)
+        assert len(rows) == 1440
+
+    @pytest.mark.asyncio
+    async def test_fetch_bars_404_uses_period_specific_fallback(self) -> None:
+        """On 404, fallback should receive period bounds, not global range."""
+        connector = BinanceHistoricalConnector()
+
+        resp_404 = MagicMock(spec=httpx.Response)
+        resp_404.status_code = 404
+
+        # REST fallback returns one kline
+        kline_row = _sample_kline_csv_row().split(",")
+        rest_resp = MagicMock(spec=httpx.Response)
+        rest_resp.status_code = 200
+        rest_resp.json = MagicMock(return_value=[kline_row])
+        rest_resp.raise_for_status = MagicMock()
+
+        rest_resp_empty = MagicMock(spec=httpx.Response)
+        rest_resp_empty.status_code = 200
+        rest_resp_empty.json = MagicMock(return_value=[])
+        rest_resp_empty.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            # First call: ZIP 404, then REST klines, then empty
+            mock_client.get = AsyncMock(side_effect=[resp_404, rest_resp, rest_resp_empty])
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+                start = datetime(2024, 1, 1, tzinfo=UTC)
+                end = datetime(2024, 1, 2, tzinfo=UTC)
+                batches = []
+                async for batch in connector.fetch_bars("BTCUSDT", BarSize.M1, start, end):
+                    batches.append(batch)
+
+        assert len(batches) >= 1
+
+    @pytest.mark.asyncio
+    async def test_fetch_ticks_rest_fallback(self) -> None:
+        """On 404 for aggTrades ZIP, REST fallback should be called."""
+        connector = BinanceHistoricalConnector()
+
+        resp_404 = MagicMock(spec=httpx.Response)
+        resp_404.status_code = 404
+
+        # REST fallback returns one trade
+        trade = {
+            "a": 1,
+            "p": "42000.0",
+            "q": "0.5",
+            "f": 100,
+            "l": 200,
+            "T": 1704067200000,
+            "m": True,
+        }
+        rest_resp = MagicMock(spec=httpx.Response)
+        rest_resp.status_code = 200
+        rest_resp.json = MagicMock(return_value=[trade])
+        rest_resp.raise_for_status = MagicMock()
+
+        rest_resp_empty = MagicMock(spec=httpx.Response)
+        rest_resp_empty.status_code = 200
+        rest_resp_empty.json = MagicMock(return_value=[])
+        rest_resp_empty.raise_for_status = MagicMock()
+
+        with patch("httpx.AsyncClient") as mock_cls:
+            mock_client = AsyncMock()
+            # ZIP 404, then REST trades, then empty for remaining hours
+            mock_client.get = AsyncMock(side_effect=[resp_404, rest_resp] + [rest_resp_empty] * 24)
+            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+            mock_client.__aexit__ = AsyncMock(return_value=False)
+            mock_cls.return_value = mock_client
+
+            with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+                start = datetime(2024, 1, 1, tzinfo=UTC)
+                end = datetime(2024, 1, 2, tzinfo=UTC)
+                batches = []
+                async for batch in connector.fetch_ticks("BTCUSDT", start, end):
+                    batches.append(batch)
+
+        assert len(batches) >= 1
+        assert batches[0][0].price == Decimal("42000.0")
