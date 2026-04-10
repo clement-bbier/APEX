@@ -1044,6 +1044,8 @@ def _split_trades_is_oos(
         Lopez de Prado (2018). AFML Chapter 7.
         Pardo (2008). Chapter 5.
     """
+    if embargo_days < 0:
+        raise ValueError(f"embargo_days must be non-negative, got {embargo_days}")
     if oos_fraction <= 0.0 or oos_fraction >= 1.0:
         msg = f"oos_fraction must be in (0, 1), got {oos_fraction}"
         raise ValueError(msg)
@@ -1103,6 +1105,10 @@ def full_report(
         profit_factor, avg_win, avg_loss, psr, dsr, sharpe_ci_95_low,
         sharpe_ci_95_high, by_session, by_regime, by_signal, equity_curve.
     """
+    if oos_fraction != 0.0:
+        if not math.isfinite(oos_fraction) or oos_fraction < 0.0 or oos_fraction >= 1.0:
+            raise ValueError(f"oos_fraction must be finite and in [0, 1), got {oos_fraction!r}")
+
     if not trades:
         return {"error": "no trades"}
 

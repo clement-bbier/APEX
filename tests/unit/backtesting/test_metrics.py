@@ -690,7 +690,10 @@ def test_oos_embargo_removes_trades_near_boundary() -> None:
     is_count_no = report_no_embargo["is_report"]["trade_count"]
     is_count_with = report_with_embargo["is_report"]["trade_count"]
     # Embargo must remove at least some trades from IS
-    assert is_count_with <= is_count_no
+    assert is_count_with < is_count_no, (
+        f"Embargo of 5 days should remove at least 1 IS trade, "
+        f"but IS count is {is_count_with} in both cases"
+    )
 
 
 def test_oos_fraction_zero_has_no_split_fields() -> None:
@@ -703,12 +706,25 @@ def test_oos_fraction_zero_has_no_split_fields() -> None:
 
 
 def test_oos_trade_counts_sum_correctly() -> None:
-    """IS + OOS + embargo trades = total trades."""
+    """IS + OOS trades = total (no embargo); with embargo, IS shrinks."""
     trades, initial = _seeded_equity_curve(n_days=60, seed=42)
-    report = full_report(trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=0)
-    is_count = report["is_report"]["trade_count"]
-    oos_count = report["oos_report"]["trade_count"]
-    assert is_count + oos_count == len(trades)
+
+    # No embargo: IS + OOS = total
+    report_no = full_report(
+        trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=0
+    )
+    is_no = report_no["is_report"]["trade_count"]
+    oos_no = report_no["oos_report"]["trade_count"]
+    assert is_no + oos_no == len(trades)
+
+    # With embargo: IS + OOS < total (embargo removed some IS trades)
+    report_emb = full_report(
+        trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=5
+    )
+    is_emb = report_emb["is_report"]["trade_count"]
+    oos_emb = report_emb["oos_report"]["trade_count"]
+    assert is_emb + oos_emb < len(trades), "With embargo, IS + OOS should be less than total trades"
+    assert oos_emb == oos_no, "OOS count should be unaffected by embargo"
 
 
 def test_oos_sharpe_degradation_computed_correctly() -> None:
@@ -720,3 +736,17 @@ def test_oos_sharpe_degradation_computed_correctly() -> None:
     if s_is != 0.0:
         expected = (s_is - s_oos) / abs(s_is) * 100.0
         assert report["oos_sharpe_degradation"] == pytest.approx(expected, rel=1e-9)
+
+
+def test_oos_fraction_nan_raises_value_error() -> None:
+    """Regression: NaN oos_fraction must raise, not silently skip."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    with pytest.raises(ValueError, match="oos_fraction"):
+        full_report(trades=trades, initial_capital=initial, oos_fraction=float("nan"))
+
+
+def test_oos_negative_embargo_raises_value_error() -> None:
+    """Regression: negative embargo_days must raise."""
+    trades, initial = _seeded_equity_curve(seed=42)
+    with pytest.raises(ValueError, match="embargo_days"):
+        full_report(trades=trades, initial_capital=initial, oos_fraction=0.3, embargo_days=-1)
