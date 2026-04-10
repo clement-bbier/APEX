@@ -103,7 +103,7 @@ class FREDConnector(MacroConnector):
             raise FREDFetchError(f"unreachable for {series_id}")
 
         # Convert pandas Series to MacroPoint batches
-        batch: list[MacroPoint] = []
+        points: list[MacroPoint] = []
         for ts, value in series.items():
             # Skip NaN values (FRED uses NaN for missing observations)
             if value != value:
@@ -112,18 +112,19 @@ class FREDConnector(MacroConnector):
             dt = ts.to_pydatetime()  # type: ignore[union-attr,unused-ignore]
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=UTC)
-            batch.append(
+            points.append(
                 MacroPoint(
                     series_id=series_id,
                     timestamp=dt,
                     value=float(value),
                 )
             )
-            if len(batch) >= _BATCH_SIZE:
-                yield batch
-                batch = []
-        if batch:
-            yield batch
+
+        # Enforce [start, end) — FRED treats observation_end as inclusive
+        points = [p for p in points if p.timestamp < end]
+
+        for i in range(0, len(points), _BATCH_SIZE):
+            yield points[i : i + _BATCH_SIZE]
 
     async def fetch_metadata(self, series_id: str) -> MacroSeriesMeta:
         """Retrieve FRED series metadata.

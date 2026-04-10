@@ -19,6 +19,23 @@ skip_no_network = pytest.mark.skipif(not _HAS_NETWORK, reason="APEX_NETWORK_TEST
 
 
 @pytest.mark.integration
+class TestBoJOffline:
+    """Tests that don't need network — BoJ metadata is from a curated registry."""
+
+    @pytest.mark.asyncio
+    async def test_fetch_metadata_policy_rate(self) -> None:
+        """Fetch BoJ policy rate metadata (no network needed)."""
+        from services.s01_data_ingestion.connectors.boj_connector import BoJConnector
+
+        connector = BoJConnector()
+        meta = await connector.fetch_metadata("boj_policy_rate")
+
+        assert meta.series_id == "boj_policy_rate"
+        assert meta.source == "BOJ"
+        assert meta.frequency == "monthly"
+
+
+@pytest.mark.integration
 @pytest.mark.network
 @skip_no_network
 class TestBoJBackfillIntegration:
@@ -39,15 +56,3 @@ class TestBoJBackfillIntegration:
 
         assert len(all_points) >= 10
         assert all(isinstance(p, MacroPoint) for p in all_points)
-
-    @pytest.mark.asyncio
-    async def test_fetch_metadata_policy_rate(self) -> None:
-        """Fetch BoJ policy rate metadata (no network needed)."""
-        from services.s01_data_ingestion.connectors.boj_connector import BoJConnector
-
-        connector = BoJConnector()
-        meta = await connector.fetch_metadata("boj_policy_rate")
-
-        assert meta.series_id == "boj_policy_rate"
-        assert meta.source == "BOJ"
-        assert meta.frequency == "monthly"

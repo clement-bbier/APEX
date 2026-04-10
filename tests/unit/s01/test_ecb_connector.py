@@ -45,7 +45,7 @@ class TestECBConnectorInit:
 
     def test_connector_name(self):
         conn = ECBConnector()
-        assert conn.connector_name == "ecb"
+        assert conn.connector_name == "ecb_sdw"
 
     def test_parse_series_id_valid(self):
         flow, key = ECBConnector._parse_series_id("EXR/D.USD.EUR.SP00.A")
