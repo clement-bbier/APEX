@@ -71,7 +71,7 @@ class DataIngestionService(BaseService):
         )
 
         # Macro data feed.
-        self._macro_feed = MacroFeed(fred_api_key=settings.fred_api_key)
+        self._macro_feed = MacroFeed(fred_api_key=settings.fred_api_key.get_secret_value())
 
     # ── BaseService interface ─────────────────────────────────────────────────
 

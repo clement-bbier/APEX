@@ -16,7 +16,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
-from datetime import UTC, datetime
+from datetime import datetime
 
 import structlog
 from tqdm import tqdm
@@ -24,6 +24,7 @@ from tqdm import tqdm
 from core.config import get_settings
 from core.data.timescale_repository import TimescaleRepository
 from core.models.data import AssetClass, BarSize, IngestionStatus
+from scripts._backfill_common import _parse_utc_datetime
 from services.s01_data_ingestion.connectors.binance_historical import (
     BinanceHistoricalConnector,
 )
@@ -32,14 +33,6 @@ from services.s01_data_ingestion.quality.checker import DataQualityChecker
 from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
 
 logger = structlog.get_logger(__name__)
-
-
-def _parse_utc_datetime(s: str) -> datetime:
-    """Parse ISO datetime string and ensure UTC tz."""
-    dt = datetime.fromisoformat(s)
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt
 
 
 async def run_backfill(
