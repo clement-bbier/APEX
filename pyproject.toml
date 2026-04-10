@@ -66,6 +66,7 @@ module = [
     "apex_mc.*",
     "scipy.*",
     "defusedxml.*",
+    "asyncpg.*",
 ]
 ignore_missing_imports = true
 
@@ -73,8 +74,10 @@ ignore_missing_imports = true
 module = [
     "core.models.*",
     "core.config",
+    "core.data.*",
     "tests.*",
     "services.s10_monitor.dashboard",
+    "scripts.*",
 ]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
@@ -83,6 +86,7 @@ ignore_errors = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = ["integration: tests requiring external services (TimescaleDB, etc.)"]
 addopts = "-ra --strict-markers --strict-config"
 filterwarnings = [
     "error",
