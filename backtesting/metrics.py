@@ -1224,8 +1224,12 @@ def almgren_chriss_impact(
     Returns:
         Dict with temporary_impact_bps, permanent_impact_bps,
         total_impact_bps. Returns None if adv_usd <= 0.
-        Returns all zeros if order_size_usd <= 0 or
+        Returns all zeros if order_size_usd == 0 or
         daily_volatility <= 0.
+
+    Raises:
+        ValueError: If eta or gamma is negative, or any numeric
+            parameter is non-finite (NaN/inf).
 
     Reference:
         Almgren, R., & Chriss, N. (2001). Optimal execution of
@@ -1233,9 +1237,23 @@ def almgren_chriss_impact(
         Almgren, R., Thum, C., Hauptmann, E., & Li, H. (2005).
         Equity market impact. Risk, July, 57-62.
     """
+    if (
+        not math.isfinite(order_size_usd)
+        or not math.isfinite(adv_usd)
+        or not math.isfinite(daily_volatility)
+        or not math.isfinite(eta)
+        or not math.isfinite(gamma)
+        or eta < 0
+        or gamma < 0
+    ):
+        raise ValueError(
+            f"almgren_chriss_impact requires finite non-negative calibration "
+            f"params, got eta={eta!r}, gamma={gamma!r}, vol={daily_volatility!r}, "
+            f"order={order_size_usd!r}, adv={adv_usd!r}"
+        )
     if adv_usd <= 0:
         return None
-    if order_size_usd <= 0 or daily_volatility <= 0:
+    if order_size_usd == 0.0 or daily_volatility <= 0:
         return {
             "temporary_impact_bps": 0.0,
             "permanent_impact_bps": 0.0,
