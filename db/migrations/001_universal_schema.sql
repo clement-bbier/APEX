@@ -11,6 +11,7 @@
 -- 0. Extension
 -- ============================================================
 CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ============================================================
 -- 1. Asset Registry

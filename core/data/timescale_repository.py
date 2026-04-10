@@ -8,8 +8,6 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from decimal import Decimal
-from typing import Any
 
 import asyncpg
 
@@ -27,7 +25,6 @@ from core.models.data import (
     IngestionStatus,
     MacroPoint,
     MacroSeriesMeta,
-    Severity,
 )
 
 
@@ -105,7 +102,7 @@ class TimescaleRepository:
             asset.created_at or datetime.now(timezone.utc),
             asset.updated_at or datetime.now(timezone.utc),
         )
-        return uuid.UUID(str(row["asset_id"]))  # type: ignore[index]
+        return uuid.UUID(str(row["asset_id"]))
 
     async def get_asset(self, symbol: str, exchange: str) -> Asset | None:
         """Look up an asset by symbol and exchange."""
@@ -130,7 +127,7 @@ class TimescaleRepository:
         return self._row_to_asset(row)
 
     async def search_assets(
-        self, query: str, asset_class: str | None = None
+        self, query: str, asset_class: AssetClass | None = None
     ) -> list[Asset]:
         """Search assets by symbol prefix, optionally filtered by asset_class."""
         pool = self._get_pool()
@@ -138,7 +135,7 @@ class TimescaleRepository:
             rows = await pool.fetch(
                 "SELECT * FROM assets WHERE symbol ILIKE $1 AND asset_class = $2 ORDER BY symbol",
                 f"{query}%",
-                asset_class,
+                asset_class.value,
             )
         else:
             rows = await pool.fetch(
@@ -284,14 +281,12 @@ class TimescaleRepository:
 
     # ── Macro ─────────────────────────────────────────────────────────────────
 
-    async def insert_macro_points(
-        self, series_id: str, points: list[MacroPoint]
-    ) -> int:
+    async def insert_macro_points(self, points: list[MacroPoint]) -> int:
         """Bulk-insert macro series points. Returns count inserted."""
         if not points:
             return 0
         pool = self._get_pool()
-        records = [(series_id, p.timestamp, p.value) for p in points]
+        records = [(p.series_id, p.timestamp, p.value) for p in points]
         result = await pool.copy_records_to_table(
             "macro_series",
             records=records,
@@ -419,7 +414,7 @@ class TimescaleRepository:
     async def finish_ingestion_run(
         self,
         run_id: uuid.UUID,
-        status: str,
+        status: IngestionStatus,
         rows: int,
         error: str | None = None,
     ) -> None:
@@ -431,7 +426,7 @@ class TimescaleRepository:
             SET finished_at = $1, status = $2, rows_inserted = $3, error_message = $4
             WHERE run_id = $5
             """,
-            datetime.now(timezone.utc), status, rows, error, run_id,
+            datetime.now(timezone.utc), status.value, rows, error, run_id,
         )
 
     # ── Data quality ──────────────────────────────────────────────────────────

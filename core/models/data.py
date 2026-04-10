@@ -11,12 +11,20 @@ All timestamps are UTC-aware datetime.
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+def _ensure_utc(v: object) -> object:
+    """If *v* is a naive datetime, assume UTC and attach tzinfo."""
+    if isinstance(v, datetime) and v.tzinfo is None:
+        return v.replace(tzinfo=UTC)
+    return v
+
 
 # ── Enums ─────────────────────────────────────────────────────────────────────
 
@@ -117,6 +125,12 @@ class Asset(BaseModel):
         """Ensure symbol and exchange are uppercase."""
         return v.upper()
 
+    @field_validator("created_at", "updated_at", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure datetime fields are UTC-aware."""
+        return _ensure_utc(v)
+
     @field_validator("tick_size", "lot_size", mode="before")
     @classmethod
     def coerce_to_decimal(cls, v: object) -> Decimal | None:
@@ -149,6 +163,12 @@ class Bar(BaseModel):
     vwap: Decimal | None = Field(default=None, description="Volume-weighted average price")
     adj_close: Decimal | None = Field(default=None, description="Split/dividend adjusted close")
 
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure timestamp is UTC-aware."""
+        return _ensure_utc(v)
+
     @field_validator("open", "high", "low", "close", "volume", "vwap", "adj_close", mode="before")
     @classmethod
     def coerce_to_decimal(cls, v: object) -> Decimal | None:
@@ -175,6 +195,12 @@ class DbTick(BaseModel):
     price: Decimal = Field(..., gt=Decimal("0"), description="Trade price")
     quantity: Decimal = Field(..., gt=Decimal("0"), description="Trade quantity")
     side: str = Field(default="unknown", description="Aggressor side: buy, sell, unknown")
+
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure timestamp is UTC-aware."""
+        return _ensure_utc(v)
 
     @field_validator("price", "quantity", mode="before")
     @classmethod
@@ -203,6 +229,12 @@ class OrderBookLevel(BaseModel):
     ask_price: Decimal | None = Field(default=None, description="Ask price at this level")
     ask_size: Decimal | None = Field(default=None, description="Ask size at this level")
 
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure timestamp is UTC-aware."""
+        return _ensure_utc(v)
+
     @field_validator("bid_price", "bid_size", "ask_price", "ask_size", mode="before")
     @classmethod
     def coerce_to_decimal(cls, v: object) -> Decimal | None:
@@ -225,6 +257,12 @@ class MacroPoint(BaseModel):
     series_id: str = Field(..., min_length=1, description="Series identifier, e.g. VIXCLS")
     timestamp: datetime = Field(..., description="Observation timestamp (UTC)")
     value: float = Field(..., description="Observation value")
+
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure timestamp is UTC-aware."""
+        return _ensure_utc(v)
 
 
 class MacroSeriesMeta(BaseModel):
@@ -300,6 +338,12 @@ class EconomicEvent(BaseModel):
     )
     source: str | None = Field(default=None, description="Data source")
 
+    @field_validator("scheduled_time", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure scheduled_time is UTC-aware."""
+        return _ensure_utc(v)
+
 
 class DataQualityEntry(BaseModel):
     """Data quality check log entry.
@@ -318,6 +362,12 @@ class DataQualityEntry(BaseModel):
     severity: Severity = Field(..., description="Check severity level")
     details_json: dict[str, Any] = Field(default_factory=dict, description="Check details")
     resolved: bool = Field(default=False, description="Whether the issue has been resolved")
+
+    @field_validator("timestamp", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure timestamp is UTC-aware."""
+        return _ensure_utc(v)
 
 
 class IngestionRun(BaseModel):
@@ -343,3 +393,9 @@ class IngestionRun(BaseModel):
     metadata_json: dict[str, Any] = Field(
         default_factory=dict, description="Extra metadata (date_range, api_calls, etc.)"
     )
+
+    @field_validator("started_at", "finished_at", mode="before")
+    @classmethod
+    def ensure_utc(cls, v: object) -> object:
+        """Ensure datetime fields are UTC-aware."""
+        return _ensure_utc(v)

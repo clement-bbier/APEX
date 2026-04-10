@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
-import sys
 from pathlib import Path
 
 import asyncpg
@@ -64,8 +63,8 @@ async def run_migrations(
     migrations_dir = Path(__file__).resolve().parent.parent / "db" / "migrations"
 
     if not migrations_dir.exists():
-        logger.error("migrations_dir_not_found", path=str(migrations_dir))
-        sys.exit(1)
+        msg = f"Migrations directory not found: {migrations_dir}"
+        raise FileNotFoundError(msg)
 
     sql_files = sorted(migrations_dir.glob("*.sql"))
     if not sql_files:
@@ -110,6 +109,8 @@ async def run_migrations(
 
 def main() -> None:
     """CLI entry point for init_db."""
+    import sys
+
     parser = argparse.ArgumentParser(description="APEX DB migration runner")
     parser.add_argument("--host", default="localhost", help="TimescaleDB host")
     parser.add_argument("--port", type=int, default=5432, help="TimescaleDB port")
@@ -117,6 +118,9 @@ def main() -> None:
     parser.add_argument("--user", default="apex", help="Database user")
     parser.add_argument("--password", default="apex_secret", help="Database password")
     args = parser.parse_args()
+
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
     asyncio.run(
         run_migrations(

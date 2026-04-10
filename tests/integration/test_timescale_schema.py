@@ -173,7 +173,7 @@ class TestFullCycle:
             )
             for i in range(30)
         ]
-        count = await repo.insert_macro_points("VIXCLS", points)
+        count = await repo.insert_macro_points(points)
         assert count == 30
 
         result = await repo.get_macro_series("VIXCLS", base_time, base_time + timedelta(days=30))
