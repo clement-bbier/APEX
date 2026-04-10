@@ -940,3 +940,22 @@ def test_avg_slippage_increases_with_volatility() -> None:
     report_calm = full_report(trades=trades, initial_capital=initial, daily_volatility=0.01)
     report_vol = full_report(trades=trades, initial_capital=initial, daily_volatility=0.05)
     assert report_vol["avg_slippage_bps"] > report_calm["avg_slippage_bps"]
+
+
+def test_ac_impact_negative_order_size_computes_impact() -> None:
+    """Regression: negative order size (short/sell) must still compute impact."""
+    pos = almgren_chriss_impact(50_000, 1_000_000, 0.02)
+    neg = almgren_chriss_impact(-50_000, 1_000_000, 0.02)
+    assert pos is not None
+    assert neg is not None
+    assert neg["total_impact_bps"] == pytest.approx(pos["total_impact_bps"], rel=1e-9)
+
+
+def test_ac_impact_rejects_invalid_calibration() -> None:
+    """Regression: NaN/negative eta/gamma must raise ValueError."""
+    with pytest.raises(ValueError, match="finite non-negative"):
+        almgren_chriss_impact(50_000, 1_000_000, 0.02, eta=-0.01)
+    with pytest.raises(ValueError, match="finite non-negative"):
+        almgren_chriss_impact(50_000, 1_000_000, 0.02, gamma=float("nan"))
+    with pytest.raises(ValueError, match="finite non-negative"):
+        almgren_chriss_impact(float("inf"), 1_000_000, 0.02)
