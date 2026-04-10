@@ -55,7 +55,10 @@ class VolumeCheck(QualityCheck):
 
             # Volume spike detection
             if i > 0:
-                prev_volumes = [float(bars[j].volume) for j in range(max(0, i - 20), i)]
+                prev_volumes = [
+                    float(bars[j].volume)
+                    for j in range(max(0, i - self._config.volume_spike_lookback), i)
+                ]
                 if prev_volumes:
                     avg = sum(prev_volumes) / len(prev_volumes)
                     if avg > 0 and float(bar.volume) > avg * self._config.volume_spike_multiplier:

@@ -18,7 +18,11 @@ logger = get_logger("quality.stale_check")
 
 
 class StaleCheck(QualityCheck):
-    """Detect stale data based on last-seen timestamp."""
+    """Detect stale data based on last-seen timestamp.
+
+    Not included in the default pipeline checks (check_bars/check_ticks
+    are no-ops).  Use check_staleness() directly from monitoring code.
+    """
 
     def __init__(self, config: QualityConfig) -> None:
         self._config = config

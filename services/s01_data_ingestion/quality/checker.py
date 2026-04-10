@@ -19,7 +19,6 @@ from .config import QualityConfig
 from .gap_check import GapCheck
 from .outlier_check import OutlierCheck
 from .price_check import PriceCheck
-from .stale_check import StaleCheck
 from .timestamp_check import TimestampCheck
 from .volume_check import VolumeCheck
 
@@ -27,14 +26,18 @@ logger = get_logger("quality.checker")
 
 
 def _default_checks(config: QualityConfig) -> list[QualityCheck]:
-    """Instantiate the standard suite of quality checks."""
+    """Instantiate the standard suite of quality checks.
+
+    Note: StaleCheck is intentionally excluded — it is a no-op in the
+    pipeline (check_bars/check_ticks return []).  Use it explicitly via
+    StaleCheck.check_staleness() from monitoring code.
+    """
     return [
         GapCheck(config),
         OutlierCheck(config),
         TimestampCheck(config),
         VolumeCheck(config),
         PriceCheck(config),
-        StaleCheck(config),
     ]
 
 
@@ -161,21 +164,32 @@ class DataQualityChecker:
         return report
 
     def validate_ticks(self, ticks: list[DbTick], asset: Asset) -> TickQualityReport:
-        """Run all checks on ticks and classify each tick."""
+        """Run all checks on ticks and classify each tick.
+
+        Uses index-based classification to avoid timestamp collision bugs
+        when multiple ticks share the same timestamp.
+        """
         all_issues: list[QualityIssue] = []
         for check in self._checks:
             all_issues.extend(check.check_ticks(ticks, asset))
 
-        fail_timestamps: set[float] = set()
-        warn_timestamps: set[float] = set()
+        # Map timestamps to tick indices for issue → tick matching
+        ts_to_indices: dict[float, list[int]] = {}
+        for idx, tick in enumerate(ticks):
+            ts_to_indices.setdefault(tick.timestamp.timestamp(), []).append(idx)
+
+        fail_indices: set[int] = set()
+        warn_indices: set[int] = set()
 
         for issue in all_issues:
-            if issue.timestamp is not None:
-                ts = issue.timestamp.timestamp()
+            if issue.timestamp is None:
+                continue
+            indices = ts_to_indices.get(issue.timestamp.timestamp(), [])
+            for idx in indices:
                 if issue.severity == CheckResult.FAIL:
-                    fail_timestamps.add(ts)
+                    fail_indices.add(idx)
                 elif issue.severity == CheckResult.WARN:
-                    warn_timestamps.add(ts)
+                    warn_indices.add(idx)
 
         clean: list[DbTick] = []
         rejected: list[DbTick] = []
@@ -183,12 +197,11 @@ class DataQualityChecker:
         warnings = 0
         failures = 0
 
-        for tick in ticks:
-            ts = tick.timestamp.timestamp()
-            if ts in fail_timestamps:
+        for idx, tick in enumerate(ticks):
+            if idx in fail_indices:
                 rejected.append(tick)
                 failures += 1
-            elif ts in warn_timestamps:
+            elif idx in warn_indices:
                 clean.append(tick)
                 warnings += 1
             else:

@@ -315,7 +315,7 @@ class TestVolumeCheck:
     def test_volume_spike_warn(self) -> None:
         start = datetime(2025, 1, 6, 10, 0, tzinfo=UTC)
         bars = _make_bars(10, start, close=50000.0)
-        # Append a bar with volume 100x the average (100 * 10 = 1000x)
+        # Append a bar with volume ~1000x the average (well above default multiplier of 10)
         bars.append(_make_bar(start + timedelta(minutes=10), volume=100000.0))
         issues = self.check.check_bars(bars, self.asset)
         spikes = [i for i in issues if i.check_type == "volume_spike"]
