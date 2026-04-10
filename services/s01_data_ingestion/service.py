@@ -66,12 +66,12 @@ class DataIngestionService(BaseService):
             symbols=_DEFAULT_EQUITY_SYMBOLS,
             on_tick=self._on_alpaca_tick,
             api_key=settings.alpaca_api_key,
-            secret_key=settings.alpaca_secret_key,
+            secret_key=settings.alpaca_api_secret,
             url=settings.alpaca_data_url,
         )
 
         # Macro data feed.
-        self._macro_feed = MacroFeed(fred_api_key=settings.fred_api_key)
+        self._macro_feed = MacroFeed(fred_api_key=settings.fred_api_key.get_secret_value())
 
     # ── BaseService interface ─────────────────────────────────────────────────
 

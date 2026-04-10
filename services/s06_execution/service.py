@@ -76,7 +76,7 @@ class ExecutionService(BaseService):
         if settings.trading_mode == TradingMode.LIVE:
             self._alpaca = AlpacaBroker(
                 api_key=settings.alpaca_api_key,
-                secret_key=settings.alpaca_secret_key,
+                secret_key=settings.alpaca_api_secret,
                 base_url=settings.alpaca_base_url,
                 paper=False,
             )

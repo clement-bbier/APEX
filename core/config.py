@@ -9,7 +9,7 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import AliasChoices, Field, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,7 +39,7 @@ class Settings(BaseSettings):
 
     # ── Alpaca ────────────────────────────────────────────────────────────────
     alpaca_api_key: str = Field(default="", description="Alpaca API key")
-    alpaca_secret_key: str = Field(default="", description="Alpaca secret key")
+    alpaca_api_secret: str = Field(default="", description="Alpaca API secret")
     alpaca_base_url: str = Field(
         default="https://paper-api.alpaca.markets",
         description="Alpaca REST base URL",
@@ -63,7 +63,24 @@ class Settings(BaseSettings):
     )
 
     # ── FRED API ──────────────────────────────────────────────────────────────
-    fred_api_key: str = Field(default="", description="FRED API key for macro data")
+    fred_api_key: SecretStr = Field(
+        default=SecretStr(""), description="FRED API key for macro data"
+    )
+
+    # ── Massive (ex-Polygon) ─────────────────────────────────────────────────
+    massive_api_key: SecretStr = Field(
+        default=SecretStr(""), description="Massive/Polygon REST API key"
+    )
+    massive_s3_access_key: SecretStr = Field(
+        default=SecretStr(""), description="Massive S3 access key"
+    )
+    massive_s3_secret_key: SecretStr = Field(
+        default=SecretStr(""), description="Massive S3 secret key"
+    )
+    massive_s3_endpoint: str = Field(
+        default="https://files.massive.com", description="Massive S3 endpoint URL"
+    )
+    massive_s3_bucket: str = Field(default="flatfiles", description="Massive S3 bucket name")
 
     # ── Redis ─────────────────────────────────────────────────────────────────
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
