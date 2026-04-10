@@ -62,6 +62,8 @@ module = [
     "redis.*",
     "zmq.*",
     "fredapi.*",
+    "boto3.*",
+    "botocore.*",
     "fakeredis.*",
     "tqdm.*",
     "apex_mc.*",
@@ -96,6 +98,7 @@ filterwarnings = [
     "ignore::DeprecationWarning:binance",
     "ignore::DeprecationWarning:pydantic",
     "ignore::DeprecationWarning:hypothesis",
+    "ignore::DeprecationWarning:websockets",
     "ignore::pytest.PytestUnraisableExceptionWarning",
 ]
 
