@@ -71,6 +71,7 @@ module = [
     "scipy.*",
     "defusedxml.*",
     "asyncpg.*",
+    "bs4.*",
 ]
 ignore_missing_imports = true
 
