@@ -33,3 +33,9 @@ class QualityConfig:
 
     # Timestamp tolerance (seconds into the future)
     future_tolerance_seconds: int = 60
+
+    # Gap detection
+    gap_tolerance_multiplier: float = 1.5
+
+    # Volume spike lookback window
+    volume_spike_lookback: int = 20

@@ -6,7 +6,7 @@ derived from bar_size. Weekend gaps are ignored for equities.
 
 from __future__ import annotations
 
-from datetime import UTC
+from datetime import UTC, datetime, timedelta
 
 from core.logger import get_logger
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
@@ -17,26 +17,29 @@ from .config import QualityConfig
 logger = get_logger("quality.gap_check")
 
 # Expected interval in seconds for each bar size.
-_BAR_INTERVAL: dict[str, int] = {
+_BAR_INTERVAL: dict[BarSize, int] = {
     BarSize.M1: 60,
     BarSize.M5: 300,
     BarSize.M15: 900,
     BarSize.H1: 3600,
     BarSize.H4: 14400,
     BarSize.D1: 86400,
+    BarSize.W1: 604800,
+    BarSize.MO1: 2592000,
 }
-
-_GAP_TOLERANCE = 1.5
 
 
 def _is_weekend_gap(ts_a: float, ts_b: float) -> bool:
-    """Return True if the gap spans a weekend (Sat/Sun)."""
-    from datetime import datetime
-
+    """Return True if the gap between ts_a and ts_b spans a weekend day."""
     dt_a = datetime.fromtimestamp(ts_a, tz=UTC)
     dt_b = datetime.fromtimestamp(ts_b, tz=UTC)
-    # Friday = 4, Saturday = 5, Sunday = 6
-    return dt_a.weekday() == 4 and dt_b.weekday() == 0
+    # Gap traverses at least one Saturday or Sunday
+    current = dt_a
+    while current < dt_b:
+        if current.weekday() >= 5:
+            return True
+        current += timedelta(days=1)
+    return dt_b.weekday() >= 5
 
 
 class GapCheck(QualityCheck):
@@ -62,7 +65,7 @@ class GapCheck(QualityCheck):
             ts_b = bars[i + 1].timestamp.timestamp()
             actual_interval = ts_b - ts_a
 
-            if actual_interval > expected * _GAP_TOLERANCE:
+            if actual_interval > expected * self._config.gap_tolerance_multiplier:
                 if is_equity and _is_weekend_gap(ts_a, ts_b):
                     continue
 
