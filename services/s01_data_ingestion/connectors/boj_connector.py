@@ -211,7 +211,7 @@ class BoJConnector(MacroConnector):
 
         # Try multiple encodings — BoJ CSVs are often Shift-JIS
         text = ""
-        for encoding in ("utf-8-sig", "shift_jis", "cp932", "latin-1"):
+        for encoding in ("utf-8-sig", "shift_jis", "cp932"):
             try:
                 text = raw.decode(encoding)
                 break
@@ -219,7 +219,9 @@ class BoJConnector(MacroConnector):
                 continue
 
         if not text:
-            raise BoJFetchError(f"could not decode CSV for {series_id}")
+            raise BoJFetchError(
+                f"failed to decode CSV for {series_id}: tried utf-8-sig, shift_jis, cp932"
+            )
 
         reader = csv.reader(io.StringIO(text))
         for row in reader:

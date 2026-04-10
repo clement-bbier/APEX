@@ -77,7 +77,7 @@ class ECBConnector(MacroConnector):
     @property
     def connector_name(self) -> str:
         """Return connector identifier."""
-        return "ecb"
+        return "ecb_sdw"
 
     async def fetch_series(
         self,

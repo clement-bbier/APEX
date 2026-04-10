@@ -6,7 +6,7 @@ without requiring a database or network access.
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -17,7 +17,17 @@ class TestBuildConnector:
     """Tests for provider → connector dispatch."""
 
     def test_fred_provider(self):
-        with patch("services.s01_data_ingestion.connectors.fred_connector.Fred"):
+        fake_settings = MagicMock()
+        fake_settings.fred_api_key.get_secret_value.return_value = "fake_test_key"
+
+        with (
+            patch("scripts.backfill_macro.get_settings", return_value=fake_settings),
+            patch(
+                "services.s01_data_ingestion.connectors.fred_connector.get_settings",
+                return_value=fake_settings,
+            ),
+            patch("services.s01_data_ingestion.connectors.fred_connector.Fred"),
+        ):
             from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
 
             conn = _build_connector("fred")

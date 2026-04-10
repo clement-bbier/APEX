@@ -23,7 +23,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
@@ -106,6 +106,31 @@ async def run_backfill(
         dry_run: If True, fetch and log but do not insert.
     """
     connector = _build_connector(provider)
+
+    if dry_run:
+        # Pure validation mode — no DB connection at all
+        logger.info("dry_run_mode_enabled", provider=provider)
+        for series_id in series_ids:
+            try:
+                meta = await connector.fetch_metadata(series_id)
+                point_count = 0
+                last_value: float | None = None
+                async for batch in connector.fetch_series(series_id, start, end):
+                    point_count += len(batch)
+                    if batch:
+                        last_value = batch[-1].value
+                logger.info(
+                    "dry_run_series_validated",
+                    series_id=series_id,
+                    title=meta.name,
+                    point_count=point_count,
+                    last_value=str(last_value) if last_value is not None else None,
+                )
+            except Exception as exc:
+                logger.error("dry_run_series_failed", series_id=series_id, error=str(exc))
+        return
+
+    # Normal mode with DB
     settings = get_settings()
     repo = TimescaleRepository(settings.timescale_dsn)
     await repo.connect()
@@ -118,8 +143,7 @@ async def run_backfill(
             try:
                 # Fetch and upsert metadata
                 meta = await connector.fetch_metadata(series_id)
-                if not dry_run:
-                    await repo.upsert_macro_metadata(meta)
+                await repo.upsert_macro_metadata(meta)
                 logger.info(
                     "macro_metadata_fetched",
                     provider=provider,
@@ -128,25 +152,18 @@ async def run_backfill(
                     frequency=meta.frequency,
                 )
 
-                # Stream data points
+                # Stream data points — track last_value during streaming
+                last_value_normal: float | None = None
                 with tqdm(
                     unit="pts",
                     desc=f"{provider}:{series_id}",
                 ) as pbar:
                     async for batch in connector.fetch_series(series_id, start, end):
-                        if not dry_run and batch:
+                        if batch:
+                            last_value_normal = batch[-1].value
                             n = await repo.insert_macro_points(batch)
                             total_inserted += n
                             pbar.update(n)
-                        else:
-                            pbar.update(len(batch))
-
-                last_value: float | None = None
-                if total_inserted > 0 or dry_run:
-                    # Re-fetch last point for logging
-                    async for batch in connector.fetch_series(series_id, start, end):
-                        if batch:
-                            last_value = batch[-1].value
 
                 await repo.finish_ingestion_run(run_id, IngestionStatus.SUCCESS, total_inserted)
                 logger.info(
@@ -156,8 +173,7 @@ async def run_backfill(
                     count=total_inserted,
                     range_start=start.isoformat(),
                     range_end=end.isoformat(),
-                    last_value=last_value,
-                    dry_run=dry_run,
+                    last_value=last_value_normal,
                 )
 
             except Exception as exc:
@@ -196,15 +212,15 @@ def main() -> None:
     )
     parser.add_argument(
         "--start",
-        required=True,
         type=_parse_utc_datetime,
-        help="Start date (ISO format, e.g. 2010-01-01)",
+        default=_parse_utc_datetime("2010-01-01"),
+        help="Start date (ISO format, default: 2010-01-01)",
     )
     parser.add_argument(
         "--end",
-        required=True,
         type=_parse_utc_datetime,
-        help="End date (ISO format, e.g. 2024-12-31)",
+        default=datetime.now(UTC),
+        help="End date (ISO format, default: today)",
     )
     parser.add_argument(
         "--dry-run",
