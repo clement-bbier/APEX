@@ -132,6 +132,12 @@ def load_config_from_yaml(path: Path) -> OrchestratorConfig:
     data = yaml.safe_load(raw)
     if data is None:
         data = {}
+    if not isinstance(data, dict):
+        msg = (
+            f"Invalid YAML content in {path}: "
+            f"top-level must be a mapping, got {type(data).__name__}"
+        )
+        raise ValueError(msg)
 
     logger.info("orchestrator.config_loaded", path=str(path), job_count=len(data.get("jobs", [])))
     return OrchestratorConfig.model_validate(data)

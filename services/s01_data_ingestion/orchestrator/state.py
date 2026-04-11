@@ -2,10 +2,15 @@
 
 Persists job run state (distributed locks, last success timestamps,
 run history) in Redis. All methods are async and fakeredis-compatible.
+
+Lock safety: uses a unique UUID token per acquisition and a Lua
+compare-and-delete script for release (prevents releasing another
+worker's lock if TTL expired during a long run).
 """
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 from typing import Any
 
@@ -23,6 +28,15 @@ _LAST_SUCCESS_PREFIX: str = f"{_KEY_PREFIX}:last_success"
 _HISTORY_PREFIX: str = f"{_KEY_PREFIX}:history"
 _HISTORY_MAX_LEN: int = 100
 _HISTORY_DEFAULT_LIMIT: int = 10
+
+# Lua script: compare token then delete — atomic on the Redis server.
+_LOCK_RELEASE_LUA: str = """
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+else
+    return 0
+end
+"""
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -48,37 +62,55 @@ class JobStateManager:
     """Manages job run state in Redis.
 
     Responsibilities:
-    - Distributed locks (SET NX EX) to prevent concurrent runs
+    - Distributed locks (SET NX EX + Lua CAS release) to prevent concurrent runs
     - Last-success timestamps per job
     - Capped run history via Redis streams (XADD / XRANGE)
     """
 
     def __init__(self, redis: Redis) -> None:
         self._redis = redis
+        self._lock_tokens: dict[str, str] = {}
 
     # ── Locking ──────────────────────────────────────────────────────────
 
     async def acquire_lock(self, job_name: str, ttl_seconds: int) -> bool:
         """Try to acquire a distributed lock for *job_name*.
 
-        Uses ``SET NX EX`` for atomic lock acquisition with TTL.
+        Uses ``SET NX EX`` with a unique UUID token. The token is stored
+        in-memory so that only the owner can release the lock via Lua CAS.
 
         Returns:
             True if the lock was acquired, False if already held.
         """
         key = f"{_LOCK_PREFIX}:{job_name}"
-        acquired = await self._redis.set(key, "1", nx=True, ex=ttl_seconds)
+        token = str(uuid.uuid4())
+        acquired = await self._redis.set(key, token, nx=True, ex=ttl_seconds)
         if acquired:
+            self._lock_tokens[job_name] = token
             logger.debug("state.lock_acquired", job=job_name, ttl=ttl_seconds)
-        else:
-            logger.debug("state.lock_already_held", job=job_name)
-        return bool(acquired)
+            return True
+        logger.debug("state.lock_already_held", job=job_name)
+        return False
 
     async def release_lock(self, job_name: str) -> None:
-        """Release the distributed lock for *job_name*."""
+        """Release the distributed lock for *job_name* via Lua CAS.
+
+        Only deletes the key if the stored token matches the one from
+        ``acquire_lock``. This prevents releasing another worker's lock
+        if the TTL expired and the lock was re-acquired.
+        """
         key = f"{_LOCK_PREFIX}:{job_name}"
-        await self._redis.delete(key)
-        logger.debug("state.lock_released", job=job_name)
+        token = self._lock_tokens.pop(job_name, None)
+        if token is None:
+            logger.warning("state.lock_release_no_token", job=job_name)
+            return
+        result = await self._redis.eval(  # type: ignore[misc]
+            _LOCK_RELEASE_LUA, 1, key, token
+        )
+        if result == 0:
+            logger.warning("state.lock_release_token_mismatch", job=job_name)
+        else:
+            logger.debug("state.lock_released", job=job_name)
 
     # ── Last success ─────────────────────────────────────────────────────
 
@@ -139,6 +171,7 @@ class JobStateManager:
 
     async def clear_state(self, job_name: str) -> None:
         """Purge all state for *job_name* (lock, last_success, history)."""
+        self._lock_tokens.pop(job_name, None)
         keys = [
             f"{_LOCK_PREFIX}:{job_name}",
             f"{_LAST_SUCCESS_PREFIX}:{job_name}",

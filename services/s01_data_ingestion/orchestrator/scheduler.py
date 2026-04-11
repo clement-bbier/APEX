@@ -70,12 +70,21 @@ class BackfillScheduler:
         self._shutdown_event.set()
 
     async def _drain_tasks(self) -> None:
-        """Cancel all running tasks and wait for them to finish."""
+        """Cancel all running tasks and wait with a timeout."""
         logger.info("scheduler.draining", task_count=len(self._tasks))
         for task in self._tasks:
             task.cancel()
 
-        results = await asyncio.gather(*self._tasks, return_exceptions=True)
+        try:
+            results = await asyncio.wait_for(
+                asyncio.gather(*self._tasks, return_exceptions=True),
+                timeout=_SHUTDOWN_DRAIN_TIMEOUT_SECONDS,
+            )
+        except TimeoutError:
+            remaining = [t.get_name() for t in self._tasks if not t.done()]
+            logger.error("scheduler.drain_timeout", remaining_tasks=remaining)
+            return
+
         cancelled = sum(1 for r in results if isinstance(r, asyncio.CancelledError))
         errors = sum(
             1

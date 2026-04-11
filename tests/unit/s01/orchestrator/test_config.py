@@ -60,6 +60,12 @@ class TestLoadConfigFromYaml:
         config = load_config_from_yaml(path)
         assert config.jobs == []
 
+    def test_non_dict_yaml_raises_value_error(self, tmp_path: Path) -> None:
+        path = tmp_path / "list.yaml"
+        path.write_text("- item1\n- item2\n", encoding="utf-8")
+        with pytest.raises(ValueError, match="top-level must be a mapping"):
+            load_config_from_yaml(path)
+
 
 class TestOrchestratorConfig:
     """Tests for OrchestratorConfig validation."""

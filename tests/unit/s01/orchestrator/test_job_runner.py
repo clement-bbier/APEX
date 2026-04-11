@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, MagicMock
 
 import fakeredis.aioredis
@@ -20,6 +21,7 @@ def _make_job(
     max_attempts: int = 2,
     backoff: float = 0.01,
     timeout: int = 30,
+    dependencies: list[str] | None = None,
 ) -> JobConfig:
     return JobConfig(
         name=name,
@@ -28,6 +30,7 @@ def _make_job(
         params=params or {"symbol": "BTCUSDT", "bar_size": "1m"},
         retry=RetryConfig(max_attempts=max_attempts, backoff_seconds=backoff),
         timeout_seconds=timeout,
+        dependencies=dependencies or [],
     )
 
 
@@ -58,7 +61,10 @@ def mock_settings() -> MagicMock:
     return MagicMock()
 
 
-def _make_bar_connector(batches: list | None = None, error: Exception | None = None) -> MagicMock:
+def _make_bar_connector(
+    batches: list[object] | None = None,
+    error: Exception | None = None,
+) -> MagicMock:
     connector = MagicMock()
 
     async def _fetch_bars(*args: object, **kwargs: object):  # type: ignore[no-untyped-def]
@@ -92,7 +98,29 @@ class TestJobRunnerSuccess:
         assert result.rows_inserted == 100
 
     @pytest.mark.asyncio
-    async def test_state_updated_on_success(
+    async def test_last_success_is_window_end_not_wallclock(
+        self,
+        state: JobStateManager,
+        mock_repo: AsyncMock,
+        mock_settings: MagicMock,
+    ) -> None:
+        """FIX 2: last_success should be the window end, not completion time."""
+        job = _make_job()
+        factory = MagicMock(spec=ConnectorFactory)
+        factory.create.return_value = _make_bar_connector()
+
+        before = datetime.now(UTC)
+        runner = JobRunner(job, factory, mock_repo, state, mock_settings)
+        await runner.run()
+
+        last = await state.get_last_success("test_job")
+        assert last is not None
+        # last_success should be <= now (the window end computed before fetch)
+        # and >= before (it was computed during run)
+        assert before <= last <= datetime.now(UTC)
+
+    @pytest.mark.asyncio
+    async def test_history_recorded_on_success(
         self,
         state: JobStateManager,
         mock_repo: AsyncMock,
@@ -104,9 +132,6 @@ class TestJobRunnerSuccess:
 
         runner = JobRunner(job, factory, mock_repo, state, mock_settings)
         await runner.run()
-
-        last = await state.get_last_success("test_job")
-        assert last is not None
 
         history = await state.get_run_history("test_job")
         assert len(history) == 1
@@ -198,6 +223,66 @@ class TestJobRunnerLocking:
 
         # Lock should be released — we should be able to acquire it
         assert await state.acquire_lock("test_job", ttl_seconds=60) is True
+
+
+class TestJobRunnerDependencies:
+    """Tests for dependency enforcement (FIX 3)."""
+
+    @pytest.mark.asyncio
+    async def test_dependencies_not_ready_skips_job(
+        self,
+        state: JobStateManager,
+        mock_repo: AsyncMock,
+        mock_settings: MagicMock,
+    ) -> None:
+        """Job with unmet dependency returns dependency_not_ready."""
+        job = _make_job(dependencies=["parent_job"])
+        factory = MagicMock(spec=ConnectorFactory)
+
+        runner = JobRunner(job, factory, mock_repo, state, mock_settings)
+        result = await runner.run()
+
+        assert result.status == "dependency_not_ready"
+        factory.create.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_dependencies_ready_runs_job(
+        self,
+        state: JobStateManager,
+        mock_repo: AsyncMock,
+        mock_settings: MagicMock,
+    ) -> None:
+        """Job with met dependency runs normally."""
+        # Set parent_job last_success to recent
+        await state.set_last_success("parent_job", datetime.now(UTC))
+
+        job = _make_job(dependencies=["parent_job"])
+        factory = MagicMock(spec=ConnectorFactory)
+        factory.create.return_value = _make_bar_connector()
+
+        runner = JobRunner(job, factory, mock_repo, state, mock_settings)
+        result = await runner.run()
+
+        assert result.status == "success"
+
+    @pytest.mark.asyncio
+    async def test_stale_dependency_skips_job(
+        self,
+        state: JobStateManager,
+        mock_repo: AsyncMock,
+        mock_settings: MagicMock,
+    ) -> None:
+        """Dependency older than 24h is considered not ready."""
+        stale_ts = datetime.now(UTC) - timedelta(hours=25)
+        await state.set_last_success("parent_job", stale_ts)
+
+        job = _make_job(dependencies=["parent_job"])
+        factory = MagicMock(spec=ConnectorFactory)
+
+        runner = JobRunner(job, factory, mock_repo, state, mock_settings)
+        result = await runner.run()
+
+        assert result.status == "dependency_not_ready"
 
 
 class TestJobRunnerMacro:

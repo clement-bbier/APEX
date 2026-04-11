@@ -1,6 +1,6 @@
 """JobRunner — Template Method for executing a single backfill job.
 
-Implements the run lifecycle: lock → retry loop → fetch → insert → state.
+Implements the run lifecycle: deps check -> lock -> retry loop -> fetch -> insert -> state.
 The fetch-specific logic is delegated to the connector via ConnectorFactory.
 JobRunner depends only on abstractions (factory, repo, state), never on
 concrete connector classes.
@@ -32,10 +32,12 @@ logger = structlog.get_logger(__name__)
 # ── Constants ────────────────────────────────────────────────────────────────
 
 _DEFAULT_LOOKBACK_DAYS: int = 30
+_DEPENDENCY_MAX_AGE_HOURS: int = 24
 _STATUS_SUCCESS: str = "success"
 _STATUS_FAILED: str = "failed"
 _STATUS_LOCKED: str = "locked"
 _STATUS_TIMEOUT: str = "timeout"
+_STATUS_DEPENDENCY_NOT_READY: str = "dependency_not_ready"
 
 # Connector type groups for dispatch
 _BAR_CONNECTORS: frozenset[str] = frozenset(
@@ -103,6 +105,14 @@ class JobRunner:
         started_at = datetime.now(UTC)
         job_name = self._config.name
 
+        if not await self._dependencies_ready():
+            logger.info(
+                "job_runner.dependency_not_ready",
+                job=job_name,
+                deps=self._config.dependencies,
+            )
+            return self._build_result(started_at, _STATUS_DEPENDENCY_NOT_READY)
+
         if not await self._state.acquire_lock(job_name, self._config.timeout_seconds):
             return self._build_result(started_at, _STATUS_LOCKED)
 
@@ -113,6 +123,17 @@ class JobRunner:
 
         await self._state.append_run_history(job_name, result)
         return result
+
+    async def _dependencies_ready(self) -> bool:
+        """Check that all dependencies had a last_success within 24h."""
+        if not self._config.dependencies:
+            return True
+        cutoff = datetime.now(UTC) - timedelta(hours=_DEPENDENCY_MAX_AGE_HOURS)
+        for dep_name in self._config.dependencies:
+            last_success = await self._state.get_last_success(dep_name)
+            if last_success is None or last_success < cutoff:
+                return False
+        return True
 
     async def _run_with_timeout(self, started_at: datetime) -> JobRunResult:
         """Wrap the retry loop with an asyncio timeout."""
@@ -134,16 +155,18 @@ class JobRunner:
         last_error: str | None = None
         max_attempts = self._config.retry.max_attempts
         backoff = self._config.retry.backoff_seconds
+        start, end = await self._compute_window()
 
         for attempt in range(1, max_attempts + 1):
             try:
-                rows = await self._execute_fetch_and_insert()
-                await self._state.set_last_success(self._config.name, datetime.now(UTC))
+                rows = await self._execute_fetch_and_insert(start, end)
+                await self._state.set_last_success(self._config.name, end)
                 logger.info(
                     "job_runner.success",
                     job=self._config.name,
                     rows=rows,
                     attempt=attempt,
+                    window_end=end.isoformat(),
                 )
                 return self._build_result(started_at, _STATUS_SUCCESS, rows=rows)
             except Exception as exc:
@@ -167,27 +190,34 @@ class JobRunner:
         )
         return self._build_result(started_at, _STATUS_FAILED, error_message=last_error)
 
-    async def _execute_fetch_and_insert(self) -> int:
+    async def _execute_fetch_and_insert(self, start: datetime, end: datetime) -> int:
         """Dispatch to the correct connector type and insert results."""
         connector_name = self._config.connector
         connector = self._factory.create(connector_name, self._settings)
-        start, end = await self._compute_window()
 
         if connector_name in _BAR_CONNECTORS:
             return await self._fetch_and_insert_bars(
-                connector, start, end  # type: ignore[arg-type]
+                connector,  # type: ignore[arg-type]
+                start,
+                end,
             )
         if connector_name in _MACRO_CONNECTORS:
             return await self._fetch_and_insert_macro(
-                connector, start, end  # type: ignore[arg-type]
+                connector,  # type: ignore[arg-type]
+                start,
+                end,
             )
         if connector_name in _CALENDAR_CONNECTORS:
             return await self._fetch_and_insert_calendar(
-                connector, start, end  # type: ignore[arg-type]
+                connector,  # type: ignore[arg-type]
+                start,
+                end,
             )
         if connector_name in _FUNDAMENTALS_CONNECTORS:
             return await self._fetch_and_insert_fundamentals(
-                connector, start, end  # type: ignore[arg-type]
+                connector,  # type: ignore[arg-type]
+                start,
+                end,
             )
 
         msg = f"No dispatch handler for connector {connector_name!r}"

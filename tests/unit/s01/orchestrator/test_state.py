@@ -52,6 +52,41 @@ class TestLocking:
         await state.release_lock("job_a")
         assert await state.acquire_lock("job_a", ttl_seconds=60) is True
 
+    @pytest.mark.asyncio
+    async def test_release_lock_only_owner_can_release(
+        self,
+        redis: fakeredis.aioredis.FakeRedis,
+    ) -> None:
+        """A second manager cannot release a lock held by the first."""
+        state_a = JobStateManager(redis)
+        state_b = JobStateManager(redis)
+
+        await state_a.acquire_lock("shared_job", ttl_seconds=60)
+        # state_b has no token for "shared_job" — release should be a no-op
+        await state_b.release_lock("shared_job")
+        # Lock should still be held — state_a's token is untouched
+        assert await state_b.acquire_lock("shared_job", ttl_seconds=60) is False
+
+    @pytest.mark.asyncio
+    async def test_release_lock_after_ttl_expiration(
+        self,
+        redis: fakeredis.aioredis.FakeRedis,
+    ) -> None:
+        """If TTL expires and another worker re-acquires, release is a no-op."""
+        state_a = JobStateManager(redis)
+        state_b = JobStateManager(redis)
+
+        await state_a.acquire_lock("job_x", ttl_seconds=60)
+        # Simulate TTL expiry by deleting the key directly
+        await redis.delete("apex:orchestrator:lock:job_x")
+        # state_b acquires the lock (new token)
+        assert await state_b.acquire_lock("job_x", ttl_seconds=60) is True
+        # state_a tries to release — token mismatch, should be a no-op
+        await state_a.release_lock("job_x")
+        # state_b's lock should still be intact — release from b works
+        await state_b.release_lock("job_x")
+        assert await state_a.acquire_lock("job_x", ttl_seconds=60) is True
+
 
 class TestLastSuccess:
     """Tests for last_success timestamp storage."""

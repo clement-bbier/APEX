@@ -168,9 +168,9 @@ class GapsCommand(Command):
         self._config_path = config_path
 
     async def execute(self) -> None:
-        print("Gap detection requires a running TimescaleDB connection.")
-        print("Use the scheduler's built-in gap detection for automated recovery.")
-        print("(Manual gap detection via CLI is a placeholder for Phase 2.12)")
+        print("Gap detection is implemented in gap_detector.py but not yet")
+        print("wired into the scheduler.")
+        print("Manual gap detection via CLI requires Phase 2.12 (Observability).")
 
 
 # ── CLI wiring ───────────────────────────────────────────────────────────────
