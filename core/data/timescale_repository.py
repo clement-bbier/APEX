@@ -7,10 +7,17 @@ Implements the Repository pattern (Fowler 2002, Ch. 18).
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from datetime import date, datetime, timezone
 
 import asyncpg
+
+from services.s01_data_ingestion.observability.metrics import (
+    record_db_insert,
+    record_db_query,
+)
+from services.s01_data_ingestion.observability.tracing import trace_async
 
 from core.models.data import (
     Asset,
@@ -194,6 +201,7 @@ class TimescaleRepository:
 
     # ── Bars ──────────────────────────────────────────────────────────────────
 
+    @trace_async("timescale.insert_bars")
     async def insert_bars(self, bars: list[Bar]) -> int:
         """Bulk-insert bars using COPY protocol. Returns count inserted."""
         if not bars:
@@ -216,6 +224,7 @@ class TimescaleRepository:
             )
             for b in bars
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "bars",
             records=records,
@@ -234,6 +243,7 @@ class TimescaleRepository:
                 "adj_close",
             ],
         )
+        record_db_insert("bars", time.monotonic() - start)
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
     async def get_bars(
@@ -277,6 +287,7 @@ class TimescaleRepository:
 
     # ── Ticks ─────────────────────────────────────────────────────────────────
 
+    @trace_async("timescale.insert_ticks")
     async def insert_ticks(self, ticks: list[DbTick]) -> int:
         """Bulk-insert ticks using COPY protocol. Returns count inserted."""
         if not ticks:
@@ -285,11 +296,13 @@ class TimescaleRepository:
         records = [
             (t.asset_id, t.timestamp, t.trade_id, t.price, t.quantity, t.side) for t in ticks
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "ticks",
             records=records,
             columns=["asset_id", "timestamp", "trade_id", "price", "quantity", "side"],
         )
+        record_db_insert("ticks", time.monotonic() - start)
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
     async def get_ticks(
@@ -324,17 +337,20 @@ class TimescaleRepository:
 
     # ── Macro ─────────────────────────────────────────────────────────────────
 
+    @trace_async("timescale.insert_macro_points")
     async def insert_macro_points(self, points: list[MacroPoint]) -> int:
         """Bulk-insert macro series points. Returns count inserted."""
         if not points:
             return 0
         pool = self._get_pool()
         records = [(p.series_id, p.timestamp, p.value) for p in points]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "macro_series",
             records=records,
             columns=["series_id", "timestamp", "value"],
         )
+        record_db_insert("macro_series", time.monotonic() - start)
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
     async def get_macro_series(
@@ -399,6 +415,7 @@ class TimescaleRepository:
 
     # ── Fundamentals ──────────────────────────────────────────────────────────
 
+    @trace_async("timescale.insert_fundamentals")
     async def insert_fundamentals(self, points: list[FundamentalPoint]) -> int:
         """Bulk-insert fundamental data points. Returns count inserted."""
         if not points:
@@ -408,11 +425,13 @@ class TimescaleRepository:
             (p.asset_id, p.report_date, p.period_type, p.metric_name, p.value, p.currency)
             for p in points
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "fundamentals",
             records=records,
             columns=["asset_id", "report_date", "period_type", "metric_name", "value", "currency"],
         )
+        record_db_insert("fundamentals", time.monotonic() - start)
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
     async def get_fundamentals(
@@ -457,6 +476,7 @@ class TimescaleRepository:
 
     # ── Events ────────────────────────────────────────────────────────────────
 
+    @trace_async("timescale.insert_economic_events")
     async def insert_economic_events(self, events: list[EconomicEvent]) -> int:
         """Bulk-insert economic events. Returns count inserted."""
         if not events:
@@ -476,6 +496,7 @@ class TimescaleRepository:
             )
             for e in events
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "economic_events",
             records=records,
@@ -491,8 +512,10 @@ class TimescaleRepository:
                 "source",
             ],
         )
+        record_db_insert("economic_events", time.monotonic() - start)
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
+    @trace_async("timescale.insert_corporate_events")
     async def insert_corporate_events(self, events: list[CorporateEvent]) -> int:
         """Bulk-insert corporate events. Returns count inserted."""
         if not events:
@@ -501,11 +524,13 @@ class TimescaleRepository:
         records = [
             (e.event_id, e.asset_id, e.event_date, e.event_type, e.details_json) for e in events
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "corporate_events",
             records=records,
             columns=["event_id", "asset_id", "event_date", "event_type", "details_json"],
         )
+        record_db_insert("corporate_events", time.monotonic() - start)
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
     async def get_economic_events(

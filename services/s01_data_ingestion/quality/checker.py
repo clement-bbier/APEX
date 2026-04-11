@@ -13,6 +13,10 @@ from dataclasses import dataclass, field
 
 from core.logger import get_logger
 from core.models.data import Asset, Bar, DbTick
+from services.s01_data_ingestion.observability.metrics import (
+    record_quality_issue,
+    record_quality_records,
+)
 
 from .base import CheckResult, QualityCheck, QualityIssue
 from .config import QualityConfig
@@ -161,6 +165,11 @@ class DataQualityChecker:
             pass_rate=round(report.pass_rate, 4),
         )
 
+        # Record observability metrics
+        for issue in all_issues:
+            record_quality_issue(issue.check_type, issue.severity.value)
+        record_quality_records(report.passed, report.warnings, report.failures)
+
         return report
 
     def validate_ticks(self, ticks: list[DbTick], asset: Asset) -> TickQualityReport:
@@ -225,5 +234,10 @@ class DataQualityChecker:
             warnings=report.warnings,
             failures=report.failures,
         )
+
+        # Record observability metrics
+        for issue in all_issues:
+            record_quality_issue(issue.check_type, issue.severity.value)
+        record_quality_records(report.passed, report.warnings, report.failures)
 
         return report

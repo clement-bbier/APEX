@@ -74,6 +74,9 @@ module = [
     "defusedxml.*",
     "asyncpg.*",
     "bs4.*",
+    "prometheus_client.*",
+    "opentelemetry.*",
+    "grpc.*",
 ]
 ignore_missing_imports = true
 
