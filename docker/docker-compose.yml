@@ -77,6 +77,22 @@ services:
       <<: *svc-env
       SERVICE_MODULE: services.s01_data_ingestion.service
 
+  s01-serving:
+    <<: *svc
+    environment:
+      <<: *svc-env
+      SERVICE_MODULE: services.s01_data_ingestion.serving.main
+    ports:
+      - "8001:8001"
+    depends_on:
+      redis:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+      zmq-broker:
+        condition: service_started
+    command: ["uvicorn", "services.s01_data_ingestion.serving.main:app", "--host", "0.0.0.0", "--port", "8001"]
+
   s07-analytics:
     <<: *svc
     environment:

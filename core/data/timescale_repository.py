@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 import asyncpg
 
@@ -27,6 +27,8 @@ from core.models.data import (
     MacroPoint,
     MacroSeriesMeta,
 )
+
+_MACRO_META_FIELDS = ("series_id", "source", "name", "frequency", "unit", "description")
 
 
 class TimescaleRepository:
@@ -137,16 +139,12 @@ class TimescaleRepository:
     async def get_asset_by_id(self, asset_id: uuid.UUID) -> Asset | None:
         """Look up an asset by its UUID."""
         pool = self._get_pool()
-        row = await pool.fetchrow(
-            "SELECT * FROM assets WHERE asset_id = $1", asset_id
-        )
+        row = await pool.fetchrow("SELECT * FROM assets WHERE asset_id = $1", asset_id)
         if row is None:
             return None
         return self._row_to_asset(row)
 
-    async def search_assets(
-        self, query: str, asset_class: AssetClass | None = None
-    ) -> list[Asset]:
+    async def search_assets(self, query: str, asset_class: AssetClass | None = None) -> list[Asset]:
         """Search assets by symbol prefix, optionally filtered by asset_class."""
         pool = self._get_pool()
         if asset_class is not None:
@@ -160,6 +158,18 @@ class TimescaleRepository:
                 "SELECT * FROM assets WHERE symbol ILIKE $1 ORDER BY symbol",
                 f"{query}%",
             )
+        return [self._row_to_asset(r) for r in rows]
+
+    async def list_assets(self, asset_class: AssetClass | None = None) -> list[Asset]:
+        """List all assets, optionally filtered by asset_class."""
+        pool = self._get_pool()
+        if asset_class is not None:
+            rows = await pool.fetch(
+                "SELECT * FROM assets WHERE asset_class = $1 ORDER BY symbol",
+                asset_class.value,
+            )
+        else:
+            rows = await pool.fetch("SELECT * FROM assets ORDER BY symbol")
         return [self._row_to_asset(r) for r in rows]
 
     @staticmethod
@@ -210,9 +220,18 @@ class TimescaleRepository:
             "bars",
             records=records,
             columns=[
-                "asset_id", "bar_type", "bar_size", "timestamp",
-                "open", "high", "low", "close", "volume",
-                "trade_count", "vwap", "adj_close",
+                "asset_id",
+                "bar_type",
+                "bar_size",
+                "timestamp",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "trade_count",
+                "vwap",
+                "adj_close",
             ],
         )
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
@@ -234,7 +253,11 @@ class TimescaleRepository:
               AND timestamp >= $4 AND timestamp < $5
             ORDER BY timestamp
             """,
-            asset_id, bar_type, bar_size, start, end,
+            asset_id,
+            bar_type,
+            bar_size,
+            start,
+            end,
         )
         return [
             Bar(
@@ -262,8 +285,7 @@ class TimescaleRepository:
             return 0
         pool = self._get_pool()
         records = [
-            (t.asset_id, t.timestamp, t.trade_id, t.price, t.quantity, t.side)
-            for t in ticks
+            (t.asset_id, t.timestamp, t.trade_id, t.price, t.quantity, t.side) for t in ticks
         ]
         result = await pool.copy_records_to_table(
             "ticks",
@@ -272,9 +294,7 @@ class TimescaleRepository:
         )
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
-    async def get_ticks(
-        self, asset_id: uuid.UUID, start: datetime, end: datetime
-    ) -> list[DbTick]:
+    async def get_ticks(self, asset_id: uuid.UUID, start: datetime, end: datetime) -> list[DbTick]:
         """Fetch ticks for an asset within a time range."""
         pool = self._get_pool()
         rows = await pool.fetch(
@@ -283,7 +303,9 @@ class TimescaleRepository:
             WHERE asset_id = $1 AND timestamp >= $2 AND timestamp < $3
             ORDER BY timestamp
             """,
-            asset_id, start, end,
+            asset_id,
+            start,
+            end,
         )
         return [
             DbTick(
@@ -323,7 +345,9 @@ class TimescaleRepository:
             WHERE series_id = $1 AND timestamp >= $2 AND timestamp < $3
             ORDER BY timestamp
             """,
-            series_id, start, end,
+            series_id,
+            start,
+            end,
         )
         return [
             MacroPoint(
@@ -348,9 +372,24 @@ class TimescaleRepository:
                 unit = EXCLUDED.unit,
                 description = EXCLUDED.description
             """,
-            meta.series_id, meta.source, meta.name,
-            meta.frequency, meta.unit, meta.description,
+            meta.series_id,
+            meta.source,
+            meta.name,
+            meta.frequency,
+            meta.unit,
+            meta.description,
         )
+
+    async def get_macro_metadata(self, series_id: str) -> MacroSeriesMeta | None:
+        """Fetch metadata for a macro series by series_id."""
+        pool = self._get_pool()
+        row = await pool.fetchrow(
+            "SELECT * FROM macro_series_metadata WHERE series_id = $1",
+            series_id,
+        )
+        if row is None:
+            return None
+        return MacroSeriesMeta(**{f: row[f] for f in _MACRO_META_FIELDS})
 
     # ── Fundamentals ──────────────────────────────────────────────────────────
 
@@ -370,6 +409,51 @@ class TimescaleRepository:
         )
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
+    async def get_fundamentals(
+        self,
+        asset_id: uuid.UUID,
+        start: date,
+        end: date,
+        period_type: str | None = None,
+    ) -> list[FundamentalPoint]:
+        """Fetch fundamental data points for an asset within a date range."""
+        pool = self._get_pool()
+        if period_type is not None:
+            rows = await pool.fetch(
+                """
+                SELECT * FROM fundamentals
+                WHERE asset_id = $1 AND report_date >= $2 AND report_date < $3
+                  AND period_type = $4
+                ORDER BY report_date, metric_name
+                """,
+                asset_id,
+                start,
+                end,
+                period_type,
+            )
+        else:
+            rows = await pool.fetch(
+                """
+                SELECT * FROM fundamentals
+                WHERE asset_id = $1 AND report_date >= $2 AND report_date < $3
+                ORDER BY report_date, metric_name
+                """,
+                asset_id,
+                start,
+                end,
+            )
+        return [
+            FundamentalPoint(
+                asset_id=r["asset_id"],
+                report_date=r["report_date"],
+                period_type=r["period_type"],
+                metric_name=r["metric_name"],
+                value=r["value"],
+                currency=r["currency"],
+            )
+            for r in rows
+        ]
+
     # ── Events ────────────────────────────────────────────────────────────────
 
     async def insert_economic_events(self, events: list[EconomicEvent]) -> int:
@@ -379,9 +463,15 @@ class TimescaleRepository:
         pool = self._get_pool()
         records = [
             (
-                e.event_id, e.event_type, e.scheduled_time,
-                e.actual, e.consensus, e.prior,
-                e.impact_score, e.related_asset_id, e.source,
+                e.event_id,
+                e.event_type,
+                e.scheduled_time,
+                e.actual,
+                e.consensus,
+                e.prior,
+                e.impact_score,
+                e.related_asset_id,
+                e.source,
             )
             for e in events
         ]
@@ -389,9 +479,15 @@ class TimescaleRepository:
             "economic_events",
             records=records,
             columns=[
-                "event_id", "event_type", "scheduled_time",
-                "actual", "consensus", "prior",
-                "impact_score", "related_asset_id", "source",
+                "event_id",
+                "event_type",
+                "scheduled_time",
+                "actual",
+                "consensus",
+                "prior",
+                "impact_score",
+                "related_asset_id",
+                "source",
             ],
         )
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
@@ -402,8 +498,7 @@ class TimescaleRepository:
             return 0
         pool = self._get_pool()
         records = [
-            (e.event_id, e.asset_id, e.event_date, e.event_type, e.details_json)
-            for e in events
+            (e.event_id, e.asset_id, e.event_date, e.event_type, e.details_json) for e in events
         ]
         result = await pool.copy_records_to_table(
             "corporate_events",
@@ -411,6 +506,81 @@ class TimescaleRepository:
             columns=["event_id", "asset_id", "event_date", "event_type", "details_json"],
         )
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
+
+    async def get_economic_events(
+        self,
+        start: datetime,
+        end: datetime,
+        event_type: str | None = None,
+        min_impact: int = 1,
+    ) -> list[EconomicEvent]:
+        """Fetch economic events within a time range, with optional filters."""
+        pool = self._get_pool()
+        if event_type is not None:
+            rows = await pool.fetch(
+                """
+                SELECT * FROM economic_events
+                WHERE scheduled_time >= $1 AND scheduled_time < $2
+                  AND event_type = $3 AND impact_score >= $4
+                ORDER BY scheduled_time
+                """,
+                start,
+                end,
+                event_type,
+                min_impact,
+            )
+        else:
+            rows = await pool.fetch(
+                """
+                SELECT * FROM economic_events
+                WHERE scheduled_time >= $1 AND scheduled_time < $2
+                  AND impact_score >= $3
+                ORDER BY scheduled_time
+                """,
+                start,
+                end,
+                min_impact,
+            )
+        return [self._row_to_economic_event(r) for r in rows]
+
+    async def get_upcoming_events(
+        self,
+        start: datetime,
+        end: datetime,
+        min_impact: int = 1,
+    ) -> list[EconomicEvent]:
+        """Fetch upcoming economic events between start and end.
+
+        Critical for Phase 6 Risk Manager pre-event blocking.
+        """
+        pool = self._get_pool()
+        rows = await pool.fetch(
+            """
+            SELECT * FROM economic_events
+            WHERE scheduled_time >= $1 AND scheduled_time < $2
+              AND impact_score >= $3
+            ORDER BY scheduled_time
+            """,
+            start,
+            end,
+            min_impact,
+        )
+        return [self._row_to_economic_event(r) for r in rows]
+
+    @staticmethod
+    def _row_to_economic_event(row: asyncpg.Record) -> EconomicEvent:
+        """Convert an asyncpg Record to an EconomicEvent model."""
+        return EconomicEvent(
+            event_id=row["event_id"],
+            event_type=row["event_type"],
+            scheduled_time=row["scheduled_time"],
+            actual=row["actual"],
+            consensus=row["consensus"],
+            prior=row["prior"],
+            impact_score=row["impact_score"],
+            related_asset_id=row["related_asset_id"],
+            source=row.get("source"),
+        )
 
     # ── Ingestion tracking ────────────────────────────────────────────────────
 
@@ -425,7 +595,10 @@ class TimescaleRepository:
             INSERT INTO ingestion_runs (run_id, connector, asset_id, started_at, status)
             VALUES ($1, $2, $3, $4, 'running')
             """,
-            run_id, connector, asset_id, datetime.now(timezone.utc),
+            run_id,
+            connector,
+            asset_id,
+            datetime.now(timezone.utc),
         )
         return run_id
 
@@ -444,7 +617,11 @@ class TimescaleRepository:
             SET finished_at = $1, status = $2, rows_inserted = $3, error_message = $4
             WHERE run_id = $5
             """,
-            datetime.now(timezone.utc), status.value, rows, error, run_id,
+            datetime.now(timezone.utc),
+            status.value,
+            rows,
+            error,
+            run_id,
         )
 
     # ── Data quality ──────────────────────────────────────────────────────────
