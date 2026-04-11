@@ -236,9 +236,9 @@ Conducted as gate before Phase 3 (refs #55). Full report:
 
 | Metric | Value |
 |---|---|
-| Findings | P0: 0, P1: 14, P2: 13, P3: 6 |
+| Findings | P0: 0, P1: 15, P2: 13, P3: 6 |
 | Decision | **CLEARED for Phase 3** |
-| Issues created | #64–#76 (13 issues) |
+| Issues created | #64–#77 (14 issues) |
 
 Top P1 findings: CI gates drifted from standards (#64,#65), float→Decimal (#66),
 SecretStr for broker keys (#71), SOLID violations in S02-S06 (#72–#76),

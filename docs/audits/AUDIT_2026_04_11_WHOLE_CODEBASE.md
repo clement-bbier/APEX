@@ -27,7 +27,7 @@
 | Rust crates | 2 (apex_mc, apex_risk) — compile clean, 2 tests total |
 | pylint rating | 9.96/10 |
 | TODOs/FIXMEs | 1 |
-| Total findings | **P0: 0, P1: 14, P2: 13, P3: 6** |
+| Total findings | **P0: 0, P1: 15, P2: 13, P3: 6** |
 | **Decision** | **CLEARED for Phase 3** |
 
 The APEX codebase is in **good overall health**. No blocking P0 issues were found. The architecture is clean: zero cross-service coupling, zero core→services imports, bandit-clean security, and mypy strict passing on all 319 files. The 14 P1 findings fall into three categories: (1) **CI/config drift** — coverage gate at 40% vs 85%, backtest gate non-blocking, mypy blind spots; (2) **Code quality** — `float()` for financial values, broker API keys not using `SecretStr`, CVEs in dependencies; (3) **SOLID violations** — S02 monolithic `_process_tick`, S03 dead code + duplicated enums, S04 hardcoded strategy dispatch, S05 StateStore abstraction leak, S06 no Broker ABC. All P1 items can be addressed in parallel with Phase 3. The codebase shows clear quality improvement from Phase 1 to Phase 2, with S01 demonstrating mature patterns (Strategy, Repository, Quality Pipeline) that are well-tested.
@@ -160,14 +160,24 @@ No functions exceeding 50 lines were found as problematic. The codebase maintain
 
 **Architecture is exemplary.** All inter-service communication goes through ZMQ PUB/SUB and Redis as designed. No direct Python imports between services.
 
-### Layering
+### S01 Internal Layering
 
-S01 internal layering is correct:
-- connectors/ → does not import normalizers/ or serving/
-- normalizers/ → independent
-- quality/ → independent
-- serving/ → imports from core models only
-- orchestrator/ → uses Redis state, independent of connectors
+**Finding C-1 (P1)**: S01 connectors directly import normalizers (upward dependency violation):
+
+| Connector | Imports | Line |
+|---|---|---|
+| `alpaca_historical.py` | `AlpacaBarNormalizer`, `AlpacaTradeNormalizer` | 26-27 |
+| `binance_historical.py` | `BinanceBarNormalizer` | 28 |
+| `massive_historical.py` | `MassiveBarNormalizer` | 29 |
+| `yahoo_historical.py` | `YahooBarNormalizer` | 26 |
+
+Connectors should return raw data; normalization should be applied by a higher-level orchestrator. Issue #77.
+
+Other layering checks:
+- connectors/ → serving/ : **CLEAN** ✅
+- normalizers/ → independent ✅
+- quality/ → independent ✅
+- serving/ → imports from core models only ✅
 
 ---
 
@@ -487,6 +497,7 @@ None. No blocking issues found.
 | P1-12 | S03: Dead `_update_regime` v2 + duplicated enums | `services/s03_regime_detector/` | S | #74 |
 | P1-13 | S04: StrategySelector hardcoded if/elif (OCP) | `services/s04_fusion_engine/strategy.py` | S | #75 |
 | P1-14 | S05: Accesses StateStore private `_ensure_connected()` (DIP) | `services/s05_risk_manager/service.py:74` | S | #76 |
+| P1-15 | S01: Connectors directly import normalizers (layering violation) | `services/s01_data_ingestion/connectors/` | M | #77 |
 
 ### P2 (cosmetic — address when convenient)
 
@@ -525,7 +536,7 @@ None. No blocking issues found.
 
 5. **Test infrastructure is mature.** 1,283 tests all passing, fakeredis for unit isolation, pytest-asyncio, Hypothesis property tests. The coverage number (83% measured / ~45% true) is the weakest point but does not block Phase 3.
 
-6. **P1 items are parallelizable.** All 14 P1 findings can be addressed in parallel with Phase 3 work via separate issues/PRs without blocking the feature validation harness. The SOLID violations (S02-S06) are in services not touched by Phase 3 (which focuses on S02 signal validation, not S06 execution or S03 regime detection).
+6. **P1 items are parallelizable.** All 15 P1 findings can be addressed in parallel with Phase 3 work via separate issues/PRs without blocking the feature validation harness.
 
 **Phase 3 can begin immediately.** The P1 items should be tracked as a separate "tech debt sprint" running alongside Phase 3 sub-phases.
 
