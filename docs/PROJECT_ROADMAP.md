@@ -208,14 +208,14 @@ These are non-negotiable. Enforced on every commit via CI.
 
 ## 4. Current State (Snapshot)
 
-*Last updated: 2026-04-10*
+*Last updated: 2026-04-11 (post whole-codebase audit)*
 
 ### Phase summary
 
 | Phase | Status | Sub-phases merged | Tests | Last merge date |
 |---|---|---|---|---|
 | Phase 1 | DONE | All (ADR-0002 + quant metrics + validation) | ~400 | 2026-04-10 |
-| Phase 2 | IN PROGRESS | 2.1, 2.2, 2.3, 2.4, 2.5, 2.6 | 935+ | 2026-04-10 |
+| Phase 2 | **DONE** | All 12 (2.1–2.12) | 1,283 | 2026-04-11 |
 | Phase 3 | PENDING | — | — | — |
 | Phase 4 | PENDING | — | — | — |
 | Phase 5 | PENDING | — | — | — |
@@ -227,23 +227,41 @@ These are non-negotiable. Enforced on every commit via CI.
 | Phase 11 | PENDING | — | — | — |
 | Phase 12 | PENDING | — | — | — |
 
-**Estimated overall completion: ~15-20% of total project scope.**
+**Estimated overall completion: ~20-25% of total project scope.**
+
+### Whole-codebase audit (2026-04-11)
+
+Conducted as gate before Phase 3 (refs #55). Full report:
+`docs/audits/AUDIT_2026_04_11_WHOLE_CODEBASE.md`
+
+| Metric | Value |
+|---|---|
+| Findings | P0: 0, P1: 8, P2: 6, P3: 3 |
+| Decision | **CLEARED for Phase 3** |
+| Issues created | #64, #65, #66, #67, #68, #69, #70 |
+
+Top P1 findings: CI gates drifted from documented standards (coverage 40% vs 85%,
+backtest non-blocking), `float()` for financial values, 19 CVEs in dependencies.
+All addressable in parallel with Phase 3.
 
 ### Key metrics
 
-- **Total tests**: 935+ (all green)
-- **mypy strict**: zero errors
+- **Total tests**: 1,283 (1,228 unit + 55 integration, all green)
+- **mypy strict**: zero errors (319 files)
 - **ruff**: clean (zero warnings)
-- **Coverage**: ≥ 85% on tested modules
+- **pylint**: 9.96/10
+- **bandit**: zero security issues
+- **Coverage**: 83% on measured modules (~45% including omitted files)
 - **ADRs accepted**: 3 (ZMQ topology, Quant Methodology Charter, Universal Data Schema)
-- **PRs merged**: 47+
+- **PRs merged**: 28
 - **Services scaffolded**: 10/10 (S01-S10)
-- **Services fully implemented**: S01 (partial — connectors being added), S02 (scaffolded)
+- **S01 Data Ingestion**: fully implemented (78 files, 9,583 LOC, all connectors merged)
+- **Production LOC**: 31,149 | **Test LOC**: 17,501
 
 ### Branch status
 
 - `main` is the integration branch. All sub-phases merge to `main` via PR.
-- `feat/macro-connectors` — Phase 2.7 (FRED + ECB + BoJ) in progress.
+- No active feature branches. Working tree clean.
 
 ---
 
@@ -328,7 +346,7 @@ practices (Sharpe-only, no OOS, no multiple-testing correction).
 
 | Field | Value |
 |---|---|
-| Status | **IN PROGRESS** |
+| Status | **DONE** |
 | Services concerned | S01 (Data Ingestion) |
 | Duration | ~3-4 weeks |
 | Dependencies | Phase 1 merged (methodology charter in place) |
@@ -351,12 +369,12 @@ ETFs, and fixed-income data through a single unified schema stored in TimescaleD
 | 2.4 | Binance historical + live connector | DONE | #43 | 2026-04-10 |
 | 2.5 | Alpaca + Massive equities connectors | DONE | #45 | 2026-04-10 |
 | 2.6 | Yahoo Finance — indices, FX, ETFs | DONE | #47 | 2026-04-10 |
-| 2.7 | Macro connectors — FRED + ECB + BoJ | IN PROGRESS | — | — |
-| 2.8 | Calendar events (FOMC, ECB, CPI, NFP) | PENDING | — | — |
-| 2.9 | Fundamentals (SEC EDGAR + SimFin) | PENDING | — | — |
-| 2.10 | Internal serving layer (REST/gRPC) | PENDING | — | — |
-| 2.11 | Backfill orchestrator | PENDING | — | — |
-| 2.12 | Observability (metrics, tracing, healthchecks) | PENDING | — | — |
+| 2.7 | Macro connectors — FRED + ECB + BoJ | DONE | #49 | 2026-04-10 |
+| 2.8 | Calendar events (FOMC, ECB, CPI, NFP) | DONE | #51 | 2026-04-10 |
+| 2.9 | Fundamentals (SEC EDGAR + SimFin) | DONE | #53 | 2026-04-10 |
+| 2.10 | Internal serving layer (REST) | DONE | #56 | 2026-04-10 |
+| 2.11 | Backfill orchestrator | DONE | #58 | 2026-04-11 |
+| 2.12 | Observability (metrics, tracing, healthchecks) | DONE | #62 | 2026-04-11 |
 
 #### Sub-phase details
 
@@ -431,16 +449,16 @@ ETFs, and fixed-income data through a single unified schema stored in TimescaleD
 
 #### Deliverables
 
-- [ ] Universal TimescaleDB schema with asset registry — DONE
-- [ ] Asset-agnostic normalizer (Strategy pattern) — DONE
-- [ ] Data quality pipeline with composable checks — DONE
-- [ ] Connectors: Binance, Alpaca, Massive, Yahoo Finance — DONE
-- [ ] Connectors: FRED, ECB, BoJ — IN PROGRESS
-- [ ] Calendar event ingestion and structured event model
-- [ ] Fundamentals pipeline (SEC EDGAR + SimFin)
-- [ ] Internal data serving API
-- [ ] Backfill orchestrator CLI
-- [ ] Observability stack (metrics, tracing, healthchecks)
+- [x] Universal TimescaleDB schema with asset registry — DONE (2.1)
+- [x] Asset-agnostic normalizer (Strategy pattern) — DONE (2.2)
+- [x] Data quality pipeline with composable checks — DONE (2.3)
+- [x] Connectors: Binance, Alpaca, Massive, Yahoo Finance — DONE (2.4, 2.5, 2.6)
+- [x] Connectors: FRED, ECB, BoJ — DONE (2.7)
+- [x] Calendar event ingestion and structured event model — DONE (2.8)
+- [x] Fundamentals pipeline (SEC EDGAR + SimFin) — DONE (2.9)
+- [x] Internal data serving API (REST) — DONE (2.10)
+- [x] Backfill orchestrator CLI — DONE (2.11)
+- [x] Observability stack (metrics, tracing, healthchecks) — DONE (2.12)
 
 #### Success metrics
 
@@ -1196,6 +1214,10 @@ ADR numbers for planned items are provisional and may change.
 | R10 | Circuit breaker opens too frequently | Medium | Medium | Calibrate thresholds from paper trading data (Phase 8). Avoid overly sensitive triggers. |
 | R11 | Dependency on free data APIs | Medium | High | Multiple sources per data type. Yahoo Finance as fallback for indices/FX. FRED is public and stable. |
 | R12 | Solo developer bus factor | High | — | Comprehensive documentation (this roadmap, ADRs, CLAUDE.md). Code quality enforced by CI. Managed Agents playbook for operational continuity. |
+| R13 | CI gates drifted from documented standards | Medium | **Confirmed** | Audit 2026-04-11 found coverage gate at 40% (not 85%), backtest gate non-blocking, thresholds relaxed. Issues #64, #65. Fix before Phase 3 completion. |
+| R14 | `float()` for financial values in connectors and core models | Medium | **Confirmed** | ~20+ instances of `float()` where `Decimal` is required by CLAUDE.md. Issue #66. Fix incrementally during Phase 3. |
+| R15 | Dependency CVEs (19 known vulnerabilities) | Medium | **Confirmed** | urllib3, requests, tornado, pillow have known CVEs. Issue #68. Requires version bumps in requirements.txt. |
+| R16 | Coverage denominator inflation | Medium | **Confirmed** | 25 omit entries in pyproject.toml exclude ~14,000 LOC from coverage measurement. True coverage ~45%. Issue #70. |
 
 ---
 
