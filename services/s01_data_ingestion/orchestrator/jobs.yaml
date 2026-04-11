@@ -1,0 +1,138 @@
+# Backfill Orchestrator — Job Definitions
+#
+# Each job maps to a registered connector in ConnectorFactory.
+# Schedule uses standard 5-field cron syntax: min hour dom month dow
+#
+# Refs: Kleppmann (2017) Ch. 10, Akidau et al. (2015)
+# ──────────────────────────────────────────────────────────────────────
+
+jobs:
+
+  # ── Crypto bars (Binance) ─────────────────────────────────────────
+  - name: binance_btcusdt_1m
+    connector: binance_historical
+    schedule: "0 */4 * * *"        # every 4 hours
+    params:
+      symbol: BTCUSDT
+      bar_size: "1m"
+    retry:
+      max_attempts: 3
+      backoff_seconds: 30
+
+  - name: binance_ethusdt_1m
+    connector: binance_historical
+    schedule: "15 */4 * * *"       # every 4 hours, offset 15 min
+    params:
+      symbol: ETHUSDT
+      bar_size: "1m"
+    retry:
+      max_attempts: 3
+      backoff_seconds: 30
+
+  # ── US Equities (Alpaca) ──────────────────────────────────────────
+  - name: alpaca_spy_d1
+    connector: alpaca_historical
+    schedule: "0 22 * * 1-5"       # weekdays after market close
+    params:
+      symbol: SPY
+      bar_size: "1d"
+    retry:
+      max_attempts: 3
+      backoff_seconds: 60
+
+  # ── US Equities (Yahoo) ──────────────────────────────────────────
+  - name: yahoo_spy_d1
+    connector: yahoo_historical
+    schedule: "30 22 * * 1-5"      # weekdays, 30 min after alpaca
+    params:
+      symbol: SPY
+      bar_size: "1d"
+    dependencies:
+      - alpaca_spy_d1
+
+  # ── Macro: FRED ──────────────────────────────────────────────────
+  - name: fred_fedfunds
+    connector: fred
+    schedule: "0 6 * * *"          # daily at 06:00 UTC
+    params:
+      series_id: FEDFUNDS
+
+  - name: fred_dgs10
+    connector: fred
+    schedule: "5 6 * * *"
+    params:
+      series_id: DGS10
+
+  # ── Macro: ECB ───────────────────────────────────────────────────
+  - name: ecb_eurusd
+    connector: ecb_sdw
+    schedule: "0 7 * * 1-5"        # weekdays at 07:00 UTC
+    params:
+      series_id: "EXR/D.USD.EUR.SP00.A"
+
+  # ── Macro: BoJ ──────────────────────────────────────────────────
+  - name: boj_policy_rate
+    connector: boj
+    schedule: "0 2 * * 1-5"        # weekdays at 02:00 UTC
+    params:
+      series_id: boj_policy_rate
+
+  # ── Calendar: FOMC ──────────────────────────────────────────────
+  - name: fomc_calendar
+    connector: fomc_scraper
+    schedule: "0 8 * * 0"          # weekly, Sunday 08:00 UTC
+    retry:
+      max_attempts: 2
+      backoff_seconds: 120
+
+  # ── Calendar: ECB ───────────────────────────────────────────────
+  - name: ecb_calendar
+    connector: ecb_scraper
+    schedule: "0 8 * * 0"          # weekly, Sunday 08:00 UTC
+    retry:
+      max_attempts: 2
+      backoff_seconds: 120
+
+  # ── Calendar: BoJ ──────────────────────────────────────────────
+  - name: boj_calendar
+    connector: boj_calendar_scraper
+    schedule: "0 1 * * 0"          # weekly, Sunday 01:00 UTC
+    retry:
+      max_attempts: 2
+      backoff_seconds: 120
+
+  # ── Calendar: FRED Releases ────────────────────────────────────
+  - name: fred_releases
+    connector: fred_releases
+    schedule: "0 5 * * *"          # daily at 05:00 UTC
+    retry:
+      max_attempts: 2
+      backoff_seconds: 60
+
+  # ── Fundamentals: SEC EDGAR ────────────────────────────────────
+  - name: edgar_fundamentals
+    connector: edgar
+    schedule: "0 3 * * 6"          # weekly, Saturday 03:00 UTC
+    params:
+      ticker: AAPL
+      filing_types:
+        - "10-K"
+        - "10-Q"
+    timeout_seconds: 7200
+    retry:
+      max_attempts: 2
+      backoff_seconds: 300
+
+  # ── Fundamentals: SimFin ───────────────────────────────────────
+  - name: simfin_fundamentals
+    connector: simfin
+    schedule: "0 4 * * 6"          # weekly, Saturday 04:00 UTC
+    params:
+      ticker: AAPL
+      filing_types:
+        - "10-K"
+        - "10-Q"
+    timeout_seconds: 7200
+    retry:
+      max_attempts: 2
+      backoff_seconds: 300
