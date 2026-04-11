@@ -53,6 +53,36 @@ class TestMassiveSettings:
         assert s.massive_s3_bucket == "flatfiles"
 
 
+class TestSimFinSettings:
+    """Validate SimFin API key is SecretStr."""
+
+    def test_simfin_key_from_env(self, monkeypatch: object) -> None:
+        mp = monkeypatch  # type: ignore[assignment]
+        mp.setenv("SIMFIN_API_KEY", "simfin_test_key")
+        s = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert isinstance(s.simfin_api_key, SecretStr)
+        assert s.simfin_api_key.get_secret_value() == "simfin_test_key"
+
+    def test_simfin_default_empty(self) -> None:
+        s = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert s.simfin_api_key.get_secret_value() == ""
+
+
+class TestEdgarSettings:
+    """Validate EDGAR user-agent setting."""
+
+    def test_edgar_user_agent_from_env(self, monkeypatch: object) -> None:
+        mp = monkeypatch  # type: ignore[assignment]
+        mp.setenv("EDGAR_USER_AGENT", "TestBot test@example.com")
+        s = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert s.edgar_user_agent == "TestBot test@example.com"
+
+    def test_edgar_user_agent_default(self) -> None:
+        s = Settings(_env_file=None)  # type: ignore[call-arg]
+        assert "APEX" in s.edgar_user_agent
+        assert "@" in s.edgar_user_agent
+
+
 class TestFredSettings:
     """Validate FRED API key is SecretStr."""
 
