@@ -14,7 +14,7 @@ def test_health_ok(client, mock_repo):
     resp = client.get("/health")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "ok"
+    assert body["status"] == "healthy"
     assert body["database"] is True
 
 
@@ -23,7 +23,7 @@ def test_health_degraded(client, mock_repo):
     resp = client.get("/health")
     assert resp.status_code == 200
     body = resp.json()
-    assert body["status"] == "degraded"
+    assert body["status"] == "unhealthy"
     assert body["database"] is False
 
 
@@ -65,10 +65,14 @@ def test_lifespan_creates_and_closes_repo():
     mock_repo = AsyncMock()
     mock_repo.connect = AsyncMock()
     mock_repo.close = AsyncMock()
+    mock_repo.health_check = AsyncMock(return_value=True)
 
-    with patch(
-        "services.s01_data_ingestion.serving.app.TimescaleRepository",
-        return_value=mock_repo,
+    with (
+        patch(
+            "services.s01_data_ingestion.serving.app.TimescaleRepository",
+            return_value=mock_repo,
+        ),
+        patch("services.s01_data_ingestion.serving.app.init_tracing"),
     ):
         with TestClient(app):
             mock_repo.connect.assert_called_once()

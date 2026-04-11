@@ -30,3 +30,6 @@ EXTENSIONS.md
 # Claude Code internal worktree state — never commit
 .claude/worktrees/
 .claude/settings.local.json
+
+# Claude Code local settings
+.claude/

@@ -22,6 +22,10 @@ from core.models.data import (
     MacroPoint,
     MacroSeriesMeta,
 )
+from services.s01_data_ingestion.observability.healthcheck import (
+    DatabaseCheck,
+    HealthChecker,
+)
 from services.s01_data_ingestion.serving.app import app
 from services.s01_data_ingestion.serving.deps import get_repo
 
@@ -42,6 +46,9 @@ def mock_repo():
 def client(mock_repo):
     """Return a FastAPI TestClient with mocked repository."""
     app.dependency_overrides[get_repo] = lambda: mock_repo
+    app.state.health_checker = HealthChecker(
+        dependency_checks=[DatabaseCheck(mock_repo)],
+    )
     c = TestClient(app, raise_server_exceptions=False)
     yield c
     app.dependency_overrides.clear()

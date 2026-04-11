@@ -7,8 +7,11 @@ Implements the Repository pattern (Fowler 2002, Ch. 18).
 from __future__ import annotations
 
 import json
+import time
 import uuid
 from datetime import date, datetime, timezone
+
+from collections.abc import Callable
 
 import asyncpg
 
@@ -30,18 +33,36 @@ from core.models.data import (
 
 _MACRO_META_FIELDS = ("series_id", "source", "name", "frequency", "unit", "description")
 
+# Callback signature: (table_name, rows_inserted, duration_seconds) -> None
+OnInsertCallback = Callable[[str, int, float], None]
+
 
 class TimescaleRepository:
     """Async repository for all TimescaleDB operations.
 
     Uses asyncpg connection pool with COPY protocol for bulk inserts.
+
+    Args:
+        dsn: PostgreSQL connection string.
+        pool_min: Minimum asyncpg pool size.
+        pool_max: Maximum asyncpg pool size.
+        on_insert: Optional callback invoked after each successful insert
+            with ``(table, rows, duration_s)``. Used for observability
+            without coupling core to service-layer modules (DIP).
     """
 
-    def __init__(self, dsn: str, pool_min: int = 2, pool_max: int = 10) -> None:
+    def __init__(
+        self,
+        dsn: str,
+        pool_min: int = 2,
+        pool_max: int = 10,
+        on_insert: OnInsertCallback | None = None,
+    ) -> None:
         self._dsn = dsn
         self._pool_min = pool_min
         self._pool_max = pool_max
         self._pool: asyncpg.Pool[asyncpg.Record] | None = None
+        self._on_insert = on_insert
 
     async def connect(self) -> None:
         """Create the connection pool with JSON/JSONB codec registration."""
@@ -216,6 +237,7 @@ class TimescaleRepository:
             )
             for b in bars
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "bars",
             records=records,
@@ -234,7 +256,10 @@ class TimescaleRepository:
                 "adj_close",
             ],
         )
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("bars", rows, time.monotonic() - start)
+        return rows
 
     async def get_bars(
         self,
@@ -285,12 +310,16 @@ class TimescaleRepository:
         records = [
             (t.asset_id, t.timestamp, t.trade_id, t.price, t.quantity, t.side) for t in ticks
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "ticks",
             records=records,
             columns=["asset_id", "timestamp", "trade_id", "price", "quantity", "side"],
         )
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("ticks", rows, time.monotonic() - start)
+        return rows
 
     async def get_ticks(
         self,
@@ -330,12 +359,16 @@ class TimescaleRepository:
             return 0
         pool = self._get_pool()
         records = [(p.series_id, p.timestamp, p.value) for p in points]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "macro_series",
             records=records,
             columns=["series_id", "timestamp", "value"],
         )
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("macro_series", rows, time.monotonic() - start)
+        return rows
 
     async def get_macro_series(
         self,
@@ -408,12 +441,16 @@ class TimescaleRepository:
             (p.asset_id, p.report_date, p.period_type, p.metric_name, p.value, p.currency)
             for p in points
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "fundamentals",
             records=records,
             columns=["asset_id", "report_date", "period_type", "metric_name", "value", "currency"],
         )
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("fundamentals", rows, time.monotonic() - start)
+        return rows
 
     async def get_fundamentals(
         self,
@@ -476,6 +513,7 @@ class TimescaleRepository:
             )
             for e in events
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "economic_events",
             records=records,
@@ -491,7 +529,10 @@ class TimescaleRepository:
                 "source",
             ],
         )
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("economic_events", rows, time.monotonic() - start)
+        return rows
 
     async def insert_corporate_events(self, events: list[CorporateEvent]) -> int:
         """Bulk-insert corporate events. Returns count inserted."""
@@ -501,12 +542,16 @@ class TimescaleRepository:
         records = [
             (e.event_id, e.asset_id, e.event_date, e.event_type, e.details_json) for e in events
         ]
+        start = time.monotonic()
         result = await pool.copy_records_to_table(
             "corporate_events",
             records=records,
             columns=["event_id", "asset_id", "event_date", "event_type", "details_json"],
         )
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("corporate_events", rows, time.monotonic() - start)
+        return rows
 
     async def get_economic_events(
         self,

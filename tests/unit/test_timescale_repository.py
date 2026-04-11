@@ -456,3 +456,60 @@ class TestGetEconomicEvents:
         )
         sql = repo._pool.fetch.call_args[0][0]
         assert "LIMIT 10" in sql
+
+
+# ── On-insert callback tests ────────────────────────────────────────────────
+
+
+class TestOnInsertCallback:
+    @pytest.mark.asyncio
+    async def test_callback_invoked_after_insert_bars(self):
+        callback = MagicMock()
+        repo = TimescaleRepository(
+            dsn="postgresql://x:x@localhost/x",
+            on_insert=callback,
+        )
+        mock_pool = AsyncMock()
+        mock_pool.copy_records_to_table = AsyncMock(return_value="COPY 5")
+        repo._pool = mock_pool
+
+        bars = [
+            Bar(
+                asset_id=ASSET_ID,
+                bar_type=BarType.TIME,
+                bar_size=BarSize.D1,
+                timestamp=NOW,
+                open=Decimal("100"),
+                high=Decimal("101"),
+                low=Decimal("99"),
+                close=Decimal("100.5"),
+                volume=Decimal("1000"),
+            )
+        ]
+        await repo.insert_bars(bars)
+
+        callback.assert_called_once()
+        args = callback.call_args[0]
+        assert args[0] == "bars"
+        assert args[1] == 5  # rows from "COPY 5"
+        assert isinstance(args[2], float)  # duration
+
+    @pytest.mark.asyncio
+    async def test_no_callback_when_none(self):
+        repo = TimescaleRepository(dsn="postgresql://x:x@localhost/x")
+        mock_pool = AsyncMock()
+        mock_pool.copy_records_to_table = AsyncMock(return_value="COPY 1")
+        repo._pool = mock_pool
+
+        ticks = [
+            DbTick(
+                asset_id=ASSET_ID,
+                timestamp=NOW,
+                trade_id="t1",
+                price=Decimal("100"),
+                quantity=Decimal("1"),
+                side="buy",
+            )
+        ]
+        # Should not raise even without callback
+        await repo.insert_ticks(ticks)

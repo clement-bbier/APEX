@@ -286,6 +286,12 @@ class Settings(BaseSettings):
     # ── Logging ───────────────────────────────────────────────────────────────
     log_level: str = Field(default="INFO")
 
+    # ── OpenTelemetry ────────────────────────────────────────────────────────
+    otel_endpoint: str | None = Field(
+        default=None,
+        description="OTLP gRPC endpoint (e.g. http://localhost:4317). None = ConsoleSpanExporter.",
+    )
+
     @field_validator("trading_mode", mode="before")
     @classmethod
     def normalize_mode(cls, v: object) -> str:

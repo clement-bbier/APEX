@@ -22,6 +22,10 @@ from services.s01_data_ingestion.connectors.fundamentals_base import (
     FundamentalsConnector,
 )
 from services.s01_data_ingestion.connectors.macro_base import MacroConnector
+from services.s01_data_ingestion.observability.metrics import (
+    orchestrator_jobs_running,
+    record_orchestrator_job,
+)
 
 from .config import JobConfig
 from .connector_factory import ConnectorFactory
@@ -116,10 +120,15 @@ class JobRunner:
         if not await self._state.acquire_lock(job_name, self._config.timeout_seconds):
             return self._build_result(started_at, _STATUS_LOCKED)
 
+        orchestrator_jobs_running.labels(job=job_name).inc()
         try:
             result = await self._run_with_timeout(started_at)
         finally:
+            orchestrator_jobs_running.labels(job=job_name).dec()
             await self._state.release_lock(job_name)
+
+        duration_s = (result.finished_at - started_at).total_seconds()
+        record_orchestrator_job(job_name, result.status, duration_s)
 
         await self._state.append_run_history(job_name, result)
         return result
