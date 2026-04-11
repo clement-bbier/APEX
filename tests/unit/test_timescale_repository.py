@@ -301,3 +301,158 @@ class TestDataQuality:
         repo._pool.execute = AsyncMock()
         await repo.log_quality_check(entry)
         repo._pool.execute.assert_called_once()
+
+
+# ── New query method tests (Phase 2.10) ─────────────────────────────────────
+
+
+class TestListAssets:
+    @pytest.mark.asyncio
+    async def test_list_assets_all(self, repo):
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "asset_id": ASSET_ID,
+            "symbol": "BTCUSDT",
+            "exchange": "BINANCE",
+            "asset_class": "crypto",
+            "currency": "USD",
+            "timezone": "UTC",
+            "tick_size": None,
+            "lot_size": None,
+            "is_active": True,
+            "listing_date": None,
+            "delisting_date": None,
+            "metadata_json": {},
+            "created_at": NOW,
+            "updated_at": NOW,
+        }[key]
+        repo._pool.fetch = AsyncMock(return_value=[mock_row])
+
+        assets = await repo.list_assets()
+        assert len(assets) == 1
+        assert assets[0].symbol == "BTCUSDT"
+
+        sql = repo._pool.fetch.call_args[0][0]
+        assert "ORDER BY symbol" in sql
+
+    @pytest.mark.asyncio
+    async def test_list_assets_filtered(self, repo):
+        repo._pool.fetch = AsyncMock(return_value=[])
+        await repo.list_assets(asset_class=AssetClass.CRYPTO)
+        sql = repo._pool.fetch.call_args[0][0]
+        assert "asset_class" in sql
+
+
+class TestGetMacroMetadata:
+    @pytest.mark.asyncio
+    async def test_get_macro_metadata_found(self, repo):
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "series_id": "VIXCLS",
+            "source": "FRED",
+            "name": "VIX Close",
+            "frequency": "daily",
+            "unit": "index",
+            "description": "Volatility index",
+        }[key]
+        repo._pool.fetchrow = AsyncMock(return_value=mock_row)
+
+        meta = await repo.get_macro_metadata("VIXCLS")
+        assert meta is not None
+        assert meta.series_id == "VIXCLS"
+        assert meta.source == "FRED"
+
+    @pytest.mark.asyncio
+    async def test_get_macro_metadata_not_found(self, repo):
+        repo._pool.fetchrow = AsyncMock(return_value=None)
+        meta = await repo.get_macro_metadata("NONEXISTENT")
+        assert meta is None
+
+
+class TestGetFundamentals:
+    @pytest.mark.asyncio
+    async def test_get_fundamentals_query(self, repo):
+        from datetime import date
+
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "asset_id": ASSET_ID,
+            "report_date": date(2024, 3, 31),
+            "period_type": "quarterly",
+            "metric_name": "revenue",
+            "value": 94836000000.0,
+            "currency": "USD",
+        }[key]
+        repo._pool.fetch = AsyncMock(return_value=[mock_row])
+
+        results = await repo.get_fundamentals(
+            ASSET_ID,
+            date(2024, 1, 1),
+            date(2024, 12, 31),
+        )
+        assert len(results) == 1
+        assert results[0].metric_name == "revenue"
+
+    @pytest.mark.asyncio
+    async def test_get_fundamentals_with_period_type(self, repo):
+        from datetime import date
+
+        repo._pool.fetch = AsyncMock(return_value=[])
+        await repo.get_fundamentals(
+            ASSET_ID,
+            date(2024, 1, 1),
+            date(2024, 12, 31),
+            period_type="quarterly",
+        )
+        sql = repo._pool.fetch.call_args[0][0]
+        assert "period_type" in sql
+
+
+class TestGetEconomicEvents:
+    @pytest.mark.asyncio
+    async def test_get_economic_events_basic(self, repo):
+        mock_row = MagicMock()
+        mock_row.__getitem__ = lambda self, key: {
+            "event_id": uuid.uuid4(),
+            "event_type": "FOMC",
+            "scheduled_time": NOW,
+            "actual": None,
+            "consensus": None,
+            "prior": None,
+            "impact_score": 3,
+            "related_asset_id": None,
+            "source": "fed",
+        }[key]
+        mock_row.get = lambda key, default=None: {
+            "source": "fed",
+        }.get(key, default)
+        repo._pool.fetch = AsyncMock(return_value=[mock_row])
+
+        events = await repo.get_economic_events(
+            start=datetime(2024, 1, 1, tzinfo=UTC),
+            end=datetime(2024, 12, 31, tzinfo=UTC),
+        )
+        assert len(events) == 1
+        assert events[0].event_type == "FOMC"
+
+    @pytest.mark.asyncio
+    async def test_get_economic_events_with_type(self, repo):
+        repo._pool.fetch = AsyncMock(return_value=[])
+        await repo.get_economic_events(
+            start=datetime(2024, 1, 1, tzinfo=UTC),
+            end=datetime(2024, 12, 31, tzinfo=UTC),
+            event_type="FOMC",
+        )
+        sql = repo._pool.fetch.call_args[0][0]
+        assert "event_type" in sql
+
+    @pytest.mark.asyncio
+    async def test_get_economic_events_with_limit(self, repo):
+        repo._pool.fetch = AsyncMock(return_value=[])
+        await repo.get_economic_events(
+            start=datetime(2024, 1, 1, tzinfo=UTC),
+            end=datetime(2024, 12, 31, tzinfo=UTC),
+            limit=10,
+        )
+        sql = repo._pool.fetch.call_args[0][0]
+        assert "LIMIT 10" in sql

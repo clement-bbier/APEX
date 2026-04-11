@@ -33,6 +33,8 @@ allowed-confusables = ["\u00d7","\u2212","\u03b1","\u03b2","\u03b3","\u03bc","\u
 # Backtesting walk-forward: helper variables are kept for clarity even
 # when not consumed downstream by every code path.
 "backtesting/walk_forward.py" = ["F841"]
+# FastAPI endpoints use Query() and Depends() in function defaults by design.
+"services/s01_data_ingestion/serving/routers/**" = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
