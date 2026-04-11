@@ -24,6 +24,7 @@
 9. [Identified Risks and Mitigations](#9-identified-risks-and-mitigations)
 10. [Appendices](#10-appendices)
 11. [Document Changelog](#11-document-changelog)
+12. [Governance & Methodology](#12-governance--methodology)
 
 ---
 
@@ -1356,8 +1357,60 @@ in future phases if they provide demonstrable alpha after Phase 3 validation:
 
 ---
 
+## 12. Governance & Methodology
+
+*Added 2026-04-11 by meta-governance audit (#59).*
+
+### Non-code artifact inventory
+
+| Category | Count | Status |
+|---|---|---|
+| Root-level docs (CLAUDE.md, README, AI_RULES, etc.) | 8 | 7 current, 1 stale (CHANGELOG.md) |
+| docs/ directory | 8 | 6 current, 2 stale (roadmap sub-phases, copilot-instructions) |
+| ADRs | 3 accepted | All current and aligned with code |
+| Agent prompts | 5 | 3 current, 2 stale (apex-sre, copilot-instructions contradict ADR-0001) |
+| PR/issue templates | 3 | All current |
+| CI workflows | 3 | Functional but drifted from documented standards (tracked by #64-#65) |
+| Service READMEs | 2 (S01 observability, S01 orchestrator) | Current |
+
+### Artifacts to create
+
+| Priority | Artifact | Issue | Status |
+|---|---|---|---|
+| **P0** | `docs/GLOSSARY.md` | #78 | PENDING |
+| **P0** | Fix roadmap Phase 2 stale sub-phase descriptions | #79 | PENDING |
+| **P0** | `docs/CONVENTIONS/COMMIT_MESSAGES.md` | #80 | PENDING |
+| P1 | ADR-0004: Feature validation methodology | #81 | PENDING |
+| P1 | `docs/ARCHITECTURE.md` | #82 | PENDING |
+| P1 | `docs/ACADEMIC_REFERENCES.md` | #83 | PENDING |
+| P1 | `docs/ONBOARDING.md` | #84 | PENDING |
+| P1 | `.pre-commit-config.yaml` | #85 | PENDING |
+| P1 | Fix stale agent prompts (SRE, copilot-instructions) | #86 | PENDING |
+
+### Managed Agents status
+
+| Agent | Phase | Est. cost/month | Status |
+|---|---|---|---|
+| `apex-veille-quant` | Now | $2-4 | Template ready (MANAGED_AGENTS_PLAYBOOK.md) |
+| `apex-dep-auditor` | Now | $1 | Proposed |
+| `apex-convention-checker` | Phase 3 | $1-2 | Proposed |
+| `apex-nightly-backtest` | Phase 5 | $5 | Template ready |
+| `apex-watchdog-circuit-breaker` | Phase 8 | $15-25 | Template ready |
+| `apex-paper-summarizer` | On demand | $0.50/paper | Proposed |
+
+### Audit trail
+
+| Audit | Date | Scope | Decision | Report |
+|---|---|---|---|---|
+| Whole-codebase (#55) | 2026-04-11 | Code quality, architecture, SOLID, tests, security | CLEARED for Phase 3 | `docs/audits/AUDIT_2026_04_11_WHOLE_CODEBASE.md` |
+| Meta-governance (#59) | 2026-04-11 | Docs, ADRs, conventions, workflows, knowledge base, agents | CLEARED for Phase 3 | `docs/audits/META_AUDIT_2026_04_11_GOVERNANCE.md` |
+
+---
+
 ## 11. Document Changelog
 
 | Date | Version | Change | Author |
 |---|---|---|---|
 | 2026-04-10 | 1.0 | Initial document — vision, architecture, Phases 1-12, references, ADR index, risks, appendices | Claude Code (orchestrated by C. Barbier) |
+| 2026-04-11 | 1.1 | Section 4 updated with audit #55 results. Risks R13-R16 added. | Claude Code (audit #55) |
+| 2026-04-11 | 1.2 | Section 12 (Governance & Methodology) added from meta-governance audit #59. | Claude Code (audit #59) |

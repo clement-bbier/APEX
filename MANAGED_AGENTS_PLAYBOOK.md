@@ -236,6 +236,20 @@ Indépendants du code, déployables aujourd'hui sans risque :
 - **Output** : Données dans TimescaleDB + rapport dans `data/backfill_runs/`
 - **Coût** : ~$3-5 par run complet
 
+### Agent `apex-dep-auditor` *(ajouté par audit #59)*
+- **Quoi** : Lance `pip-audit` hebdomadaire sur `requirements.txt`. Crée automatiquement des issues GitHub pour les CVEs critiques. Produit un résumé des vulnérabilités connues.
+- **Quand** : 1/semaine (lundi matin)
+- **Output** : Issues GitHub pour nouvelles CVEs, résumé dans `docs/security/`
+- **Coût** : ~$1/mois (Haiku 4.5, tâche simple)
+- **Justification** : 19 CVEs trouvées par l'audit #55 dans 10 packages. Sans scan automatisé, les vulnérabilités s'accumulent silencieusement.
+
+### Agent `apex-convention-checker` *(ajouté par audit #59)*
+- **Quoi** : Vérifie sur chaque PR que les commit messages suivent Conventional Commits, que les docstrings citent les références académiques requises, que les conventions de nommage sont respectées, et qu'aucun pattern interdit (float pour prix, print(), threading) n'est introduit.
+- **Quand** : Manuel ou déclenché par PR
+- **Output** : Commentaire sur la PR avec violations trouvées
+- **Coût** : ~$1-2/mois (Sonnet 4.6, 5min par PR, ~10 PRs/mois)
+- **Justification** : Complète le CI qui ne couvre pas les conventions de commit, naming, et format de docstrings.
+
 ### Agent `apex-fixture-generator`
 - **Quoi** : Génère et met à jour les fixtures de test (téléchargement réel de données récentes pour les tests)
 - **Quand** : 1/mois ou avant chaque release
@@ -604,6 +618,7 @@ system_prompt: |
 |---|---|---|
 | Aujourd'hui | Lire ce playbook | ✅ |
 | Semaine 1 | Déployer `apex-veille-quant` (template 1) | ⏳ |
+| Semaine 1 | Déployer `apex-dep-auditor` (ajouté par audit #59) | ⏳ |
 | Semaine 2 | Déployer `apex-backfill-historical` (template 2) | ⏳ |
 | Phase 3 | Agent `apex-feature-ic-runner` (multi-agent fan-out) | ⏳ |
 | Phase 5 | `apex-nightly-backtest` (template 3) | ⏳ |
