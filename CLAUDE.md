@@ -213,7 +213,34 @@ list                   # bare generic — use list[T]
 
 ---
 
-## 12. When in doubt
+## 12. Persistent memory across sessions
+
+APEX development spans many Claude Code sessions. To preserve context:
+
+### Directory: `docs/claude_memory/`
+
+| File | Purpose |
+|---|---|
+| `SESSIONS.md` | Chronological log of all Claude Code sessions |
+| `DECISIONS.md` | Architectural decisions (mini-ADRs) |
+| `CONTEXT.md` | Current project state snapshot |
+| `PHASE_3_NOTES.md` | Phase 3-specific notes and IC results |
+| `templates/` | Templates for session and decision entries |
+
+### Mandatory rules for ALL Claude Code sessions
+
+**Step 1bis (before coding)**:
+Read `docs/claude_memory/CONTEXT.md` AND the relevant phase notes file
+(e.g., `docs/claude_memory/PHASE_3_NOTES.md`) BEFORE writing any code.
+
+**Final step (after coding)**:
+1. Append a session entry to `docs/claude_memory/SESSIONS.md`
+2. Update `docs/claude_memory/CONTEXT.md` if project state changed
+3. Record any architectural decisions in `docs/claude_memory/DECISIONS.md`
+
+---
+
+## 13. When in doubt
 
 1. Check MANIFEST.md for the intended behavior
 2. Check existing service implementations for established patterns

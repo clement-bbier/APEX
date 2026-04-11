@@ -209,7 +209,7 @@ These are non-negotiable. Enforced on every commit via CI.
 
 ## 4. Current State (Snapshot)
 
-*Last updated: 2026-04-11 (post whole-codebase audit)*
+*Last updated: 2026-04-11 (post Phase 3 design gate)*
 
 ### Phase summary
 
@@ -217,7 +217,7 @@ These are non-negotiable. Enforced on every commit via CI.
 |---|---|---|---|---|
 | Phase 1 | DONE | All (ADR-0002 + quant metrics + validation) | ~400 | 2026-04-10 |
 | Phase 2 | **DONE** | All 12 (2.1–2.12) | 1,283 | 2026-04-11 |
-| Phase 3 | PENDING | — | — | — |
+| Phase 3 | **DESIGN COMPLETE** | 0/13 (spec ready) | — | — |
 | Phase 4 | PENDING | — | — | — |
 | Phase 5 | PENDING | — | — | — |
 | Phase 6 | PENDING | — | — | — |
@@ -500,63 +500,74 @@ ETFs, and fixed-income data through a single unified schema stored in TimescaleD
 
 | Field | Value |
 |---|---|
-| Status | **PENDING** |
-| Services concerned | S02 (Signal Engine), S09 (Feedback Loop) |
+| Status | **DESIGN COMPLETE** (2026-04-11) |
+| Services concerned | S02 (Signal Engine), S07 (Quant Analytics), S09 (Feedback Loop) |
 | Duration | ~3-4 weeks |
 | Dependencies | Phase 2 merged (all data sources available) |
 | Roadmap weight | ~10% |
+| Design spec | `docs/phases/PHASE_3_SPEC.md` (complete, 13 sub-phases) |
 
 #### Objective
 
 Build a rigorous feature validation pipeline that measures the predictive power of every
 signal and feature before it enters the live trading pipeline. No feature is accepted
-without passing IC measurement, stability testing, and multicollinearity checks.
-This phase operationalizes ADR-0002 at the feature level.
+without passing IC measurement, stability testing, multicollinearity checks, CPCV with
+purging, and multiple hypothesis testing (DSR, PBO). This phase operationalizes ADR-0002
+at the feature level.
 
-#### Sub-phases (indicative)
+**Full specification**: See `docs/phases/PHASE_3_SPEC.md` for detailed sub-phase
+breakdowns with academic justification, technical deliverables, success metrics, risks,
+and 60 Tier-1 academic references.
+
+#### Sub-phases (detailed in PHASE_3_SPEC.md)
 
 | Sub-phase | Title | Status |
 |---|---|---|
-| 3.1 | IC measurement pipeline (Spearman rank IC, IC_IR, turnover-adjusted IC) | PENDING |
-| 3.2 | HAR-RV / Rough Volatility validation | PENDING |
-| 3.3 | OFI / CVD / Kyle lambda microstructure validation | PENDING |
-| 3.4 | GEX (Gamma Exposure) validation | PENDING |
-| 3.5 | Cross-validation: multicollinearity, IC stability, feature clustering | PENDING |
-| 3.6 | Final feature selection report | PENDING |
+| 3.1 | Feature Engineering Pipeline Foundation | PENDING |
+| 3.2 | Feature Store Architecture | PENDING |
+| 3.3 | Information Coefficient Measurement | PENDING |
+| 3.4 | HAR-RV Validation (Corsi 2009) | PENDING |
+| 3.5 | Rough Volatility Validation (Gatheral et al. 2018) | PENDING |
+| 3.6 | Order Flow Imbalance Validation (Cont et al. 2014) | PENDING |
+| 3.7 | CVD + Kyle Lambda Validation (Kyle 1985) | PENDING |
+| 3.8 | GEX Validation (Barbon & Buraschi 2020) | PENDING |
+| 3.9 | Multicollinearity and Orthogonalization | PENDING |
+| 3.10 | CPCV with Purging (Bailey & Lopez de Prado 2017) | PENDING |
+| 3.11 | Multiple Hypothesis Testing (DSR, PBO) | PENDING |
+| 3.12 | Feature Selection Report | PENDING |
+| 3.13 | Integration with S02 Signal Engine | PENDING |
 
 #### Deliverables
 
-- IC measurement framework integrated into `full_report()`.
-- Per-feature validation reports with IC, IC_IR, stability, decay.
-- Multicollinearity matrix and VIF scores across all features.
-- Final approved feature list with documented rationale for each inclusion/exclusion.
+- Feature engineering pipeline (`features/` package) with `FeatureCalculator` ABC.
+- Versioned Feature Store with point-in-time queries (custom on TimescaleDB).
+- IC measurement framework (Spearman rank IC, IC_IR, turnover-adjusted IC, IC decay).
+- Per-feature validation reports for HAR-RV, Rough Vol, OFI, CVD, Kyle lambda, GEX.
+- Multicollinearity matrix, VIF scores, and orthogonalization.
+- CPCV with purging and embargo (C(6,2) = 15 folds).
+- DSR and PBO corrections for multiple hypothesis testing.
+- Final approved feature list with documented keep/reject rationale.
+- S02 Feature Adapter (Adapter pattern) for Phase 4 integration.
 
 #### Success metrics
 
 - Every feature in S02 has a measured IC with confidence interval.
-- No feature with IC < threshold (to be determined, typically |IC| > 0.02) remains active.
+- IC threshold: |IC| > 0.02, IC_IR > 0.50 for feature acceptance.
 - Multicollinearity check: no pair of active features with |correlation| > 0.7.
-- Feature validation is automated and runs as part of CI for any S02 change.
+- CPCV OOS IC consistent across folds (low variance).
+- PBO < 0.50 for the retained feature set.
+- DSR > 0.95 for all retained features.
+- 85% test coverage on `features/` package.
 
 #### Canonical references
 
-1. Lopez de Prado, M. (2018). *Advances in Financial Machine Learning*, Ch. 3-8. Wiley.
-2. Kakushadze, Z. (2016). "101 Formulaic Alphas". *Wilmott*, 2016(84), 72-81.
-3. Arnott, R. D., Harvey, C. R., Kalesnik, V. & Linnainmaa, J. T. (2019).
-   "Reports of Value's Death May Be Greatly Exaggerated". *Financial Analysts Journal*,
-   75(4), 36-52.
-4. Grinold, R. C. & Kahn, R. N. (1999). *Active Portfolio Management* (2nd ed.).
-   McGraw-Hill. (Information Coefficient framework)
-5. Corsi, F. (2009). "A Simple Approximate Long-Memory Model of Realized Volatility".
-   *Journal of Financial Econometrics*, 7(2), 174-196. (HAR-RV)
+See `docs/phases/PHASE_3_SPEC.md` Section 11 for complete bibliography (60 references).
 
 #### Open questions
 
-- What IC threshold to use for feature inclusion? Literature suggests |IC| > 0.02 is
-  meaningful, but this depends on signal frequency and transaction costs.
-- Should feature validation run on the full historical dataset or only on a rolling window?
-- How to handle features that are predictive only in certain regimes (e.g., GEX is
-  meaningful mainly in high-gamma environments)?
+- What IC threshold to use for feature inclusion? Spec proposes |IC| > 0.02 and IC_IR > 0.50.
+- GEX data availability: options OI + gamma data source TBD (may need paid API).
+- If all features fail IC threshold, Phase 4 must re-scope features.
 
 #### ADRs
 

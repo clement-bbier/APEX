@@ -259,15 +259,71 @@ Indépendants du code, déployables aujourd'hui sans risque :
 ## B.3 Phase 3 (Feature validation harness)
 
 Phase 3 = mesure d'IC (Information Coefficient) sur 3 ans de données réelles pour valider les signaux S02.
+Full specification: `docs/phases/PHASE_3_SPEC.md` (13 sub-phases, 60 references).
 
-### Parallélisation possible
+### Agents Phase 3 spécifiques
 
-- **Agent `apex-feature-ic-runner`** : un agent par feature (HAR-RV, Rough Vol, OFI, CVD, Kyle lambda, GEX, ...). Chaque agent calcule l'IC sur son propre subset, indépendamment. **6-8 agents en parallèle = ~6x speedup**.
+#### Agent `apex-paper-watcher` (P0 — $2-4/mois)
+
+- **Quoi** : Scanne arXiv q-fin.ST, q-fin.TR, SSRN Financial Economics pour les nouveaux papers pertinents aux features Phase 3 (HAR-RV, rough vol, OFI, microstructure, GEX). Produit un brief hebdo filtré par pertinence APEX.
+- **Quand** : Tous les lundis 8:00 UTC
+- **Model** : Claude Sonnet 4.6
+- **Output** : `docs/veille/YYYY-MM-DD-phase3-brief.md`
+- **Coût** : ~$2-4/mois
+- **Priorité** : P0 — déployable immédiatement
+- **ROI** : Attrape les améliorations méthodologiques avant que la validation soit finalisée. Un seul paper pertinent peut éviter un mois de travail inutile.
+- **Activation** : Déployer pendant Phase 3.1
+
+#### Agent `apex-codebase-analyzer` (P0 — $1-3/mois)
+
+- **Quoi** : Audit incrémental hebdomadaire du package `features/` ajouté pendant Phase 3. Vérifie : couverture de tests, conformité mypy, présence de docstrings, violations SOLID, patterns interdits (float, print, threading).
+- **Quand** : Tous les dimanches 20:00 UTC
+- **Model** : Claude Haiku 4.5
+- **Output** : `docs/audits/incremental/YYYY-MM-DD-phase3-audit.md`
+- **Coût** : ~$1-3/mois
+- **Priorité** : P0 — déployer après merge de Phase 3.1
+- **ROI** : Détecte la dérive qualité avant qu'elle ne s'accumule. Chaque finding P1 évité en amont = 30 min de refactor économisées.
+- **Activation** : Déployer après Phase 3.1 (le code existe pour auditer)
+
+#### Agent `apex-feature-tester` (P1 — $10-15/mois)
+
+- **Quoi** : Lance le pipeline IC sur un feature spécifique contre les dernières données. Produit un rapport IC et compare à la baseline précédente. Alerte si IC dégrade > 20%.
+- **Quand** : À la demande (quand nouvelles données arrivent ou feature modifié)
+- **Model** : Claude Sonnet 4.6
+- **Inputs** : Nom du feature, symbol, date range
+- **Output** : IC report JSON + Markdown dans `data/ic_reports/`
+- **Coût** : ~$3-5/run (~$10-15/mois si déclenché bi-hebdo)
+- **Priorité** : P1 — **ATTENTION : peut pousser le budget total à $15-22/mois, près du plafond.** Considérer de lancer manuellement si le budget est serré.
+- **Activation** : Déployer après Phase 3.3 (framework IC prêt)
+
+#### Agent `apex-academic-coherence-checker` (P1 — $1-2/mois)
+
+- **Quoi** : Vérifie sur chaque PR au package `features/` que chaque classe `FeatureCalculator` cite le paper académique source dans sa docstring, que la formule mathématique correspond au paper, et que l'implémentation est cohérente avec la référence citée.
+- **Quand** : Sur chaque PR touchant `features/`
+- **Model** : Claude Haiku 4.5
+- **Output** : Commentaire sur la PR avec résultats du check de cohérence
+- **Coût** : ~$1-2/mois
+- **Priorité** : P1
+- **Activation** : Déployer après Phase 3.4 (premier FeatureCalculator existe)
+
+### Budget Phase 3
+
+| Agent | Coût mensuel | Priorité |
+|---|---|---|
+| apex-paper-watcher | $2-4 | P0 |
+| apex-codebase-analyzer | $1-3 | P0 |
+| apex-feature-tester | $10-15 | P1 (peut dépasser budget) |
+| apex-academic-coherence-checker | $1-2 | P1 |
+| **Total P0** | **$3-7** | |
+| **Total P0+P1** | **$14-24** | Proche du plafond budget |
+
+**Recommandation** : Déployer les agents P0 immédiatement ($3-7/mois). Évaluer les P1 après Phase 3.3 en fonction du budget réel.
+
+### Parallélisation possible (via Claude Code subagents)
+
+- Un subagent par feature (HAR-RV, Rough Vol, OFI, CVD, Kyle lambda, GEX). Chaque agent calcule l'IC sur son propre subset, indépendamment.
 - **Output** : `data/ic_reports/<feature>/<symbol>/<date>.json`
-
-### Coordination
-
-Un agent maître `apex-ic-aggregator` qui attend la fin des 6-8 agents enfants et compile un rapport global. Pattern fan-out / fan-in classique.
+- Coordination via un agent maître `apex-ic-aggregator` pattern fan-out / fan-in.
 
 ## B.4 Phase 4-5 (Signal Engine + Backtesting)
 
