@@ -236,13 +236,13 @@ Conducted as gate before Phase 3 (refs #55). Full report:
 
 | Metric | Value |
 |---|---|
-| Findings | P0: 0, P1: 9, P2: 6, P3: 3 |
+| Findings | P0: 0, P1: 14, P2: 13, P3: 6 |
 | Decision | **CLEARED for Phase 3** |
-| Issues created | #64, #65, #66, #67, #68, #69, #70, #71 |
+| Issues created | #64–#76 (13 issues) |
 
-Top P1 findings: CI gates drifted from documented standards (coverage 40% vs 85%,
-backtest non-blocking), `float()` for financial values, broker API keys not using
-`SecretStr` (#71), 19 CVEs in dependencies. All addressable in parallel with Phase 3.
+Top P1 findings: CI gates drifted from standards (#64,#65), float→Decimal (#66),
+SecretStr for broker keys (#71), SOLID violations in S02-S06 (#72–#76),
+19 CVEs (#68). All addressable in parallel with Phase 3.
 
 ### Key metrics
 

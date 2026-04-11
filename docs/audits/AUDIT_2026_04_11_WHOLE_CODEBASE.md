@@ -27,10 +27,10 @@
 | Rust crates | 2 (apex_mc, apex_risk) — compile clean, 2 tests total |
 | pylint rating | 9.96/10 |
 | TODOs/FIXMEs | 1 |
-| Total findings | **P0: 0, P1: 9, P2: 6, P3: 3** |
+| Total findings | **P0: 0, P1: 14, P2: 13, P3: 6** |
 | **Decision** | **CLEARED for Phase 3** |
 
-The APEX codebase is in **good overall health**. No blocking P0 issues were found. The architecture is clean: zero cross-service coupling, zero core→services imports, bandit-clean security, and mypy strict passing on all 319 files. The 9 P1 findings are primarily: (1) CI configuration drifting from documented standards, (2) `float()` usage where `Decimal` is mandated, (3) broker API keys not using `SecretStr`, (4) PROJECT_ROADMAP.md significantly out of date, and (5) known CVEs in dependencies. These can all be addressed in parallel with Phase 3 without risk. The codebase shows clear quality improvement from Phase 1 to Phase 2, with S01 demonstrating mature patterns (Strategy, Repository, Quality Pipeline) that are well-tested.
+The APEX codebase is in **good overall health**. No blocking P0 issues were found. The architecture is clean: zero cross-service coupling, zero core→services imports, bandit-clean security, and mypy strict passing on all 319 files. The 14 P1 findings fall into three categories: (1) **CI/config drift** — coverage gate at 40% vs 85%, backtest gate non-blocking, mypy blind spots; (2) **Code quality** — `float()` for financial values, broker API keys not using `SecretStr`, CVEs in dependencies; (3) **SOLID violations** — S02 monolithic `_process_tick`, S03 dead code + duplicated enums, S04 hardcoded strategy dispatch, S05 StateStore abstraction leak, S06 no Broker ABC. All P1 items can be addressed in parallel with Phase 3. The codebase shows clear quality improvement from Phase 1 to Phase 2, with S01 demonstrating mature patterns (Strategy, Repository, Quality Pipeline) that are well-tested.
 
 ---
 
@@ -48,28 +48,38 @@ S01 is the largest and most mature service. It follows SOLID principles well:
 
 **Finding A-1 (P2)**: `services/s01_data_ingestion/orchestrator/cli.py` — CLI class handles both display formatting AND business logic (fetching state, triggering runs). Minor SRP violation. Could split into a CLI formatter + a service layer.
 
-### S02 Signal Engine (8 files, 1,759 LOC) — **ACCEPTABLE**
+### S02 Signal Engine (8 files, 1,759 LOC) — **NEEDS ATTENTION**
 
-- **SRP** ✅ — Separate modules for microstructure, VPIN, technical indicators, crowd behavior, signal scoring.
-- **OCP** ⚠️ — `technical.py` (190 LOC) has multiple indicator functions in a single module. Adding a new indicator requires modifying this file.
+- **SRP** ⚠️ — `_process_tick` in `service.py` is a 270-line monolith performing 7 distinct operations.
+- **OCP** ⚠️ — `technical.py` mixes bar building + indicator computation.
 
-**Finding A-2 (P3)**: `services/s02_signal_engine/technical.py` — Monolithic indicator module. Consider splitting into per-indicator modules or using a Strategy pattern for each indicator family. Low priority since this file will likely be refactored during Phase 3.
+**Finding A-2 (P1)**: `services/s02_signal_engine/service.py` — `_process_tick()` is 270 lines handling lazy-init, VPIN refresh, 5 indicator families, scorer components, ATR levels, MTFContext, and Signal construction/publishing. This is the hottest path in the system and hard to unit-test. **Recommendation**: Extract sub-methods (`_compute_indicators()`, `_build_signal()`) or a `SignalPipeline` class. Issue #73.
 
-### S03 Regime Detector (5 files, 893 LOC) — **CLEAN**
+**Finding A-3 (P2)**: `services/s02_signal_engine/technical.py` — `TechnicalAnalyzer` has two responsibilities: bar construction from ticks AND indicator computation (RSI, BB, EMA, VWAP, ATR, etc.). Extract a `BarBuilder` class for testability.
 
-No violations found. Clean separation between regime engine, session tracker, and CB calendar.
+### S03 Regime Detector (5 files, 893 LOC) — **NEEDS CLEANUP**
 
-### S04 Fusion Engine (8 files, 1,107 LOC) — **CLEAN**
+**Finding A-4 (P1)**: `services/s03_regime_detector/service.py` — `_update_regime()` writes to `regime:current:v2` Redis key but is never called. Dead code in a critical service introduces confusion. Issue #74.
 
-Well-structured with separate modules for fusion, Kelly sizing, meta-labeling, hedge triggers, feature logging, and strategy.
+**Finding A-5 (P1)**: `services/s03_regime_detector/regime_engine.py` — Defines local `VolRegime` and `RiskMode` enums that shadow `core.models.regime.VolRegime` and `core.models.regime.RiskMode`. Risk of drift between canonical and local definitions. Issue #74.
 
-### S05 Risk Manager (8 files, 1,628 LOC) — **CLEAN**
+### S04 Fusion Engine (8 files, 1,107 LOC) — **MOSTLY CLEAN**
 
-Circuit breaker, position rules, meta-label gate, exposure monitor, and CB event guard are properly separated. Risk Manager as VETO layer is correctly implemented.
+Well-structured with separate modules for fusion, Kelly sizing, meta-labeling, hedge triggers, feature logging.
 
-### S06 Execution (7 files, 1,325 LOC) — **CLEAN**
+**Finding A-6 (P1)**: `services/s04_fusion_engine/strategy.py` — `StrategySelector.is_active()` and `get_size_multiplier()` use hardcoded if/elif chains for strategy names. Adding a new strategy requires modifying both methods. **Recommendation**: Use Strategy Pattern with a registry dict. Issue #75.
 
-Paper trader, optimal execution (Almgren-Chriss), and broker abstractions are properly separated.
+### S05 Risk Manager (8 files, 1,628 LOC) — **MOSTLY CLEAN**
+
+Circuit breaker, position rules, meta-label gate, exposure monitor, and CB event guard are properly separated. Risk Manager as VETO layer is correctly implemented. Position rules and exposure monitor are pure functions (excellent SRP).
+
+**Finding A-7 (P1)**: `services/s05_risk_manager/service.py:74` — `on_start()` accesses `self.state._ensure_connected()` (private method) to extract raw Redis, then passes it to CircuitBreaker, CBEventGuard, and MetaLabelGate. Breaks StateStore abstraction (DIP violation). Issue #76.
+
+**Finding A-8 (P2)**: `services/s05_risk_manager/service.py` — `process_order_candidate()` is 135 lines with 10x duplicated `_build_blocked` pattern. **Recommendation**: Implement Chain of Responsibility properly with a `RiskChain` list of callables.
+
+### S06 Execution (7 files, 1,325 LOC) — **NEEDS REFACTOR**
+
+**Finding A-9 (P1)**: `services/s06_execution/` — `AlpacaBroker`, `BinanceBroker`, and `PaperTrader` share **no common interface/ABC**. They have overlapping methods (`connect`, `disconnect`, `place_order`, `cancel_order`) with different signatures. `ExecutionService._execute()` uses config-based branching. Adding IBKR would require multi-file modification. **Recommendation**: Extract a `Broker` ABC. Create a `BrokerFactory` for config-based instantiation. Issue #72. (Note: This blocks Phase 7, not Phase 3.)
 
 ### S07 Quant Analytics (9 files, 1,745 LOC) — **GOOD**
 
@@ -472,6 +482,11 @@ None. No blocking issues found.
 | P1-7 | mypy `ignore_errors=true` for `core.models.*` | `pyproject.toml:83-92` | M | #69 |
 | P1-8 | Coverage omit too broad — S01 entirely excluded, true coverage ~40-50% | `pyproject.toml:112-147` | L | #70 |
 | P1-9 | Broker API keys (Alpaca, Binance) use `str` instead of `SecretStr` | `core/config.py:41-42,53-54` | S | #71 |
+| P1-10 | S06: No Broker ABC — 3 brokers share no interface (DIP+OCP) | `services/s06_execution/` | M | #72 |
+| P1-11 | S02: `_process_tick` is 270-line monolith (SRP) | `services/s02_signal_engine/service.py` | M | #73 |
+| P1-12 | S03: Dead `_update_regime` v2 + duplicated enums | `services/s03_regime_detector/` | S | #74 |
+| P1-13 | S04: StrategySelector hardcoded if/elif (OCP) | `services/s04_fusion_engine/strategy.py` | S | #75 |
+| P1-14 | S05: Accesses StateStore private `_ensure_connected()` (DIP) | `services/s05_risk_manager/service.py:74` | S | #76 |
 
 ### P2 (cosmetic — address when convenient)
 
@@ -510,7 +525,7 @@ None. No blocking issues found.
 
 5. **Test infrastructure is mature.** 1,283 tests all passing, fakeredis for unit isolation, pytest-asyncio, Hypothesis property tests. The coverage number (83% measured / ~45% true) is the weakest point but does not block Phase 3.
 
-6. **P1 items are parallelizable.** All 9 P1 findings can be addressed in parallel with Phase 3 work via separate issues/PRs without blocking the feature validation harness.
+6. **P1 items are parallelizable.** All 14 P1 findings can be addressed in parallel with Phase 3 work via separate issues/PRs without blocking the feature validation harness. The SOLID violations (S02-S06) are in services not touched by Phase 3 (which focuses on S02 signal validation, not S06 execution or S03 regime detection).
 
 **Phase 3 can begin immediately.** The P1 items should be tracked as a separate "tech debt sprint" running alongside Phase 3 sub-phases.
 
