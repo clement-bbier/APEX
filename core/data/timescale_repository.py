@@ -11,13 +11,9 @@ import time
 import uuid
 from datetime import date, datetime, timezone
 
-import asyncpg
+from collections.abc import Callable
 
-from services.s01_data_ingestion.observability.metrics import (
-    record_db_insert,
-    record_db_query,
-)
-from services.s01_data_ingestion.observability.tracing import trace_async
+import asyncpg
 
 from core.models.data import (
     Asset,
@@ -37,18 +33,36 @@ from core.models.data import (
 
 _MACRO_META_FIELDS = ("series_id", "source", "name", "frequency", "unit", "description")
 
+# Callback signature: (table_name, rows_inserted, duration_seconds) -> None
+OnInsertCallback = Callable[[str, int, float], None]
+
 
 class TimescaleRepository:
     """Async repository for all TimescaleDB operations.
 
     Uses asyncpg connection pool with COPY protocol for bulk inserts.
+
+    Args:
+        dsn: PostgreSQL connection string.
+        pool_min: Minimum asyncpg pool size.
+        pool_max: Maximum asyncpg pool size.
+        on_insert: Optional callback invoked after each successful insert
+            with ``(table, rows, duration_s)``. Used for observability
+            without coupling core to service-layer modules (DIP).
     """
 
-    def __init__(self, dsn: str, pool_min: int = 2, pool_max: int = 10) -> None:
+    def __init__(
+        self,
+        dsn: str,
+        pool_min: int = 2,
+        pool_max: int = 10,
+        on_insert: OnInsertCallback | None = None,
+    ) -> None:
         self._dsn = dsn
         self._pool_min = pool_min
         self._pool_max = pool_max
         self._pool: asyncpg.Pool[asyncpg.Record] | None = None
+        self._on_insert = on_insert
 
     async def connect(self) -> None:
         """Create the connection pool with JSON/JSONB codec registration."""
@@ -201,7 +215,6 @@ class TimescaleRepository:
 
     # ── Bars ──────────────────────────────────────────────────────────────────
 
-    @trace_async("timescale.insert_bars")
     async def insert_bars(self, bars: list[Bar]) -> int:
         """Bulk-insert bars using COPY protocol. Returns count inserted."""
         if not bars:
@@ -243,8 +256,10 @@ class TimescaleRepository:
                 "adj_close",
             ],
         )
-        record_db_insert("bars", time.monotonic() - start)
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("bars", rows, time.monotonic() - start)
+        return rows
 
     async def get_bars(
         self,
@@ -287,7 +302,6 @@ class TimescaleRepository:
 
     # ── Ticks ─────────────────────────────────────────────────────────────────
 
-    @trace_async("timescale.insert_ticks")
     async def insert_ticks(self, ticks: list[DbTick]) -> int:
         """Bulk-insert ticks using COPY protocol. Returns count inserted."""
         if not ticks:
@@ -302,8 +316,10 @@ class TimescaleRepository:
             records=records,
             columns=["asset_id", "timestamp", "trade_id", "price", "quantity", "side"],
         )
-        record_db_insert("ticks", time.monotonic() - start)
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("ticks", rows, time.monotonic() - start)
+        return rows
 
     async def get_ticks(
         self,
@@ -337,7 +353,6 @@ class TimescaleRepository:
 
     # ── Macro ─────────────────────────────────────────────────────────────────
 
-    @trace_async("timescale.insert_macro_points")
     async def insert_macro_points(self, points: list[MacroPoint]) -> int:
         """Bulk-insert macro series points. Returns count inserted."""
         if not points:
@@ -350,8 +365,10 @@ class TimescaleRepository:
             records=records,
             columns=["series_id", "timestamp", "value"],
         )
-        record_db_insert("macro_series", time.monotonic() - start)
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("macro_series", rows, time.monotonic() - start)
+        return rows
 
     async def get_macro_series(
         self,
@@ -415,7 +432,6 @@ class TimescaleRepository:
 
     # ── Fundamentals ──────────────────────────────────────────────────────────
 
-    @trace_async("timescale.insert_fundamentals")
     async def insert_fundamentals(self, points: list[FundamentalPoint]) -> int:
         """Bulk-insert fundamental data points. Returns count inserted."""
         if not points:
@@ -431,8 +447,10 @@ class TimescaleRepository:
             records=records,
             columns=["asset_id", "report_date", "period_type", "metric_name", "value", "currency"],
         )
-        record_db_insert("fundamentals", time.monotonic() - start)
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("fundamentals", rows, time.monotonic() - start)
+        return rows
 
     async def get_fundamentals(
         self,
@@ -476,7 +494,6 @@ class TimescaleRepository:
 
     # ── Events ────────────────────────────────────────────────────────────────
 
-    @trace_async("timescale.insert_economic_events")
     async def insert_economic_events(self, events: list[EconomicEvent]) -> int:
         """Bulk-insert economic events. Returns count inserted."""
         if not events:
@@ -512,10 +529,11 @@ class TimescaleRepository:
                 "source",
             ],
         )
-        record_db_insert("economic_events", time.monotonic() - start)
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("economic_events", rows, time.monotonic() - start)
+        return rows
 
-    @trace_async("timescale.insert_corporate_events")
     async def insert_corporate_events(self, events: list[CorporateEvent]) -> int:
         """Bulk-insert corporate events. Returns count inserted."""
         if not events:
@@ -530,8 +548,10 @@ class TimescaleRepository:
             records=records,
             columns=["event_id", "asset_id", "event_date", "event_type", "details_json"],
         )
-        record_db_insert("corporate_events", time.monotonic() - start)
-        return int(result.split()[-1]) if isinstance(result, str) else len(records)
+        rows = int(result.split()[-1]) if isinstance(result, str) else len(records)
+        if self._on_insert is not None:
+            self._on_insert("corporate_events", rows, time.monotonic() - start)
+        return rows
 
     async def get_economic_events(
         self,

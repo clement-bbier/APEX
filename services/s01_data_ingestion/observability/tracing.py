@@ -23,7 +23,7 @@ from opentelemetry.sdk.trace.export import (
     ConsoleSpanExporter,
     SpanExporter,
 )
-from opentelemetry.trace import StatusCode
+from opentelemetry.trace import Status, StatusCode
 
 _SERVICE_NAME = "apex-s01-data-ingestion"
 _RESOURCE_ATTRIBUTES_KEY = "service.name"
@@ -111,10 +111,10 @@ def trace_async(span_name: str) -> Callable[[_F], _F]:
             with tracer.start_as_current_span(span_name) as span:
                 try:
                     result = await func(*args, **kwargs)
-                    span.set_status(StatusCode.OK)
+                    span.set_status(Status(StatusCode.OK))
                     return result
                 except Exception as exc:
-                    span.set_status(StatusCode.ERROR, str(exc))
+                    span.set_status(Status(StatusCode.ERROR, description=str(exc)))
                     span.record_exception(exc)
                     raise
 

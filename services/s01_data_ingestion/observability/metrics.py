@@ -192,14 +192,15 @@ def record_connector_fetch(
         connector_errors_total.labels(connector=connector, source=source).inc()
 
 
-def record_db_insert(table: str, duration_s: float) -> None:
+def record_db_insert(table: str, rows: int, duration_s: float) -> None:
     """Record a database insert operation.
 
     Args:
         table: Target table name (e.g. ``bars``, ``ticks``).
+        rows: Number of rows inserted in this bulk operation.
         duration_s: Insert duration in seconds.
     """
-    db_inserts_total.labels(table=table).inc()
+    db_inserts_total.labels(table=table).inc(rows)
     db_insert_duration.labels(table=table).observe(duration_s)
 
 
@@ -219,7 +220,7 @@ def record_quality_issue(check_type: str, severity: str) -> None:
 
     Args:
         check_type: Type of check that detected the issue.
-        severity: Issue severity (``WARN`` or ``FAIL``).
+        severity: Issue severity (``warn`` or ``fail``, lowercase).
     """
     quality_issues_total.labels(check_type=check_type, severity=severity).inc()
 

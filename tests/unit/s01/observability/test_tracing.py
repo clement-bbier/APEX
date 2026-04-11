@@ -90,6 +90,18 @@ class TestTraceAsync:
         with pytest.raises(ValueError, match="test error"):
             await failing_func()
 
+    async def test_exception_propagates_not_type_error(self) -> None:
+        """Verify set_status uses Status objects — no TypeError from OTel."""
+        init_tracing(otel_endpoint=None)
+
+        @trace_async("test.status_object")
+        async def raises_runtime() -> None:
+            msg = "runtime boom"
+            raise RuntimeError(msg)
+
+        with pytest.raises(RuntimeError, match="runtime boom"):
+            await raises_runtime()
+
     async def test_preserves_function_name(self) -> None:
         @trace_async("test.named")
         async def original_name() -> None:

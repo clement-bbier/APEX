@@ -163,13 +163,13 @@ class TestRecordConnectorFetch:
 class TestRecordDbInsert:
     """Tests for record_db_insert helper."""
 
-    def test_increments_counter(self) -> None:
-        metrics.record_db_insert("bars", 0.01)
+    def test_increments_counter_by_rows(self) -> None:
+        metrics.record_db_insert("bars", rows=50, duration_s=0.01)
         val = metrics.db_inserts_total.labels(table="bars")._value.get()
-        assert val == 1.0
+        assert val == 50.0
 
     def test_records_duration(self) -> None:
-        metrics.record_db_insert("ticks", 0.123)
+        metrics.record_db_insert("ticks", rows=10, duration_s=0.123)
         total = metrics.db_insert_duration.labels(table="ticks")._sum.get()
         assert total == pytest.approx(0.123)
 
@@ -187,9 +187,9 @@ class TestRecordQualityIssue:
     """Tests for record_quality_issue helper."""
 
     def test_increments_by_type_and_severity(self) -> None:
-        metrics.record_quality_issue("gap_check", "WARN")
+        metrics.record_quality_issue("gap_check", "warn")
         val = metrics.quality_issues_total.labels(
-            check_type="gap_check", severity="WARN"
+            check_type="gap_check", severity="warn"
         )._value.get()
         assert val == 1.0
 

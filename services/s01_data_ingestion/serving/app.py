@@ -22,9 +22,11 @@ from services.s01_data_ingestion.observability.healthcheck import (
     DatabaseCheck,
     HealthChecker,
 )
+from services.s01_data_ingestion.observability.metrics import record_db_insert
 from services.s01_data_ingestion.observability.metrics_server import (
     mount_metrics_endpoint,
 )
+from services.s01_data_ingestion.observability.tracing import init_tracing
 
 from .deps import get_repo
 from .middleware import ObservabilityMiddleware
@@ -41,10 +43,16 @@ _API_VERSION = "1.0.0"
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     """Manage TimescaleRepository connection pool lifecycle."""
     settings = get_settings()
+    init_tracing(otel_endpoint=settings.otel_endpoint)
+
+    def _on_insert(table: str, rows: int, duration_s: float) -> None:
+        record_db_insert(table=table, rows=rows, duration_s=duration_s)
+
     repo = TimescaleRepository(
         dsn=settings.timescale_dsn,
         pool_min=settings.timescale_pool_min,
         pool_max=settings.timescale_pool_max,
+        on_insert=_on_insert,
     )
     await repo.connect()
     application.state.repo = repo
@@ -115,6 +123,9 @@ async def health(
     """Health check — verifies database connectivity via HealthChecker."""
     checker: HealthChecker = request.app.state.health_checker
     report = await checker.readiness()
-    db_ok = all(c.status.value == "healthy" for c in report.checks)
-    status = report.status.value
-    return HealthResponse(status=status, database=db_ok)
+    database_check = next(
+        (c for c in report.checks if c.name == "database"),
+        None,
+    )
+    db_ok = database_check is not None and database_check.status.value == "healthy"
+    return HealthResponse(status=report.status.value, database=db_ok)

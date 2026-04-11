@@ -67,9 +67,12 @@ def test_lifespan_creates_and_closes_repo():
     mock_repo.close = AsyncMock()
     mock_repo.health_check = AsyncMock(return_value=True)
 
-    with patch(
-        "services.s01_data_ingestion.serving.app.TimescaleRepository",
-        return_value=mock_repo,
+    with (
+        patch(
+            "services.s01_data_ingestion.serving.app.TimescaleRepository",
+            return_value=mock_repo,
+        ),
+        patch("services.s01_data_ingestion.serving.app.init_tracing"),
     ):
         with TestClient(app):
             mock_repo.connect.assert_called_once()
