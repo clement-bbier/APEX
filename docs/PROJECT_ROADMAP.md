@@ -6,7 +6,7 @@
 |---|---|
 | Maintainer | Clement Barbier |
 | Created | 2026-04-10 |
-| Last updated | 2026-04-10 |
+| Last updated | 2026-04-11 |
 | Update frequency | After each sub-phase merge |
 
 ---
@@ -415,38 +415,40 @@ ETFs, and fixed-income data through a single unified schema stored in TimescaleD
 - ETFs: SPY, QQQ, IWM, TLT, GLD, USO, HYG, LQD, EEM, VXX.
 - Daily resolution via yfinance with DataQualityChecker integration.
 
-**2.7 — Macro connectors FRED + ECB + BoJ (IN PROGRESS)**
+**2.7 — Macro connectors FRED + ECB + BoJ (DONE)**
 - FRED: US macro series (GDP, CPI, NFP, unemployment, Fed Funds, yield curve,
   credit spreads, consumer sentiment, ISM PMI, housing starts).
 - ECB Statistical Data Warehouse: Euro area rates, M3 money supply, HICP inflation.
 - Bank of Japan: policy rate, monetary base, Tankan survey.
 - All connectors inherit from `MacroConnectorBase` with unified `fetch()` interface.
 
-**2.8 — Calendar events (PENDING)**
+**2.8 — Calendar events (DONE)**
 - Central bank meeting dates: FOMC, ECB Governing Council, BoJ, BoE.
 - Economic releases: CPI, NFP, ISM PMI, retail sales, GDP.
 - Structured event objects with expected impact level (HIGH/MEDIUM/LOW).
 - Integration with S08 Macro Intelligence for pre-event blocking.
 
-**2.9 — Fundamentals (PENDING)**
+**2.9 — Fundamentals (DONE)**
 - SEC EDGAR: quarterly filings (10-Q, 10-K), insider transactions (Form 4).
 - SimFin: standardized financial statements, ratios.
 - Earnings calendar integration.
 
-**2.10 — Internal serving layer (PENDING)**
-- FastAPI or gRPC internal API for services to query historical data.
+**2.10 — Internal serving layer (DONE)**
+- FastAPI internal REST API for services to query historical data.
 - Replaces direct DB queries from individual services.
 - Caching layer with Redis.
 
-**2.11 — Backfill orchestrator (PENDING)**
+**2.11 — Backfill orchestrator (DONE)**
 - CLI tool to backfill historical data for any connector/date range.
-- Resume-capable (tracks last successful timestamp per asset/source).
+- Resume-capable (tracks last successful timestamp per asset/source via Redis WATCH/MULTI/EXEC).
 - Rate-limit aware with exponential backoff.
+- Job scheduler with retry, state tracking, and gap detection.
 
-**2.12 — Observability (PENDING)**
+**2.12 — Observability (DONE)**
 - Prometheus metrics for each connector (latency, error rate, throughput).
 - Structured tracing for data pipeline (ingest → normalize → validate → store).
 - Health check endpoints for Docker orchestration.
+- Orchestrator instrumentation for backfill job monitoring.
 
 #### Deliverables
 
@@ -480,15 +482,15 @@ ETFs, and fixed-income data through a single unified schema stored in TimescaleD
 5. Lucca, D. O. & Moench, E. (2015). "The Pre-FOMC Announcement Drift".
    *Journal of Finance*, 70(1), 329-371.
 
-#### Open questions
+#### Open questions (all resolved)
 
-- **2.8**: Which calendar source? Investing.com scraping vs. paid API (FedWatch, Econ
-  Calendar API). Need to evaluate reliability and latency.
-- **2.9**: SEC EDGAR rate limits (10 req/s) — is that sufficient for real-time
-  monitoring of insider transactions?
-- **2.10**: REST vs. gRPC for internal serving. REST is simpler; gRPC is faster for
-  inter-service communication. Decision needed before implementation.
-- **2.11**: Should backfill run as a standalone script or as a service (S01 mode)?
+- **2.8**: Resolved — built custom calendar event ingestion from FOMC, ECB, BoJ, and
+  US economic release schedules. No paid API needed at this stage.
+- **2.9**: Resolved — SEC EDGAR 10 req/s is sufficient for batch backfill; real-time
+  insider monitoring deferred to Phase 9+.
+- **2.10**: Resolved — FastAPI REST chosen for simplicity and consistency with S10.
+- **2.11**: Resolved — standalone CLI orchestrator with YAML job definitions and Redis
+  state persistence.
 
 #### ADRs
 
@@ -1198,15 +1200,21 @@ in their domain.
 
 | ADR | Title | Phase | Status |
 |---|---|---|---|
-| ADR-0004 | HMM library selection for S03 Regime Detector | Phase 4 | PENDING |
-| ADR-0005 | Capital allocation methodology (Risk Parity vs. B-L vs. Kelly) | Phase 4 | PENDING |
-| ADR-0006 | Backtesting engine architecture (build vs. vectorbt vs. lean) | Phase 5 | PENDING |
-| ADR-0007 | Slippage model specification per asset class | Phase 5 | PENDING |
-| ADR-0008 | Bayesian Kelly shrinkage formulation | Phase 6 | PENDING |
-| ADR-0009 | Circuit breaker state machine specification | Phase 6 | PENDING |
-| ADR-0010 | Order routing strategy | Phase 7 | PENDING |
+| ADR-0004 | Feature validation methodology and IC thresholds | Phase 3 | PENDING (#81) |
+| ADR-0005 | HMM library selection for S03 Regime Detector | Phase 4 | PENDING |
+| ADR-0006 | Capital allocation methodology (Risk Parity vs. B-L vs. Kelly) | Phase 4 | PENDING |
+| ADR-0007 | Backtesting engine architecture (build vs. vectorbt vs. lean) | Phase 5 | PENDING |
+| ADR-0008 | Slippage model specification per asset class | Phase 5 | PENDING |
+| ADR-0009 | Feature versioning and feature store architecture | Phase 3+ | PENDING |
+| ADR-0010 | Bayesian Kelly shrinkage formulation | Phase 6 | PENDING |
+| ADR-0011 | Circuit breaker state machine specification | Phase 6 | PENDING |
+| ADR-0012 | Order routing strategy | Phase 7 | PENDING |
+| ADR-0013 | Monitoring and alerting strategy | Phase 8 | PENDING |
+| ADR-0014 | Paper-to-live cutover process | Phase 7-8 | PENDING |
+| ADR-0015 | Disaster recovery and failover | Phase 8+ | PENDING |
 
 ADR numbers for planned items are provisional and may change.
+ADR-0004 and ADR-0009 are proposed by the Phase 3 design spec (#61) and meta-governance audit (#59).
 
 ---
 
@@ -1230,6 +1238,9 @@ ADR numbers for planned items are provisional and may change.
 | R14 | `float()` for financial values in connectors and core models | Medium | **Confirmed** | ~20+ instances of `float()` where `Decimal` is required by CLAUDE.md. Issue #66. Fix incrementally during Phase 3. |
 | R15 | Dependency CVEs (19 known vulnerabilities) | Medium | **Confirmed** | urllib3, requests, tornado, pillow have known CVEs. Issue #68. Requires version bumps in requirements.txt. |
 | R16 | Coverage denominator inflation | Medium | **Confirmed** | 25 omit entries in pyproject.toml exclude ~14,000 LOC from coverage measurement. True coverage ~45%. Issue #70. |
+| R17 | No glossary for 40+ specialized terms | Low | **Confirmed** | Every new Claude Code session rediscovers acronyms. Slows onboarding. Issue #78. Addressed by Sprint 1 docs. |
+| R18 | No commit message convention | Low | **Confirmed** | CHANGELOG.md unmaintainable without systematic commit format. Issue #80. Addressed by Sprint 1 docs. |
+| R19 | No pre-commit hooks | Medium | **Confirmed** | Convention enforcement relies entirely on CI. Local violations not caught until push. Issue #85. |
 
 ---
 
@@ -1254,24 +1265,24 @@ ADR numbers for planned items are provisional and may change.
 
 | Series | Source | Frequency | Status |
 |---|---|---|---|
-| US GDP, CPI, NFP, unemployment, Fed Funds rate | FRED | Monthly/Quarterly | IN PROGRESS (2.7) |
-| US yield curve (2Y, 5Y, 10Y, 30Y spreads) | FRED | Daily | IN PROGRESS (2.7) |
-| US credit spreads (BAA-AAA, HY-IG) | FRED | Daily | IN PROGRESS (2.7) |
-| US consumer sentiment (Michigan) | FRED | Monthly | IN PROGRESS (2.7) |
-| US ISM PMI, housing starts | FRED | Monthly | IN PROGRESS (2.7) |
-| Euro area policy rate, M3, HICP | ECB SDW | Monthly/Quarterly | IN PROGRESS (2.7) |
-| Japan policy rate, monetary base, Tankan | Bank of Japan | Quarterly | IN PROGRESS (2.7) |
-| Central bank meeting dates (FOMC, ECB, BoJ, BoE) | TBD | Event-driven | PENDING (2.8) |
-| Economic releases (CPI, NFP, ISM, retail, GDP) | TBD | Event-driven | PENDING (2.8) |
+| US GDP, CPI, NFP, unemployment, Fed Funds rate | FRED | Monthly/Quarterly | DONE (2.7) |
+| US yield curve (2Y, 5Y, 10Y, 30Y spreads) | FRED | Daily | DONE (2.7) |
+| US credit spreads (BAA-AAA, HY-IG) | FRED | Daily | DONE (2.7) |
+| US consumer sentiment (Michigan) | FRED | Monthly | DONE (2.7) |
+| US ISM PMI, housing starts | FRED | Monthly | DONE (2.7) |
+| Euro area policy rate, M3, HICP | ECB SDW | Monthly/Quarterly | DONE (2.7) |
+| Japan policy rate, monetary base, Tankan | Bank of Japan | Quarterly | DONE (2.7) |
+| Central bank meeting dates (FOMC, ECB, BoJ, BoE) | Custom ingestion | Event-driven | DONE (2.8) |
+| Economic releases (CPI, NFP, ISM, retail, GDP) | Custom ingestion | Event-driven | DONE (2.8) |
 
 #### Fundamental data
 
 | Data type | Source | Frequency | Status |
 |---|---|---|---|
-| Quarterly filings (10-Q, 10-K) | SEC EDGAR | Quarterly | PENDING (2.9) |
-| Insider transactions (Form 4) | SEC EDGAR | Event-driven | PENDING (2.9) |
-| Standardized financials + ratios | SimFin | Quarterly | PENDING (2.9) |
-| Earnings calendar | TBD | Event-driven | PENDING (2.9) |
+| Quarterly filings (10-Q, 10-K) | SEC EDGAR | Quarterly | DONE (2.9) |
+| Insider transactions (Form 4) | SEC EDGAR | Event-driven | DONE (2.9) |
+| Standardized financials + ratios | SimFin | Quarterly | DONE (2.9) |
+| Earnings calendar | SimFin | Event-driven | DONE (2.9) |
 
 ---
 
@@ -1388,9 +1399,9 @@ in future phases if they provide demonstrable alpha after Phase 3 validation:
 
 | Priority | Artifact | Issue | Status |
 |---|---|---|---|
-| **P0** | `docs/GLOSSARY.md` | #78 | PENDING |
-| **P0** | Fix roadmap Phase 2 stale sub-phase descriptions | #79 | PENDING |
-| **P0** | `docs/CONVENTIONS/COMMIT_MESSAGES.md` | #80 | PENDING |
+| **P0** | `docs/GLOSSARY.md` | #78 | **DONE** (Sprint 1) |
+| **P0** | Fix roadmap Phase 2 stale sub-phase descriptions | #79 | **DONE** (Sprint 1) |
+| **P0** | `docs/CONVENTIONS/COMMIT_MESSAGES.md` | #80 | **DONE** (Sprint 1) |
 | P1 | ADR-0004: Feature validation methodology | #81 | PENDING |
 | P1 | `docs/ARCHITECTURE.md` | #82 | PENDING |
 | P1 | `docs/ACADEMIC_REFERENCES.md` | #83 | PENDING |
@@ -1425,3 +1436,4 @@ in future phases if they provide demonstrable alpha after Phase 3 validation:
 | 2026-04-10 | 1.0 | Initial document — vision, architecture, Phases 1-12, references, ADR index, risks, appendices | Claude Code (orchestrated by C. Barbier) |
 | 2026-04-11 | 1.1 | Section 4 updated with audit #55 results. Risks R13-R16 added. | Claude Code (audit #55) |
 | 2026-04-11 | 1.2 | Section 12 (Governance & Methodology) added from meta-governance audit #59. | Claude Code (audit #59) |
+| 2026-04-11 | 1.3 | Sprint 1 docs refresh: Phase 2 sub-phases 2.7-2.12 DONE, open questions resolved, Appendix A data coverage updated, ADR index expanded (ADR-0004 to ADR-0015), risks R17-R19 added, governance P0 items closed. Refs #67 #79. | Claude Code (Sprint 1) |
