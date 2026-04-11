@@ -213,7 +213,20 @@ list                   # bare generic — use list[T]
 
 ---
 
-## 12. Persistent memory across sessions
+## 12. Commit conventions
+
+All commits must follow the convention defined in `docs/CONVENTIONS/COMMIT_MESSAGES.md`.
+
+**Quick reference**: `<type>(<scope>): <description>`
+
+- Types: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `ci`, `audit`, `perf`, `style`
+- Scopes: `s01`..`s10`, `core`, `infra`, `ci`, `docs`, `tests`, `rust`, etc.
+- Always add `Co-Authored-By: Claude <noreply@anthropic.com>` when Claude Code authors the commit.
+- Always reference issues: `Closes #N` or `Refs #N`.
+
+---
+
+## 13. Persistent memory across sessions
 
 APEX development spans many Claude Code sessions. To preserve context:
 
@@ -240,7 +253,7 @@ Read `docs/claude_memory/CONTEXT.md` AND the relevant phase notes file
 
 ---
 
-## 13. When in doubt
+## 14. When in doubt
 
 1. Check MANIFEST.md for the intended behavior
 2. Check existing service implementations for established patterns
