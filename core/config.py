@@ -82,6 +82,17 @@ class Settings(BaseSettings):
     )
     massive_s3_bucket: str = Field(default="flatfiles", description="Massive S3 bucket name")
 
+    # ── SimFin ────────────────────────────────────────────────────────────────
+    simfin_api_key: SecretStr = Field(
+        default=SecretStr(""), description="SimFin API key for fundamentals"
+    )
+
+    # ── SEC EDGAR ─────────────────────────────────────────────────────────────
+    edgar_user_agent: str = Field(
+        default="APEX/CashMachine clement.barbier@example.com",
+        description="User-Agent for SEC EDGAR requests (required by SEC)",
+    )
+
     # ── Redis ─────────────────────────────────────────────────────────────────
     redis_url: str = Field(default="redis://localhost:6379/0", description="Redis connection URL")
     redis_max_connections: int = Field(default=50)

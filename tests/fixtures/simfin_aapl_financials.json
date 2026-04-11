@@ -1,0 +1,50 @@
+[
+  {
+    "Report Date": "2023-09-30",
+    "Period": "FY",
+    "Revenue": 383285000000,
+    "Gross Profit": 169148000000,
+    "Operating Income (Loss)": 114301000000,
+    "Net Income": 96995000000,
+    "Earnings Per Share, Basic": 6.16,
+    "Earnings Per Share, Diluted": 6.13,
+    "Total Assets": 352583000000,
+    "Total Liabilities": 290437000000,
+    "Total Equity": 62146000000,
+    "Cash, Cash Equivalents & Short Term Investments": 29965000000,
+    "Long Term Debt": 95281000000,
+    "Shares (Basic)": 15744231000
+  },
+  {
+    "Report Date": "2024-09-28",
+    "Period": "FY",
+    "Revenue": 391035000000,
+    "Gross Profit": 180683000000,
+    "Operating Income (Loss)": 123216000000,
+    "Net Income": 93736000000,
+    "Earnings Per Share, Basic": 6.08,
+    "Earnings Per Share, Diluted": 6.04,
+    "Total Assets": 364980000000,
+    "Total Liabilities": 308030000000,
+    "Total Equity": 56950000000,
+    "Cash, Cash Equivalents & Short Term Investments": 29943000000,
+    "Long Term Debt": 96807000000,
+    "Shares (Basic)": 15408095000
+  },
+  {
+    "Report Date": "2024-03-30",
+    "Period": "Q2",
+    "Revenue": 90753000000,
+    "Gross Profit": 42267000000,
+    "Operating Income (Loss)": 27901000000,
+    "Net Income": 23636000000,
+    "Earnings Per Share, Basic": 1.53,
+    "Earnings Per Share, Diluted": 1.52,
+    "Total Assets": 337411000000,
+    "Total Liabilities": 279414000000,
+    "Total Equity": 57997000000,
+    "Cash, Cash Equivalents & Short Term Investments": 32695000000,
+    "Long Term Debt": 91831000000,
+    "Shares (Basic)": 15441783000
+  }
+]
