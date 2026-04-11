@@ -76,7 +76,7 @@ def test_get_bars_with_bar_type(client, mock_repo, sample_asset, sample_bar):
 
 def test_get_bars_limit_applied(client, mock_repo, sample_asset, sample_bar):
     mock_repo.get_asset.return_value = sample_asset
-    mock_repo.get_bars.return_value = [sample_bar] * 5
+    mock_repo.get_bars.return_value = [sample_bar] * 2
     resp = client.get(
         "/v1/bars",
         params={
@@ -89,7 +89,8 @@ def test_get_bars_limit_applied(client, mock_repo, sample_asset, sample_bar):
         },
     )
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    _, kwargs = mock_repo.get_bars.call_args
+    assert kwargs["limit"] == 2
 
 
 def test_get_bars_missing_required_param(client):

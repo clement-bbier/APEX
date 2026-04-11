@@ -18,6 +18,7 @@ router = APIRouter(prefix="/v1", tags=["fundamentals"])
 
 _DEFAULT_LIMIT = 500
 _MAX_LIMIT = 5000
+_VALID_PERIOD_TYPES = frozenset({"quarterly", "annual"})
 
 
 @router.get("/fundamentals", response_model=list[FundamentalResponse])
@@ -31,6 +32,9 @@ async def get_fundamentals(
     repo: TimescaleRepository = Depends(get_repo),
 ) -> list[FundamentalResponse]:
     """Fetch fundamental metrics for a symbol within a date range."""
+    if period_type is not None and period_type not in _VALID_PERIOD_TYPES:
+        msg = f"Invalid period_type '{period_type}', must be one of {sorted(_VALID_PERIOD_TYPES)}"
+        raise ValueError(msg)
     asset = await repo.get_asset(symbol, exchange)
     if asset is None:
         return []
@@ -39,5 +43,6 @@ async def get_fundamentals(
         start=start,
         end=end,
         period_type=period_type,
+        limit=limit,
     )
-    return [FundamentalResponse.from_point(p) for p in rows[:limit]]
+    return [FundamentalResponse.from_point(p) for p in rows]

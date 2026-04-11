@@ -29,8 +29,8 @@ async def get_macro_series(
     repo: TimescaleRepository = Depends(get_repo),
 ) -> list[MacroPointResponse]:
     """Fetch macro time series data within a date range."""
-    rows = await repo.get_macro_series(series_id, start, end)
-    return [MacroPointResponse.from_point(p) for p in rows[:limit]]
+    rows = await repo.get_macro_series(series_id, start, end, limit=limit)
+    return [MacroPointResponse.from_point(p) for p in rows]
 
 
 @router.get("/macro_series/metadata", response_model=MacroMetadataResponse)

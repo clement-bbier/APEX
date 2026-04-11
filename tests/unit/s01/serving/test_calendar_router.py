@@ -63,7 +63,7 @@ def test_get_economic_events_empty(client, mock_repo):
 
 
 def test_get_economic_events_limit(client, mock_repo, sample_event):
-    mock_repo.get_economic_events.return_value = [sample_event] * 10
+    mock_repo.get_economic_events.return_value = [sample_event] * 2
     resp = client.get(
         "/v1/economic_events",
         params={
@@ -73,11 +73,12 @@ def test_get_economic_events_limit(client, mock_repo, sample_event):
         },
     )
     assert resp.status_code == 200
-    assert len(resp.json()) == 2
+    _, kwargs = mock_repo.get_economic_events.call_args
+    assert kwargs["limit"] == 2
 
 
 def test_get_upcoming_events_success(client, mock_repo, sample_event):
-    mock_repo.get_upcoming_events.return_value = [sample_event]
+    mock_repo.get_economic_events.return_value = [sample_event]
     resp = client.get(
         "/v1/economic_events/upcoming",
         params={"within_minutes": 60},
@@ -89,7 +90,7 @@ def test_get_upcoming_events_success(client, mock_repo, sample_event):
 
 
 def test_get_upcoming_events_empty(client, mock_repo):
-    mock_repo.get_upcoming_events.return_value = []
+    mock_repo.get_economic_events.return_value = []
     resp = client.get(
         "/v1/economic_events/upcoming",
         params={"within_minutes": 30},
@@ -99,13 +100,13 @@ def test_get_upcoming_events_empty(client, mock_repo):
 
 
 def test_get_upcoming_events_with_min_impact(client, mock_repo):
-    mock_repo.get_upcoming_events.return_value = []
+    mock_repo.get_economic_events.return_value = []
     resp = client.get(
         "/v1/economic_events/upcoming",
         params={"within_minutes": 45, "min_impact": 2},
     )
     assert resp.status_code == 200
-    _, kwargs = mock_repo.get_upcoming_events.call_args
+    _, kwargs = mock_repo.get_economic_events.call_args
     assert kwargs["min_impact"] == 2
 
 

@@ -35,7 +35,7 @@ def test_get_macro_series_empty(client, mock_repo):
 
 
 def test_get_macro_series_limit(client, mock_repo, sample_macro_point):
-    mock_repo.get_macro_series.return_value = [sample_macro_point] * 10
+    mock_repo.get_macro_series.return_value = [sample_macro_point] * 3
     resp = client.get(
         "/v1/macro_series",
         params={
@@ -46,7 +46,8 @@ def test_get_macro_series_limit(client, mock_repo, sample_macro_point):
         },
     )
     assert resp.status_code == 200
-    assert len(resp.json()) == 3
+    _, kwargs = mock_repo.get_macro_series.call_args
+    assert kwargs["limit"] == 3
 
 
 def test_get_macro_metadata_success(client, mock_repo, sample_macro_meta):

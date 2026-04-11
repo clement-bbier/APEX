@@ -36,14 +36,16 @@ async def get_economic_events(
         end=end,
         event_type=event_type,
         min_impact=min_impact,
+        limit=limit,
     )
-    return [EconomicEventResponse.from_event(e) for e in rows[:limit]]
+    return [EconomicEventResponse.from_event(e) for e in rows]
 
 
 @router.get("/economic_events/upcoming", response_model=list[EconomicEventResponse])
 async def get_upcoming_events(
     within_minutes: int = Query(..., ge=1, le=1440, description="Look-ahead window in minutes"),
     min_impact: int = Query(default=1, ge=1, le=3, description="Minimum impact score"),
+    limit: int = Query(default=_DEFAULT_LIMIT, ge=1, le=_MAX_LIMIT),
     repo: TimescaleRepository = Depends(get_repo),
 ) -> list[EconomicEventResponse]:
     """Fetch economic events occurring within the next N minutes.
@@ -53,5 +55,10 @@ async def get_upcoming_events(
     """
     now = datetime.now(UTC)
     end = now + timedelta(minutes=within_minutes)
-    rows = await repo.get_upcoming_events(start=now, end=end, min_impact=min_impact)
+    rows = await repo.get_economic_events(
+        start=now,
+        end=end,
+        min_impact=min_impact,
+        limit=limit,
+    )
     return [EconomicEventResponse.from_event(e) for e in rows]

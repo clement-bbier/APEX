@@ -243,22 +243,20 @@ class TimescaleRepository:
         bar_size: str,
         start: datetime,
         end: datetime,
+        limit: int | None = None,
     ) -> list[Bar]:
         """Fetch bars for an asset within a time range."""
         pool = self._get_pool()
-        rows = await pool.fetch(
-            """
+        sql = """
             SELECT * FROM bars
             WHERE asset_id = $1 AND bar_type = $2 AND bar_size = $3
               AND timestamp >= $4 AND timestamp < $5
             ORDER BY timestamp
-            """,
-            asset_id,
-            bar_type,
-            bar_size,
-            start,
-            end,
-        )
+        """
+        params: list[object] = [asset_id, bar_type, bar_size, start, end]
+        if limit is not None:
+            sql += f" LIMIT {int(limit)}"
+        rows = await pool.fetch(sql, *params)
         return [
             Bar(
                 asset_id=r["asset_id"],
@@ -294,19 +292,24 @@ class TimescaleRepository:
         )
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
-    async def get_ticks(self, asset_id: uuid.UUID, start: datetime, end: datetime) -> list[DbTick]:
+    async def get_ticks(
+        self,
+        asset_id: uuid.UUID,
+        start: datetime,
+        end: datetime,
+        limit: int | None = None,
+    ) -> list[DbTick]:
         """Fetch ticks for an asset within a time range."""
         pool = self._get_pool()
-        rows = await pool.fetch(
-            """
+        sql = """
             SELECT * FROM ticks
             WHERE asset_id = $1 AND timestamp >= $2 AND timestamp < $3
             ORDER BY timestamp
-            """,
-            asset_id,
-            start,
-            end,
-        )
+        """
+        params: list[object] = [asset_id, start, end]
+        if limit is not None:
+            sql += f" LIMIT {int(limit)}"
+        rows = await pool.fetch(sql, *params)
         return [
             DbTick(
                 asset_id=r["asset_id"],
@@ -335,20 +338,23 @@ class TimescaleRepository:
         return int(result.split()[-1]) if isinstance(result, str) else len(records)
 
     async def get_macro_series(
-        self, series_id: str, start: datetime, end: datetime
+        self,
+        series_id: str,
+        start: datetime,
+        end: datetime,
+        limit: int | None = None,
     ) -> list[MacroPoint]:
         """Fetch macro series data within a time range."""
         pool = self._get_pool()
-        rows = await pool.fetch(
-            """
+        sql = """
             SELECT * FROM macro_series
             WHERE series_id = $1 AND timestamp >= $2 AND timestamp < $3
             ORDER BY timestamp
-            """,
-            series_id,
-            start,
-            end,
-        )
+        """
+        params: list[object] = [series_id, start, end]
+        if limit is not None:
+            sql += f" LIMIT {int(limit)}"
+        rows = await pool.fetch(sql, *params)
         return [
             MacroPoint(
                 series_id=r["series_id"],
@@ -415,33 +421,28 @@ class TimescaleRepository:
         start: date,
         end: date,
         period_type: str | None = None,
+        limit: int | None = None,
     ) -> list[FundamentalPoint]:
         """Fetch fundamental data points for an asset within a date range."""
         pool = self._get_pool()
         if period_type is not None:
-            rows = await pool.fetch(
-                """
+            sql = """
                 SELECT * FROM fundamentals
                 WHERE asset_id = $1 AND report_date >= $2 AND report_date < $3
                   AND period_type = $4
                 ORDER BY report_date, metric_name
-                """,
-                asset_id,
-                start,
-                end,
-                period_type,
-            )
+            """
+            params: list[object] = [asset_id, start, end, period_type]
         else:
-            rows = await pool.fetch(
-                """
+            sql = """
                 SELECT * FROM fundamentals
                 WHERE asset_id = $1 AND report_date >= $2 AND report_date < $3
                 ORDER BY report_date, metric_name
-                """,
-                asset_id,
-                start,
-                end,
-            )
+            """
+            params = [asset_id, start, end]
+        if limit is not None:
+            sql += f" LIMIT {int(limit)}"
+        rows = await pool.fetch(sql, *params)
         return [
             FundamentalPoint(
                 asset_id=r["asset_id"],
@@ -513,58 +514,32 @@ class TimescaleRepository:
         end: datetime,
         event_type: str | None = None,
         min_impact: int = 1,
+        limit: int | None = None,
     ) -> list[EconomicEvent]:
-        """Fetch economic events within a time range, with optional filters."""
+        """Fetch economic events within a time range, with optional filters.
+
+        Also used by the /upcoming endpoint (which is just a time-window alias).
+        """
         pool = self._get_pool()
         if event_type is not None:
-            rows = await pool.fetch(
-                """
+            sql = """
                 SELECT * FROM economic_events
                 WHERE scheduled_time >= $1 AND scheduled_time < $2
                   AND event_type = $3 AND impact_score >= $4
                 ORDER BY scheduled_time
-                """,
-                start,
-                end,
-                event_type,
-                min_impact,
-            )
+            """
+            params: list[object] = [start, end, event_type, min_impact]
         else:
-            rows = await pool.fetch(
-                """
+            sql = """
                 SELECT * FROM economic_events
                 WHERE scheduled_time >= $1 AND scheduled_time < $2
                   AND impact_score >= $3
                 ORDER BY scheduled_time
-                """,
-                start,
-                end,
-                min_impact,
-            )
-        return [self._row_to_economic_event(r) for r in rows]
-
-    async def get_upcoming_events(
-        self,
-        start: datetime,
-        end: datetime,
-        min_impact: int = 1,
-    ) -> list[EconomicEvent]:
-        """Fetch upcoming economic events between start and end.
-
-        Critical for Phase 6 Risk Manager pre-event blocking.
-        """
-        pool = self._get_pool()
-        rows = await pool.fetch(
             """
-            SELECT * FROM economic_events
-            WHERE scheduled_time >= $1 AND scheduled_time < $2
-              AND impact_score >= $3
-            ORDER BY scheduled_time
-            """,
-            start,
-            end,
-            min_impact,
-        )
+            params = [start, end, min_impact]
+        if limit is not None:
+            sql += f" LIMIT {int(limit)}"
+        rows = await pool.fetch(sql, *params)
         return [self._row_to_economic_event(r) for r in rows]
 
     @staticmethod
