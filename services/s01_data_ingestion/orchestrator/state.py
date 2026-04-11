@@ -3,9 +3,10 @@
 Persists job run state (distributed locks, last success timestamps,
 run history) in Redis. All methods are async and fakeredis-compatible.
 
-Lock safety: uses a unique UUID token per acquisition and a Lua
-compare-and-delete script for release (prevents releasing another
-worker's lock if TTL expired during a long run).
+Lock safety: uses a unique UUID token per acquisition and a transactional
+WATCH/GET/MULTI/EXEC pattern for release — prevents releasing another
+worker's lock if TTL expired during a long run. Portable across both
+fakeredis (tests) and real Redis (production).
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from typing import Any
 import structlog
 from pydantic import BaseModel, ConfigDict, Field
 from redis.asyncio import Redis
+from redis.exceptions import WatchError
 
 logger = structlog.get_logger(__name__)
 
@@ -28,15 +30,6 @@ _LAST_SUCCESS_PREFIX: str = f"{_KEY_PREFIX}:last_success"
 _HISTORY_PREFIX: str = f"{_KEY_PREFIX}:history"
 _HISTORY_MAX_LEN: int = 100
 _HISTORY_DEFAULT_LIMIT: int = 10
-
-# Lua script: compare token then delete — atomic on the Redis server.
-_LOCK_RELEASE_LUA: str = """
-if redis.call("GET", KEYS[1]) == ARGV[1] then
-    return redis.call("DEL", KEYS[1])
-else
-    return 0
-end
-"""
 
 
 # ── Models ───────────────────────────────────────────────────────────────────
@@ -62,7 +55,7 @@ class JobStateManager:
     """Manages job run state in Redis.
 
     Responsibilities:
-    - Distributed locks (SET NX EX + Lua CAS release) to prevent concurrent runs
+    - Distributed locks (SET NX EX + WATCH/MULTI/EXEC release)
     - Last-success timestamps per job
     - Capped run history via Redis streams (XADD / XRANGE)
     """
@@ -77,7 +70,7 @@ class JobStateManager:
         """Try to acquire a distributed lock for *job_name*.
 
         Uses ``SET NX EX`` with a unique UUID token. The token is stored
-        in-memory so that only the owner can release the lock via Lua CAS.
+        in-memory so that only the owner can release via WATCH/MULTI/EXEC.
 
         Returns:
             True if the lock was acquired, False if already held.
@@ -93,24 +86,38 @@ class JobStateManager:
         return False
 
     async def release_lock(self, job_name: str) -> None:
-        """Release the distributed lock for *job_name* via Lua CAS.
+        """Release the distributed lock via transactional CAS.
 
-        Only deletes the key if the stored token matches the one from
-        ``acquire_lock``. This prevents releasing another worker's lock
-        if the TTL expired and the lock was re-acquired.
+        Uses WATCH/GET/MULTI/EXEC to ensure we only delete if the token
+        matches. This is portable across fakeredis and real Redis (no
+        Lua EVAL required).
         """
         key = f"{_LOCK_PREFIX}:{job_name}"
         token = self._lock_tokens.pop(job_name, None)
         if token is None:
             logger.warning("state.lock_release_no_token", job=job_name)
             return
-        result = await self._redis.eval(  # type: ignore[misc]
-            _LOCK_RELEASE_LUA, 1, key, token
-        )
-        if result == 0:
-            logger.warning("state.lock_release_token_mismatch", job=job_name)
-        else:
-            logger.debug("state.lock_released", job=job_name)
+
+        async with self._redis.pipeline(transaction=True) as pipe:
+            try:
+                await pipe.watch(key)
+                current = await pipe.get(key)
+
+                current_str = _decode_value(current)
+                if current_str != token:
+                    await pipe.unwatch()  # type: ignore[no-untyped-call]
+                    logger.warning(
+                        "state.lock_release_token_mismatch",
+                        job=job_name,
+                    )
+                    return
+
+                pipe.multi()  # type: ignore[no-untyped-call]
+                pipe.delete(key)
+                await pipe.execute()
+                logger.debug("state.lock_released", job=job_name)
+            except WatchError:
+                logger.warning("state.lock_release_watch_conflict", job=job_name)
 
     # ── Last success ─────────────────────────────────────────────────────
 
@@ -179,6 +186,15 @@ class JobStateManager:
         ]
         await self._redis.delete(*keys)
         logger.info("state.cleared", job=job_name)
+
+
+def _decode_value(value: object) -> str | None:
+    """Decode a Redis value (bytes or str) to str, or None."""
+    if value is None:
+        return None
+    if isinstance(value, bytes):
+        return value.decode()
+    return str(value)
 
 
 def _decode_stream_fields(fields: dict[Any, Any]) -> dict[str, str]:

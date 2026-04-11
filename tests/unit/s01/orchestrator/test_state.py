@@ -87,6 +87,28 @@ class TestLocking:
         await state_b.release_lock("job_x")
         assert await state_a.acquire_lock("job_x", ttl_seconds=60) is True
 
+    @pytest.mark.asyncio
+    async def test_release_lock_with_concurrent_modification(
+        self,
+        redis: fakeredis.aioredis.FakeRedis,
+    ) -> None:
+        """If the key is overwritten by another process, release is a no-op."""
+        state_a = JobStateManager(redis)
+        await state_a.acquire_lock("race_job", ttl_seconds=60)
+
+        # Simulate concurrent modification: overwrite with a different token
+        foreign_token = "foreign-token-value"
+        await redis.set("apex:orchestrator:lock:race_job", foreign_token)
+
+        # state_a tries to release — token mismatch, should NOT delete
+        await state_a.release_lock("race_job")
+
+        # Key should still exist with the foreign token
+        current = await redis.get("apex:orchestrator:lock:race_job")
+        assert current is not None
+        decoded = current.decode() if isinstance(current, bytes) else current
+        assert decoded == foreign_token
+
 
 class TestLastSuccess:
     """Tests for last_success timestamp storage."""
