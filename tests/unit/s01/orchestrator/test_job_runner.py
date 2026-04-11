@@ -7,7 +7,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import fakeredis.aioredis
 import pytest
+from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
+from services.s01_data_ingestion.observability import metrics
 from services.s01_data_ingestion.orchestrator.config import JobConfig, RetryConfig
 from services.s01_data_ingestion.orchestrator.connector_factory import ConnectorFactory
 from services.s01_data_ingestion.orchestrator.job_runner import JobRunner
@@ -373,3 +375,64 @@ class TestJobRunnerFundamentals:
 
         assert result.status == "success"
         mock_repo.insert_fundamentals.assert_called_once()
+
+
+class TestJobRunnerMetrics:
+    """Tests that JobRunner records observability metrics."""
+
+    @pytest.fixture(autouse=True)
+    def _isolated_orchestrator_metrics(self, monkeypatch):
+        registry = CollectorRegistry()
+        monkeypatch.setattr(
+            metrics,
+            "orchestrator_jobs_total",
+            Counter("test_orch_total", "t", ["job", "status"], registry=registry),
+        )
+        monkeypatch.setattr(
+            metrics,
+            "orchestrator_job_duration",
+            Histogram("test_orch_dur", "t", ["job"], registry=registry),
+        )
+        monkeypatch.setattr(
+            metrics,
+            "orchestrator_jobs_running",
+            Gauge("test_orch_running", "t", ["job"], registry=registry),
+        )
+
+    @pytest.mark.asyncio
+    async def test_success_increments_job_counter(self, state, mock_repo, mock_settings):
+        job = _make_job()
+        factory = MagicMock(spec=ConnectorFactory)
+        factory.create.return_value = _make_bar_connector()
+
+        runner = JobRunner(job, factory, mock_repo, state, mock_settings)
+        result = await runner.run()
+
+        assert result.status == "success"
+        val = metrics.orchestrator_jobs_total.labels(job="test_job", status="success")._value.get()
+        assert val == 1.0
+
+    @pytest.mark.asyncio
+    async def test_failure_increments_job_counter(self, state, mock_repo, mock_settings):
+        job = _make_job(max_attempts=1, backoff=0.001)
+        factory = MagicMock(spec=ConnectorFactory)
+        factory.create.return_value = _make_bar_connector(error=RuntimeError("boom"))
+
+        runner = JobRunner(job, factory, mock_repo, state, mock_settings)
+        result = await runner.run()
+
+        assert result.status == "failed"
+        val = metrics.orchestrator_jobs_total.labels(job="test_job", status="failed")._value.get()
+        assert val == 1.0
+
+    @pytest.mark.asyncio
+    async def test_running_gauge_returns_to_zero(self, state, mock_repo, mock_settings):
+        job = _make_job()
+        factory = MagicMock(spec=ConnectorFactory)
+        factory.create.return_value = _make_bar_connector()
+
+        runner = JobRunner(job, factory, mock_repo, state, mock_settings)
+        await runner.run()
+
+        val = metrics.orchestrator_jobs_running.labels(job="test_job")._value.get()
+        assert val == 0.0

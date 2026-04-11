@@ -104,7 +104,7 @@ def trace_async(span_name: str) -> Callable[[_F], _F]:
     def decorator(func: _F) -> _F:
         @functools.wraps(func)
         async def wrapper(
-            *args: Any,
+            *args: Any,  # noqa: ANN401
             **kwargs: Any,  # noqa: ANN401
         ) -> Any:  # noqa: ANN401
             tracer = get_tracer(func.__module__)

@@ -14,7 +14,7 @@ References:
 
 from __future__ import annotations
 
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 
 # ── Metric name constants ────────────────────────────────────────────────────
 
@@ -34,6 +34,11 @@ _DB_QUERY_DURATION = f"{_PREFIX}_db_query_duration_seconds"
 _QUALITY_ISSUES_TOTAL = f"{_PREFIX}_quality_issues_total"
 _QUALITY_RECORDS_TOTAL = f"{_PREFIX}_quality_records_total"
 
+# Orchestrator metrics
+_ORCHESTRATOR_JOBS_TOTAL = f"{_PREFIX}_orchestrator_jobs_total"
+_ORCHESTRATOR_JOB_DURATION = f"{_PREFIX}_orchestrator_job_duration_seconds"
+_ORCHESTRATOR_JOBS_RUNNING = f"{_PREFIX}_orchestrator_jobs_running"
+
 # Serving metrics
 _SERVING_REQUESTS_TOTAL = f"{_PREFIX}_serving_requests_total"
 _SERVING_REQUEST_DURATION = f"{_PREFIX}_serving_request_duration_seconds"
@@ -51,6 +56,7 @@ _LABEL_SEVERITY = "severity"
 _LABEL_METHOD = "method"
 _LABEL_ENDPOINT = "endpoint"
 _LABEL_STATUS_CODE = "status_code"
+_LABEL_JOB = "job"
 
 # ── Histogram bucket definitions ─────────────────────────────────────────────
 
@@ -59,6 +65,9 @@ _CONNECTOR_BUCKETS = (0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0)
 
 # DB operations: typically 1ms to 5s
 _DB_BUCKETS = (0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0)
+
+# Orchestrator jobs: typically 1s to 5min
+_ORCHESTRATOR_BUCKETS = (0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0)
 
 # HTTP serving: typically 5ms to 10s
 _SERVING_BUCKETS = (0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 10.0)
@@ -117,6 +126,26 @@ quality_records_total = Counter(
     _QUALITY_RECORDS_TOTAL,
     "Total number of records processed by quality checks",
     [_LABEL_STATUS],
+)
+
+# Orchestrator
+orchestrator_jobs_total = Counter(
+    _ORCHESTRATOR_JOBS_TOTAL,
+    "Total number of orchestrator job runs",
+    [_LABEL_JOB, _LABEL_STATUS],
+)
+
+orchestrator_job_duration = Histogram(
+    _ORCHESTRATOR_JOB_DURATION,
+    "Duration of orchestrator job runs in seconds",
+    [_LABEL_JOB],
+    buckets=_ORCHESTRATOR_BUCKETS,
+)
+
+orchestrator_jobs_running = Gauge(
+    _ORCHESTRATOR_JOBS_RUNNING,
+    "Number of orchestrator jobs currently running",
+    [_LABEL_JOB],
 )
 
 # Serving
@@ -206,6 +235,18 @@ def record_quality_records(passed: int, warnings: int, failures: int) -> None:
     quality_records_total.labels(status="passed").inc(passed)
     quality_records_total.labels(status="warning").inc(warnings)
     quality_records_total.labels(status="failure").inc(failures)
+
+
+def record_orchestrator_job(job_name: str, status: str, duration_s: float) -> None:
+    """Record an orchestrator job run.
+
+    Args:
+        job_name: Job configuration name.
+        status: Outcome (e.g. ``success``, ``failed``, ``timeout``).
+        duration_s: Job duration in seconds.
+    """
+    orchestrator_jobs_total.labels(job=job_name, status=status).inc()
+    orchestrator_job_duration.labels(job=job_name).observe(duration_s)
 
 
 def record_serving_request(
