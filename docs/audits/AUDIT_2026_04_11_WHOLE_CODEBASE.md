@@ -27,10 +27,10 @@
 | Rust crates | 2 (apex_mc, apex_risk) — compile clean, 2 tests total |
 | pylint rating | 9.96/10 |
 | TODOs/FIXMEs | 1 |
-| Total findings | **P0: 0, P1: 8, P2: 6, P3: 3** |
+| Total findings | **P0: 0, P1: 9, P2: 6, P3: 3** |
 | **Decision** | **CLEARED for Phase 3** |
 
-The APEX codebase is in **good overall health**. No blocking P0 issues were found. The architecture is clean: zero cross-service coupling, zero core→services imports, bandit-clean security, and mypy strict passing on all 319 files. The 8 P1 findings are primarily: (1) CI configuration drifting from documented standards, (2) `float()` usage where `Decimal` is mandated, (3) PROJECT_ROADMAP.md significantly out of date, and (4) known CVEs in dependencies. These can all be addressed in parallel with Phase 3 without risk. The codebase shows clear quality improvement from Phase 1 to Phase 2, with S01 demonstrating mature patterns (Strategy, Repository, Quality Pipeline) that are well-tested.
+The APEX codebase is in **good overall health**. No blocking P0 issues were found. The architecture is clean: zero cross-service coupling, zero core→services imports, bandit-clean security, and mypy strict passing on all 319 files. The 9 P1 findings are primarily: (1) CI configuration drifting from documented standards, (2) `float()` usage where `Decimal` is mandated, (3) broker API keys not using `SecretStr`, (4) PROJECT_ROADMAP.md significantly out of date, and (5) known CVEs in dependencies. These can all be addressed in parallel with Phase 3 without risk. The codebase shows clear quality improvement from Phase 1 to Phase 2, with S01 demonstrating mature patterns (Strategy, Repository, Quality Pipeline) that are well-tested.
 
 ---
 
@@ -301,6 +301,20 @@ Moderate mock usage across tests — no excessive mock leakage detected. The pro
 
 **No hardcoded API keys found** in production code. ✅
 
+### Broker Keys Not Using SecretStr
+
+**Finding F-2 (P1)**: Alpaca and Binance API keys in `core/config.py` use plain `str` instead of `SecretStr`:
+
+| Field | Line | Type | Should Be |
+|---|---|---|---|
+| `alpaca_api_key` | 41 | `str` | `SecretStr` |
+| `alpaca_api_secret` | 42 | `str` | `SecretStr` |
+| `binance_api_key` | 53 | `str` | `SecretStr` |
+| `binance_secret_key` | 54 | `str` | `SecretStr` |
+| `timescale_password` | 264 | `str` | `SecretStr` |
+
+Meanwhile, FRED/Massive/SimFin keys correctly use `SecretStr` (lines 66-87). This inconsistency means broker keys (the most sensitive credentials — real money access) could be accidentally logged by structlog. Issue #71.
+
 ### Missing HTTP Timeouts
 
 No missing timeout issues found on httpx/requests calls in production code. ✅
@@ -457,6 +471,7 @@ None. No blocking issues found.
 | P1-6 | 19 CVEs in 10 packages (urllib3, requests, tornado, pillow) | `requirements.txt` | S | #68 |
 | P1-7 | mypy `ignore_errors=true` for `core.models.*` | `pyproject.toml:83-92` | M | #69 |
 | P1-8 | Coverage omit too broad — S01 entirely excluded, true coverage ~40-50% | `pyproject.toml:112-147` | L | #70 |
+| P1-9 | Broker API keys (Alpaca, Binance) use `str` instead of `SecretStr` | `core/config.py:41-42,53-54` | S | #71 |
 
 ### P2 (cosmetic — address when convenient)
 
@@ -495,7 +510,7 @@ None. No blocking issues found.
 
 5. **Test infrastructure is mature.** 1,283 tests all passing, fakeredis for unit isolation, pytest-asyncio, Hypothesis property tests. The coverage number (83% measured / ~45% true) is the weakest point but does not block Phase 3.
 
-6. **P1 items are parallelizable.** All 8 P1 findings can be addressed in parallel with Phase 3 work via separate issues/PRs without blocking the feature validation harness.
+6. **P1 items are parallelizable.** All 9 P1 findings can be addressed in parallel with Phase 3 work via separate issues/PRs without blocking the feature validation harness.
 
 **Phase 3 can begin immediately.** The P1 items should be tracked as a separate "tech debt sprint" running alongside Phase 3 sub-phases.
 
