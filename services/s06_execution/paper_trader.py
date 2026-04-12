@@ -12,9 +12,14 @@ import time
 from decimal import Decimal
 from typing import Any
 
+from core.logger import get_logger
 from core.models.order import ApprovedOrder, ExecutedOrder
-from core.models.tick import NormalizedTick
+from core.models.tick import Market, NormalizedTick
+from core.state import StateStore
+from services.s06_execution.broker_base import Broker
 from services.s06_execution.optimal_execution import MarketImpactModel
+
+_logger = get_logger("s06_execution.paper_trader")
 
 _rng = secrets.SystemRandom()
 
@@ -28,17 +33,98 @@ _COMMISSION_RATE = Decimal("0.001")
 _LIQUIDITY_MULTIPLIER = 10
 
 
-class PaperTrader:
+_CRYPTO_SUFFIXES = ("USDT", "BUSD", "BTC", "ETH", "USDC")
+
+
+class PaperTrader(Broker):
     """Simulate order execution with realistic market microstructure effects.
 
     Slippage is modelled using the Bouchaud et al. (2018) square-root impact law
     for large orders, and the Kyle (1985) linear model for small orders.
     Latency is sampled uniformly from ``[5 ms, 50 ms]`` to mimic network delays.
+
+    Implements the :class:`~.broker_base.Broker` ABC so that
+    :class:`~.service.ExecutionService` can route orders uniformly.
     """
 
-    def __init__(self) -> None:
-        """Initialise with the market impact model."""
+    def __init__(self, state: StateStore | None = None) -> None:
+        """Initialise with the market impact model.
+
+        Args:
+            state: Optional :class:`~core.state.StateStore` for fetching
+                latest ticks in :meth:`place_order`. When ``None``,
+                :meth:`place_order` builds a synthetic tick from the order.
+        """
+        self._state = state
         self._impact_model = MarketImpactModel()
+
+    # ── Broker ABC interface ─────────────────────────────────────────────────
+
+    async def connect(self) -> None:
+        """No-op — paper trading has no external connection."""
+
+    async def disconnect(self) -> None:
+        """No-op — paper trading has no external connection."""
+
+    @property
+    def is_connected(self) -> bool:
+        """Always ``True`` for paper trading."""
+        return True
+
+    async def place_order(self, order: ApprovedOrder) -> ExecutedOrder | None:
+        """Execute a paper order, returning the simulated fill immediately.
+
+        Fetches the latest tick from Redis when *state* was provided at
+        construction; otherwise synthesises a minimal tick from the order.
+
+        Args:
+            order: Risk-approved order.
+
+        Returns:
+            Simulated :class:`~core.models.order.ExecutedOrder`.
+        """
+        tick = await self._get_or_build_tick(order)
+        return await self.execute(order, tick)
+
+    async def cancel_order(self, order_id: str) -> bool:
+        """No-op — paper fills are instantaneous.
+
+        Returns:
+            ``True`` unconditionally.
+        """
+        return True
+
+    # ── Tick helper ──────────────────────────────────────────────────────────
+
+    async def _get_or_build_tick(self, order: ApprovedOrder) -> NormalizedTick:
+        """Return the latest cached tick or synthesise a minimal one.
+
+        Args:
+            order: Approved order (used to derive entry price / volume).
+
+        Returns:
+            A :class:`~core.models.tick.NormalizedTick` suitable for execution.
+        """
+        symbol = order.symbol
+        if self._state is not None:
+            raw = await self._state.get(f"tick:{symbol}")
+            if raw is not None:
+                try:
+                    return NormalizedTick.model_validate(raw)
+                except Exception as exc:
+                    _logger.debug("tick_parse_failed", error=str(exc))
+
+        is_crypto = any(symbol.endswith(s) for s in _CRYPTO_SUFFIXES)
+        entry = order.candidate.entry
+        size = order.adjusted_size
+        return NormalizedTick(
+            symbol=symbol,
+            market=Market.CRYPTO if is_crypto else Market.EQUITY,
+            timestamp_ms=int(time.time() * 1000),
+            price=entry,
+            volume=size * Decimal("100"),
+            spread_bps=Decimal("5"),
+        )
 
     def compute_slippage(
         self,

@@ -14,8 +14,14 @@ from typing import Any
 
 import aiohttp
 
+from core.logger import get_logger
+from core.models.order import ApprovedOrder, ExecutedOrder
+from services.s06_execution.broker_base import Broker, BrokerConnectionError
 
-class BinanceBroker:
+logger = get_logger("s06_execution.broker_binance")
+
+
+class BinanceBroker(Broker):
     """Async HTTP client for the Binance spot trading API.
 
     Supports both mainnet and testnet environments.  The ``base_url``
@@ -45,6 +51,7 @@ class BinanceBroker:
         self._base_url = base_url.rstrip("/")
         self._testnet = testnet
         self._session: aiohttp.ClientSession | None = None
+        self._order_symbols: dict[str, str] = {}  # orderId → symbol for cancel
 
     # ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -78,9 +85,72 @@ class BinanceBroker:
             hashlib.sha256,
         ).hexdigest()
 
-    # ── Order operations ──────────────────────────────────────────────────────
+    # ── Broker ABC interface ────────────────────────────────────────────────
 
-    async def place_order(
+    @property
+    def is_connected(self) -> bool:
+        """Current connection state."""
+        return self._session is not None
+
+    async def place_order(self, order: ApprovedOrder) -> ExecutedOrder | None:
+        """Place a crypto order via Binance from an approved order.
+
+        Extracts symbol, quantity, side, and price from the
+        :class:`~core.models.order.ApprovedOrder` and submits to Binance.
+        Returns ``None`` because live fills are confirmed asynchronously.
+
+        Args:
+            order: Risk-approved order.
+
+        Returns:
+            ``None`` — fill confirmed asynchronously.
+
+        Raises:
+            BrokerConnectionError: If not connected.
+        """
+        if not self.is_connected:
+            raise BrokerConnectionError("BinanceBroker not connected. Call connect() first.")
+        candidate = order.candidate
+        side = "BUY" if candidate.direction.value == "long" else "SELL"
+        resp = await self._submit_raw_order(
+            symbol=candidate.symbol,
+            side=side,
+            order_type="LIMIT",
+            quantity=float(order.adjusted_size),
+            price=float(candidate.entry),
+        )
+        # Track symbol for cancel_order lookups.
+        resp_order_id = str(resp.get("orderId", ""))
+        if resp_order_id:
+            self._order_symbols[resp_order_id] = candidate.symbol
+        logger.info(
+            "Binance order placed",
+            order_id=candidate.order_id,
+            binance_id=resp.get("orderId"),
+        )
+        return None
+
+    async def cancel_order(self, order_id: str) -> bool:
+        """Cancel an open Binance order by ID.
+
+        Uses the internally tracked symbol mapping from :meth:`place_order`.
+
+        Args:
+            order_id: Binance-assigned numeric order ID as a string.
+
+        Returns:
+            ``True`` if cancel succeeded.
+        """
+        symbol = self._order_symbols.get(order_id, "")
+        if not symbol:
+            logger.warning("cancel_order: unknown symbol for order_id", order_id=order_id)
+            return False
+        await self._cancel_raw_order(symbol, order_id)
+        return True
+
+    # ── Venue-specific operations ────────────────────────────────────────────
+
+    async def _submit_raw_order(
         self,
         symbol: str,
         side: str,
@@ -89,7 +159,7 @@ class BinanceBroker:
         price: float | None = None,
         stop_price: float | None = None,
     ) -> dict[str, Any]:
-        """Submit a signed order to Binance.
+        """Submit a signed order to Binance with venue-specific parameters.
 
         Args:
             symbol:     Trading pair symbol (e.g. ``"BTCUSDT"``).
@@ -124,8 +194,8 @@ class BinanceBroker:
             result: dict[str, Any] = dict(await resp.json())
             return result
 
-    async def cancel_order(self, symbol: str, order_id: str) -> None:
-        """Cancel an open Binance order.
+    async def _cancel_raw_order(self, symbol: str, order_id: str) -> None:
+        """Cancel an open Binance order using venue-specific parameters.
 
         Args:
             symbol:   Trading pair symbol.

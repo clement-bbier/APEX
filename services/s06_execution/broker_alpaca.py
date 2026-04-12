@@ -16,11 +16,13 @@ from alpaca.trading.models import Order, Position, TradeAccount
 from alpaca.trading.requests import LimitOrderRequest, MarketOrderRequest
 
 from core.logger import get_logger
+from core.models.order import ApprovedOrder, ExecutedOrder
+from services.s06_execution.broker_base import Broker, BrokerConnectionError
 
 logger = get_logger("s06_execution.broker_alpaca")
 
 
-class AlpacaBroker:
+class AlpacaBroker(Broker):
     """Sync/async equity broker backed by the ``alpaca-py`` TradingClient.
 
     ``alpaca-py``'s :class:`~alpaca.trading.client.TradingClient` is
@@ -74,9 +76,65 @@ class AlpacaBroker:
         self._client = None
         logger.info("AlpacaBroker disconnected")
 
-    # ── Order operations ──────────────────────────────────────────────────────
+    # ── Broker ABC interface ────────────────────────────────────────────────
 
-    async def place_order(
+    @property
+    def is_connected(self) -> bool:
+        """Current connection state."""
+        return self._client is not None
+
+    async def place_order(self, order: ApprovedOrder) -> ExecutedOrder | None:
+        """Place an equity order via Alpaca from an approved order.
+
+        Extracts symbol, quantity, side, and price from the
+        :class:`~core.models.order.ApprovedOrder` and submits to Alpaca.
+        Returns ``None`` because live fills are confirmed asynchronously.
+
+        Args:
+            order: Risk-approved order.
+
+        Returns:
+            ``None`` — fill confirmed asynchronously via Alpaca webhooks.
+
+        Raises:
+            BrokerConnectionError: If not connected.
+        """
+        if not self.is_connected:
+            raise BrokerConnectionError("AlpacaBroker not connected. Call connect() first.")
+        candidate = order.candidate
+        side = "buy" if candidate.direction.value == "long" else "sell"
+        resp = await self._submit_raw_order(
+            symbol=candidate.symbol,
+            qty=float(order.adjusted_size),
+            side=side,
+            order_type="limit",
+            limit_price=float(candidate.entry),
+            stop_price=float(candidate.stop_loss),
+        )
+        logger.info(
+            "Alpaca order placed",
+            order_id=candidate.order_id,
+            alpaca_id=resp.get("id"),
+        )
+        return None
+
+    async def cancel_order(self, order_id: str) -> bool:
+        """Cancel an open order by its Alpaca order UUID.
+
+        Args:
+            order_id: Alpaca-assigned order UUID string.
+
+        Returns:
+            ``True`` if cancel succeeded.
+        """
+        client = self._ensure_client()
+        client.cancel_order_by_id(UUID(order_id))
+        logger.info("Order cancelled", order_id=order_id)
+        return True
+
+    # ── Venue-specific operations ────────────────────────────────────────────
+
+    async def _submit_raw_order(
         self,
         symbol: str,
         qty: float,
@@ -85,14 +143,13 @@ class AlpacaBroker:
         limit_price: float | None = None,
         stop_price: float | None = None,
     ) -> dict[str, Any]:
-        """Submit an order to Alpaca.
+        """Submit a raw order to Alpaca with venue-specific parameters.
 
         Args:
             symbol:      Ticker symbol (e.g. ``"AAPL"``).
             qty:         Number of shares (fractional supported by Alpaca).
             side:        ``"buy"`` or ``"sell"``.
-            order_type:  ``"market"`` or ``"limit"`` (stop orders use
-                         stop_limit via separate call if needed).
+            order_type:  ``"market"`` or ``"limit"``.
             limit_price: Required when *order_type* is ``"limit"``.
             stop_price:  Ignored for simple limit/market (use OCO for stops).
 
@@ -122,26 +179,16 @@ class AlpacaBroker:
             )
 
         raw = client.submit_order(order_data=req)
-        order: Order = raw if isinstance(raw, Order) else Order.model_validate(raw)
+        alpaca_order: Order = raw if isinstance(raw, Order) else Order.model_validate(raw)
         return {
-            "id": str(order.id),
-            "symbol": order.symbol,
-            "qty": str(order.qty),
-            "side": str(order.side),
-            "type": str(order.order_type),
-            "status": str(order.status),
-            "limit_price": str(order.limit_price) if order.limit_price else None,
+            "id": str(alpaca_order.id),
+            "symbol": alpaca_order.symbol,
+            "qty": str(alpaca_order.qty),
+            "side": str(alpaca_order.side),
+            "type": str(alpaca_order.order_type),
+            "status": str(alpaca_order.status),
+            "limit_price": (str(alpaca_order.limit_price) if alpaca_order.limit_price else None),
         }
-
-    async def cancel_order(self, order_id: str) -> None:
-        """Cancel an open order by its Alpaca order UUID.
-
-        Args:
-            order_id: Alpaca-assigned order UUID string.
-        """
-        client = self._ensure_client()
-        client.cancel_order_by_id(UUID(order_id))
-        logger.info("Order cancelled", order_id=order_id)
 
     # ── Account / position queries ────────────────────────────────────────────
 
