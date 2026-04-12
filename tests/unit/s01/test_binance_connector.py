@@ -24,6 +24,7 @@ from services.s01_data_ingestion.connectors.binance_historical import (
     _placeholder_asset,
 )
 from services.s01_data_ingestion.connectors.binance_live import BinanceLiveConnector
+from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parents[2] / "fixtures" / "binance_btcusdt_1m_2024-01-01.zip"
@@ -215,7 +216,7 @@ class TestBinanceHistoricalConnector:
     @pytest.mark.asyncio
     async def test_fetch_bars_streaming(self) -> None:
         """fetch_bars yields batches from mocked ZIP downloads."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         csv_text = _sample_kline_csv_row() + "\n"
         zip_bytes = _make_zip_bytes(csv_text)
 
@@ -406,7 +407,7 @@ class TestCopilotFixes:
     @pytest.mark.asyncio
     async def test_fetch_bars_404_uses_period_specific_fallback(self) -> None:
         """On 404, fallback should receive period bounds, not global range."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
 
         resp_404 = MagicMock(spec=httpx.Response)
         resp_404.status_code = 404

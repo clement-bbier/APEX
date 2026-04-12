@@ -200,7 +200,7 @@ async def get_system_status(state: StateStore) -> SystemStatus:
 async def get_positions(state: StateStore) -> list[PositionSummary]:
     """All open positions with unrealized PnL."""
     try:
-        r = state._ensure_connected()
+        r = state.client
         keys = await r.keys("positions:*")
     except Exception:
         return []
@@ -343,7 +343,7 @@ async def get_regime(state: StateStore) -> RegimeSummary:
 async def get_recent_signals(state: StateStore) -> list[SignalSummary]:
     """Latest signal for each tracked symbol."""
     try:
-        r = state._ensure_connected()
+        r = state.client
         keys = await r.keys("signal:*")
     except Exception:
         return []

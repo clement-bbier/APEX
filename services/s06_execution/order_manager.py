@@ -108,7 +108,7 @@ class OrderManager:
         Returns:
             List of timed-out order ID strings.
         """
-        r = self._state._ensure_connected()
+        r = self._state.client
         keys = await r.keys("order:*")
         timed_out: list[str] = []
         now = time.time()

@@ -71,7 +71,7 @@ class RiskManagerService(BaseService):
 
     async def on_start(self) -> None:
         """Initialize Redis-backed components after state is connected."""
-        redis = self.state._ensure_connected()
+        redis = self.state.client
         self._cb_guard = CBEventGuard(redis)
         self._circuit_breaker = CircuitBreaker(redis)
         self._meta_gate = MetaLabelGate(redis)

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from services.s03_regime_detector.regime_engine import RegimeEngine, RiskMode, VolRegime
+from core.models.regime import RiskMode, VolRegime
+from services.s03_regime_detector.regime_engine import RegimeEngine
 
 
 class TestRegimeEngine:
@@ -18,7 +19,7 @@ class TestRegimeEngine:
 
     def test_low_vol_increases_sizing(self) -> None:
         r = self.engine().compute(vix=12.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
-        assert r.vol_regime == VolRegime.LOW_VOL
+        assert r.vol_regime == VolRegime.LOW
         assert r.macro_mult > 1.0
 
     def test_inverted_yield_reduces_mult(self) -> None:
@@ -33,7 +34,7 @@ class TestRegimeEngine:
 
     def test_dxy_spike_is_risk_off(self) -> None:
         r = self.engine().compute(vix=18.0, dxy_1h_change_pct=0.8, yield_10y=4.5, yield_2y=4.3)
-        assert r.risk_mode == RiskMode.RISK_OFF
+        assert r.risk_mode == RiskMode.REDUCED
         assert r.macro_mult < 1.0
 
     def test_macro_mult_always_non_negative(self) -> None:
@@ -57,7 +58,7 @@ class TestRegimeEngine:
 
     def test_high_vol_reduces_sizing(self) -> None:
         r = self.engine().compute(vix=28.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
-        assert r.vol_regime == VolRegime.HIGH_VOL
+        assert r.vol_regime == VolRegime.HIGH
         assert r.macro_mult == pytest.approx(0.3)
 
     def test_multiple_risk_off_stack_multiplicatively(self) -> None:

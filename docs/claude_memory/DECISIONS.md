@@ -109,3 +109,82 @@ full_report().
 - Making the gate blocking while full_report() is buggy would break CI
 - Follow-up issue #102 created to track the fix
 - Thresholds should be raised in Phase 5 after feature validation confirms data quality
+
+---
+
+## D005 — S04 StrategySelector Registry Pattern (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 005 |
+| Decision | Replace if/elif chain with StrategyProfile dataclass + STRATEGY_REGISTRY dict |
+| Status | ACCEPTED |
+
+### Context
+
+S04 `StrategySelector.is_active()` and `get_size_multiplier()` used hardcoded if/elif
+chains — adding a new strategy required modifying two methods (OCP violation, issue #75).
+
+### Alternatives Considered
+
+1. **Protocol-based**: Define a Strategy Protocol with `is_active()` and `get_size_multiplier()` per strategy class. More Pythonic but overkill for 4 strategies with simple declarative rules.
+2. **Dataclass + Registry (chosen)**: `StrategyProfile` frozen dataclass with `active_vol_regimes`, `active_trend_regimes`, `use_or_logic`, `size_multiplier`. Adding a strategy = adding a dict entry.
+
+### Justification
+
+- All 4 existing strategies have pure declarative rules (regime set membership + optional OR logic)
+- Registry pattern is simpler, more testable, and fully preserves existing behavior
+- `use_or_logic` flag handles short_momentum's OR semantics (trend OR vol match)
+
+---
+
+## D006 — S01 Normalizer DI via Factory Callable (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 005 |
+| Decision | Connectors accept normalizer factory via constructor DI; ConnectorFactory injects |
+| Status | ACCEPTED |
+
+### Context
+
+S01 connectors imported concrete normalizer classes directly (layering violation,
+issue #77). Normalizers require `bar_size` at construction, but `bar_size` is a
+fetch-time parameter — so a factory callable is needed, not a pre-built instance.
+
+### Alternatives Considered
+
+1. **Raw data return (Option A)**: Connectors return raw API data, orchestrators normalize. Breaks the `DataConnector` ABC (`AsyncIterator[list[Bar]]`) and requires type-per-connector raw types.
+2. **Factory DI (chosen)**: Connectors accept `bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy]`. ConnectorFactory registration functions import and inject normalizers.
+
+### Justification
+
+- Preserves DataConnector ABC contract (zero interface change)
+- No change to job_runner at all
+- Connectors only import `NormalizerStrategy` base (abstraction, not concrete)
+- Factory pattern handles dynamic `bar_size` parameter naturally
+
+---
+
+## D007 — StateStore.client Property (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 005 |
+| Decision | Add `StateStore.client` property as public API; deprecate `_ensure_connected()` |
+| Status | ACCEPTED |
+
+### Context
+
+S05, S06, S10 all accessed `state._ensure_connected()` and `state._redis` directly
+(DIP violation, issue #76). StateStore already had `connect()` (async) but no public
+way to get the Redis client.
+
+### Justification
+
+- `.client` property is the natural public API complement to `connect()`
+- `_ensure_connected()` kept as deprecated delegate for backward compat
+- All 4 call sites (S05, S06, S10×2) migrated to `state.client`

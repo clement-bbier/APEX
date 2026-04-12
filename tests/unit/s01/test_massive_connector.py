@@ -137,7 +137,9 @@ class TestMassiveHistoricalConnector:
             import boto3
 
             boto3.client.return_value = MagicMock()  # type: ignore[attr-defined]
-            connector = MassiveHistoricalConnector(mock_settings)
+            connector = MassiveHistoricalConnector(
+                mock_settings, bar_normalizer_factory=MassiveBarNormalizer
+            )
         return connector
 
     def test_connector_name(self) -> None:

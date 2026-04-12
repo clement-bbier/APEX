@@ -15,7 +15,7 @@ import csv
 import gzip
 import io
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -26,7 +26,7 @@ from botocore.exceptions import ClientError
 from core.config import Settings
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
 from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
+from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
 
 logger = structlog.get_logger(__name__)
 
@@ -59,7 +59,13 @@ class MassiveHistoricalConnector(DataConnector):
     3. Rate limiting: ``asyncio.Semaphore(5)``
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        bar_normalizer_factory: (
+            Callable[[BarSize], NormalizerStrategy[list[str], Bar]] | None
+        ) = None,
+    ) -> None:
         import boto3
 
         self._s3_client: Any = boto3.client(
@@ -71,6 +77,7 @@ class MassiveHistoricalConnector(DataConnector):
         self._bucket = settings.massive_s3_bucket
         self._api_key = settings.massive_api_key.get_secret_value()
         self._semaphore = asyncio.Semaphore(5)
+        self._bar_normalizer_factory = bar_normalizer_factory
 
     @property
     def connector_name(self) -> str:
@@ -95,7 +102,10 @@ class MassiveHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`Bar` per batch.
         """
-        normalizer = MassiveBarNormalizer(bar_size)
+        if self._bar_normalizer_factory is None:
+            msg = "MassiveHistoricalConnector requires a bar_normalizer_factory"
+            raise RuntimeError(msg)
+        normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)
 
         current = start.replace(hour=0, minute=0, second=0, microsecond=0)

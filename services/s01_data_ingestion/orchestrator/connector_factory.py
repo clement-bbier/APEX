@@ -98,32 +98,45 @@ def _register_binance_historical(settings: Settings) -> DataConnector:
     from services.s01_data_ingestion.connectors.binance_historical import (
         BinanceHistoricalConnector,
     )
+    from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 
-    return BinanceHistoricalConnector()
+    return BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
 
 
 def _register_alpaca_historical(settings: Settings) -> DataConnector:
     from services.s01_data_ingestion.connectors.alpaca_historical import (
         AlpacaHistoricalConnector,
     )
+    from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
+    from services.s01_data_ingestion.normalizers.alpaca_trade import (
+        AlpacaTradeNormalizer,
+    )
 
-    return AlpacaHistoricalConnector(settings)
+    return AlpacaHistoricalConnector(
+        settings,
+        bar_normalizer_factory=AlpacaBarNormalizer,
+        trade_normalizer=AlpacaTradeNormalizer(),
+    )
 
 
 def _register_massive_historical(settings: Settings) -> DataConnector:
     from services.s01_data_ingestion.connectors.massive_historical import (
         MassiveHistoricalConnector,
     )
+    from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
 
-    return MassiveHistoricalConnector(settings)
+    return MassiveHistoricalConnector(settings, bar_normalizer_factory=MassiveBarNormalizer)
 
 
 def _register_yahoo_historical(settings: Settings) -> DataConnector:
     from services.s01_data_ingestion.connectors.yahoo_historical import (
         YahooHistoricalConnector,
     )
+    from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
 
-    return YahooHistoricalConnector()
+    return YahooHistoricalConnector(
+        bar_normalizer_factory=YahooBarNormalizer,  # type: ignore[arg-type]
+    )
 
 
 def _register_fred(settings: Settings) -> MacroConnector:

@@ -187,19 +187,15 @@ class TestRegimeEnginePhase2BtcFunding:
 
     def test_risk_on_in_calm_markets(self) -> None:
         engine = RegimeEngine()
-        from services.s03_regime_detector.regime_engine import RiskMode
-
         r = engine.compute(vix=12.0, dxy_1h_change_pct=0.1, yield_10y=4.5, yield_2y=4.3)
-        assert r.risk_mode == RiskMode.RISK_ON
+        assert r.risk_mode == RiskMode.NORMAL
 
     def test_vix_threshold_boundary(self) -> None:
         """VIX exactly at boundary values."""
         engine = RegimeEngine()
-        from services.s03_regime_detector.regime_engine import VolRegime
-
         r_crisis = engine.compute(vix=35.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
         r_high = engine.compute(vix=25.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
         r_normal = engine.compute(vix=15.0, dxy_1h_change_pct=0.0, yield_10y=4.5, yield_2y=4.3)
         assert r_crisis.vol_regime == VolRegime.CRISIS
-        assert r_high.vol_regime == VolRegime.HIGH_VOL
+        assert r_high.vol_regime == VolRegime.HIGH
         assert r_normal.vol_regime == VolRegime.NORMAL

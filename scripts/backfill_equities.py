@@ -32,7 +32,10 @@ from services.s01_data_ingestion.connectors.base import DataConnector
 from services.s01_data_ingestion.connectors.massive_historical import (
     MassiveHistoricalConnector,
 )
+from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
+from services.s01_data_ingestion.normalizers.alpaca_trade import AlpacaTradeNormalizer
 from services.s01_data_ingestion.normalizers.asset_resolver import AssetResolver
+from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
 from services.s01_data_ingestion.quality.checker import DataQualityChecker
 from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
 
@@ -53,9 +56,13 @@ def _create_connector(provider: str) -> DataConnector:
     """
     settings = get_settings()
     if provider == "alpaca":
-        return AlpacaHistoricalConnector(settings)
+        return AlpacaHistoricalConnector(
+            settings,
+            bar_normalizer_factory=AlpacaBarNormalizer,
+            trade_normalizer=AlpacaTradeNormalizer(),
+        )
     if provider == "massive":
-        return MassiveHistoricalConnector(settings)
+        return MassiveHistoricalConnector(settings, bar_normalizer_factory=MassiveBarNormalizer)
     msg = f"Unknown provider: {provider!r}. Use 'alpaca' or 'massive'."
     raise ValueError(msg)
 

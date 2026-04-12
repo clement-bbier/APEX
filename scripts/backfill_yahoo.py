@@ -31,6 +31,7 @@ from services.s01_data_ingestion.connectors.yahoo_historical import (
     YahooHistoricalConnector,
 )
 from services.s01_data_ingestion.normalizers.asset_resolver import AssetResolver
+from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
 from services.s01_data_ingestion.quality.checker import DataQualityChecker
 from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
 
@@ -88,7 +89,9 @@ async def run_backfill(
             {"asset_class": asset_class, "currency": currency},
         )
 
-        connector = YahooHistoricalConnector()
+        connector = YahooHistoricalConnector(
+            bar_normalizer_factory=YahooBarNormalizer,  # type: ignore[arg-type]
+        )
         run_id = await repo.start_ingestion_run(connector.connector_name, asset.asset_id)
 
         checker = DataQualityChecker()

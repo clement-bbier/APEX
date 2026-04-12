@@ -185,3 +185,67 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 - Phase 3.1 implementation
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
 - Continue raising coverage toward 85% with new test sprints
+
+---
+
+## Session 005 — 2026-04-12
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Mission | Sprint 4 — Architecture refactors S01-S05 (#74, #75, #76, #77) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1.5 hours |
+
+### Decisions Made
+
+1. S03 local VolRegime/RiskMode enums aligned on core.models.regime (CRISIS→CRISIS, HIGH_VOL→HIGH, LOW_VOL→LOW, RISK_ON→NORMAL, RISK_OFF→REDUCED). TRENDING removed (never assigned by compute())
+2. S04 StrategySelector: Registry pattern with StrategyProfile dataclass + STRATEGY_REGISTRY dict. Added `use_or_logic` flag for short_momentum's OR semantics (trend OR vol match)
+3. StateStore: Added `.client` property (public API). Kept `_ensure_connected()` as deprecated delegate to `client` for backward compat
+4. S01 layering: Connectors accept normalizer factory via DI (`bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy]`). ConnectorFactory injects normalizers at registration time. Factory pattern needed because normalizers take `bar_size` at construction
+
+### Files Modified
+
+**#74 — S03 dead code + enum alignment:**
+
+- `services/s03_regime_detector/service.py` — removed `_update_regime()` (50 LOC)
+- `services/s03_regime_detector/regime_engine.py` — deleted local VolRegime/RiskMode, aligned Phase-2 API on core enums
+- `tests/unit/s03/test_regime_engine.py` — updated assertions for core enum values
+- `tests/unit/s03/test_regime_engine_legacy.py` — updated Phase-2 boundary assertions
+
+**#75 — S04 StrategySelector registry:**
+
+- `services/s04_fusion_engine/strategy.py` — StrategyProfile dataclass + STRATEGY_REGISTRY, registry-based lookup
+
+**#76 — StateStore public API:**
+
+- `core/state.py` — added `client` property, deprecated `_ensure_connected()`
+- `services/s05_risk_manager/service.py` — `state.client` instead of `state._ensure_connected()`
+- `services/s06_execution/order_manager.py` — same migration
+- `services/s10_monitor/command_api.py` — same migration (2 occurrences)
+
+**#77 — S01 layering:**
+
+- `services/s01_data_ingestion/connectors/alpaca_historical.py` — DI normalizer factory
+- `services/s01_data_ingestion/connectors/binance_historical.py` — DI normalizer factory
+- `services/s01_data_ingestion/connectors/massive_historical.py` — DI normalizer factory
+- `services/s01_data_ingestion/connectors/yahoo_historical.py` — DI normalizer factory
+- `services/s01_data_ingestion/orchestrator/connector_factory.py` — injects normalizers
+- `scripts/backfill_binance.py` — passes normalizer factory
+- `scripts/backfill_equities.py` — passes normalizer factory
+- `scripts/backfill_yahoo.py` — passes normalizer factory
+- 4 test files updated for new constructor signatures
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: 317 files
+- mypy --strict: 319 files, 0 errors
+- pytest: 1228 unit tests passed, coverage 79.47%
+- Zero behavior regression
+
+### Next Steps
+
+- Phase 3.1 implementation
+- Continue P1 audit issues (Sprint 5+)
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate

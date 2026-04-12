@@ -29,6 +29,7 @@ from services.s01_data_ingestion.connectors.binance_historical import (
     BinanceHistoricalConnector,
 )
 from services.s01_data_ingestion.normalizers.asset_resolver import AssetResolver
+from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 from services.s01_data_ingestion.quality.checker import DataQualityChecker
 from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
 
@@ -63,7 +64,7 @@ async def run_backfill(
         )
         run_id = await repo.start_ingestion_run("binance_historical", asset.asset_id)
 
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         checker = DataQualityChecker()
         quality_logger = QualityDbLogger(repo)
 

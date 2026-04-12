@@ -15,7 +15,7 @@ import csv
 import io
 import uuid
 import zipfile
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -25,7 +25,7 @@ import structlog
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
 from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
+from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
 
 logger = structlog.get_logger(__name__)
 
@@ -82,8 +82,15 @@ class BinanceHistoricalConnector(DataConnector):
     Rate limiting: ``asyncio.Semaphore(10)`` + 0.1s sleep between requests.
     """
 
-    def __init__(self, concurrency: int = 10) -> None:
+    def __init__(
+        self,
+        concurrency: int = 10,
+        bar_normalizer_factory: (
+            Callable[[BarSize], NormalizerStrategy[list[Any], Bar]] | None
+        ) = None,
+    ) -> None:
         self._semaphore = asyncio.Semaphore(concurrency)
+        self._bar_normalizer_factory = bar_normalizer_factory
 
     @property
     def connector_name(self) -> str:
@@ -110,8 +117,11 @@ class BinanceHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`Bar` per batch.
         """
+        if self._bar_normalizer_factory is None:
+            msg = "BinanceHistoricalConnector requires a bar_normalizer_factory"
+            raise RuntimeError(msg)
         interval = _bar_size_to_binance_interval(bar_size)
-        normalizer = BinanceBarNormalizer(bar_size)
+        normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)
         use_monthly = (end - start).days > 30
 
