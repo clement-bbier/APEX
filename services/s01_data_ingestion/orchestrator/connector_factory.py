@@ -134,9 +134,7 @@ def _register_yahoo_historical(settings: Settings) -> DataConnector:
     )
     from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
 
-    return YahooHistoricalConnector(
-        bar_normalizer_factory=YahooBarNormalizer,  # type: ignore[arg-type]
-    )
+    return YahooHistoricalConnector(bar_normalizer_factory=YahooBarNormalizer)
 
 
 def _register_fred(settings: Settings) -> MacroConnector:

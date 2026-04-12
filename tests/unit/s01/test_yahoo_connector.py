@@ -69,7 +69,7 @@ class TestYahooHistoricalConnector:
     """Tests for YahooHistoricalConnector."""
 
     def test_connector_name(self) -> None:
-        connector = YahooHistoricalConnector()
+        connector = YahooHistoricalConnector(bar_normalizer_factory=YahooBarNormalizer)
         assert connector.connector_name == "yahoo_historical"
 
     def test_bar_size_to_yahoo_interval_daily(self) -> None:
@@ -175,7 +175,7 @@ class TestYahooHistoricalConnector:
     @pytest.mark.asyncio
     async def test_fetch_ticks_not_implemented(self) -> None:
         """fetch_ticks should raise NotImplementedError."""
-        connector = YahooHistoricalConnector()
+        connector = YahooHistoricalConnector(bar_normalizer_factory=YahooBarNormalizer)
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 4, 1, tzinfo=UTC)
         with pytest.raises(NotImplementedError, match="tick data"):

@@ -65,7 +65,7 @@ class TestBinanceHistoricalConnector:
     """Tests for BinanceHistoricalConnector."""
 
     def test_connector_name(self) -> None:
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         assert connector.connector_name == "binance_historical"
 
     def test_bar_size_to_binance_interval(self) -> None:
@@ -166,7 +166,7 @@ class TestBinanceHistoricalConnector:
     @pytest.mark.asyncio
     async def test_download_zip_csv_404_returns_none(self) -> None:
         """On 404, _download_zip_csv returns None (fallback trigger)."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         mock_response = MagicMock(spec=httpx.Response)
         mock_response.status_code = 404
         mock_client = AsyncMock(spec=httpx.AsyncClient)
@@ -177,7 +177,7 @@ class TestBinanceHistoricalConnector:
     @pytest.mark.asyncio
     async def test_download_zip_csv_success(self) -> None:
         """Successful ZIP download and CSV extraction."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         csv_text = _sample_kline_csv_row() + "\n"
         zip_bytes = _make_zip_bytes(csv_text)
         mock_response = MagicMock(spec=httpx.Response)
@@ -193,7 +193,7 @@ class TestBinanceHistoricalConnector:
     @pytest.mark.asyncio
     async def test_download_zip_csv_retry_on_429(self) -> None:
         """On 429, retries with backoff then succeeds."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         csv_text = _sample_kline_csv_row() + "\n"
         zip_bytes = _make_zip_bytes(csv_text)
 
@@ -360,7 +360,7 @@ class TestCopilotFixes:
     @pytest.mark.asyncio
     async def test_download_zip_csv_max_retries_raises(self) -> None:
         """After exhausting retries on 429, should raise BinanceFetchError."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         resp_429 = MagicMock(spec=httpx.Response)
         resp_429.status_code = 429
 
@@ -374,7 +374,7 @@ class TestCopilotFixes:
     @pytest.mark.asyncio
     async def test_fallback_rest_klines_paginates(self) -> None:
         """REST fallback should paginate: 1000 + 440 = 1440 total rows."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
 
         # First page: 1000 klines, second page: 440 klines, third page: empty
         page1 = [[str(1704067200000 + i * 60000)] + ["1"] * 11 for i in range(1000)]
@@ -444,7 +444,7 @@ class TestCopilotFixes:
     @pytest.mark.asyncio
     async def test_fetch_ticks_rest_fallback(self) -> None:
         """On 404 for aggTrades ZIP, REST fallback should be called."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
 
         resp_404 = MagicMock(spec=httpx.Response)
         resp_404.status_code = 404

@@ -90,7 +90,7 @@ async def run_backfill(
         )
 
         connector = YahooHistoricalConnector(
-            bar_normalizer_factory=YahooBarNormalizer,  # type: ignore[arg-type]
+            bar_normalizer_factory=YahooBarNormalizer,
         )
         run_id = await repo.start_ingestion_run(connector.connector_name, asset.asset_id)
 

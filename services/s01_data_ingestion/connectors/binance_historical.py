@@ -84,10 +84,8 @@ class BinanceHistoricalConnector(DataConnector):
 
     def __init__(
         self,
+        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[list[Any], Bar]],
         concurrency: int = 10,
-        bar_normalizer_factory: (
-            Callable[[BarSize], NormalizerStrategy[list[Any], Bar]] | None
-        ) = None,
     ) -> None:
         self._semaphore = asyncio.Semaphore(concurrency)
         self._bar_normalizer_factory = bar_normalizer_factory
@@ -117,9 +115,6 @@ class BinanceHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`Bar` per batch.
         """
-        if self._bar_normalizer_factory is None:
-            msg = "BinanceHistoricalConnector requires a bar_normalizer_factory"
-            raise RuntimeError(msg)
         interval = _bar_size_to_binance_interval(bar_size)
         normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)

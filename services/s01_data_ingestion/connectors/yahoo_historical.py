@@ -16,6 +16,7 @@ import asyncio
 import uuid
 from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import structlog
@@ -24,6 +25,9 @@ import yfinance as yf
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
 from services.s01_data_ingestion.connectors.base import DataConnector
 from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+
+if TYPE_CHECKING:
+    from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarPayload
 
 logger = structlog.get_logger(__name__)
 
@@ -79,8 +83,8 @@ class YahooHistoricalConnector(DataConnector):
 
     def __init__(
         self,
+        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[YahooBarPayload, Bar]],
         concurrency: int = 5,
-        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[object, Bar]] | None = None,
     ) -> None:
         self._semaphore = asyncio.Semaphore(concurrency)
         self._bar_normalizer_factory = bar_normalizer_factory
@@ -108,9 +112,6 @@ class YahooHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`Bar` per batch.
         """
-        if self._bar_normalizer_factory is None:
-            msg = "YahooHistoricalConnector requires a bar_normalizer_factory"
-            raise RuntimeError(msg)
         interval = _bar_size_to_yahoo_interval(bar_size)
         normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)

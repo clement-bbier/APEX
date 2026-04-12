@@ -39,9 +39,17 @@ async def test_alpaca_fetch_aapl_bars() -> None:
     from services.s01_data_ingestion.connectors.alpaca_historical import (
         AlpacaHistoricalConnector,
     )
+    from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
+    from services.s01_data_ingestion.normalizers.alpaca_trade import (
+        AlpacaTradeNormalizer,
+    )
 
     settings = Settings()
-    connector = AlpacaHistoricalConnector(settings)
+    connector = AlpacaHistoricalConnector(
+        settings,
+        bar_normalizer_factory=AlpacaBarNormalizer,
+        trade_normalizer=AlpacaTradeNormalizer(),
+    )
 
     start = datetime(2024, 1, 2, tzinfo=UTC)
     end = datetime(2024, 1, 3, tzinfo=UTC)

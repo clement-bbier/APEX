@@ -62,9 +62,7 @@ class MassiveHistoricalConnector(DataConnector):
     def __init__(
         self,
         settings: Settings,
-        bar_normalizer_factory: (
-            Callable[[BarSize], NormalizerStrategy[list[str], Bar]] | None
-        ) = None,
+        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[list[str], Bar]],
     ) -> None:
         import boto3
 
@@ -102,9 +100,6 @@ class MassiveHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`Bar` per batch.
         """
-        if self._bar_normalizer_factory is None:
-            msg = "MassiveHistoricalConnector requires a bar_normalizer_factory"
-            raise RuntimeError(msg)
         normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)
 

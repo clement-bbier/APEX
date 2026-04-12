@@ -70,8 +70,8 @@ class AlpacaHistoricalConnector(DataConnector):
     def __init__(
         self,
         settings: Settings,
-        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[object, Bar]] | None = None,
-        trade_normalizer: NormalizerStrategy[object, DbTick] | None = None,
+        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[object, Bar]],
+        trade_normalizer: NormalizerStrategy[object, DbTick],
     ) -> None:
         self._client = StockHistoricalDataClient(
             api_key=settings.alpaca_api_key.get_secret_value(),
@@ -104,9 +104,6 @@ class AlpacaHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`Bar` per batch.
         """
-        if self._bar_normalizer_factory is None:
-            msg = "AlpacaHistoricalConnector requires a bar_normalizer_factory"
-            raise RuntimeError(msg)
         timeframe = _bar_size_to_timeframe(bar_size)
         normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)
@@ -176,9 +173,6 @@ class AlpacaHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`DbTick` per batch.
         """
-        if self._trade_normalizer is None:
-            msg = "AlpacaHistoricalConnector requires a trade_normalizer"
-            raise RuntimeError(msg)
         normalizer = self._trade_normalizer
         placeholder = _placeholder_asset(symbol)
         page_token: str | None = None
