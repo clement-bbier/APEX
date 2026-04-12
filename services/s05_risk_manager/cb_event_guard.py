@@ -121,14 +121,10 @@ class CBEventGuard:
         return CB_SCALP_SIZE_MULTIPLIER
 
     def is_blocked(self) -> bool:
-        """Synchronous helper for legacy v1 integration tests.
+        """Synchronous helper returning cached blocked-state from last async refresh.
 
-        Returns the cached blocked-state computed by the last async refresh.
         Defaults to False when no refresh has occurred (safe-by-default for
         a guard: an unknown state must NOT block trading).
-
-        TODO(APEX-CB-API-V2): remove once tests/integration/test_cb_event_protocol.py
-        is migrated to the async API.
         """
         return bool(getattr(self, "_legacy_blocked", False))
 
