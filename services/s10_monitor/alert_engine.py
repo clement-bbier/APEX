@@ -59,7 +59,10 @@ class AlertEngine:
         """Synchronous SMTP send (runs in executor)."""
         with smtplib.SMTP(self._settings.alert_smtp_host, self._settings.alert_smtp_port) as server:
             server.starttls()
-            server.login(self._settings.alert_smtp_user, self._settings.alert_smtp_password)
+            server.login(
+                self._settings.alert_smtp_user,
+                self._settings.alert_smtp_password.get_secret_value(),
+            )
             server.send_message(msg)
 
     async def send_sms(self, message: str) -> None:
@@ -70,9 +73,7 @@ class AlertEngine:
         """
         if not self._settings.twilio_sid or not self._settings.twilio_token:
             return
-        url = (
-            f"https://api.twilio.com/2010-04-01/Accounts/{self._settings.twilio_sid}/Messages.json"
-        )
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{self._settings.twilio_sid.get_secret_value()}/Messages.json"
         data = {
             "To": self._settings.alert_phone_number,
             "From": self._settings.twilio_from_number,
@@ -83,7 +84,10 @@ class AlertEngine:
                 async with session.post(
                     url,
                     data=data,
-                    auth=aiohttp.BasicAuth(self._settings.twilio_sid, self._settings.twilio_token),
+                    auth=aiohttp.BasicAuth(
+                        self._settings.twilio_sid.get_secret_value(),
+                        self._settings.twilio_token.get_secret_value(),
+                    ),
                 ) as resp:
                     if resp.status not in (200, 201):
                         logger.warning("SMS send failed", status=resp.status)

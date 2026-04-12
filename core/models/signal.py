@@ -194,10 +194,10 @@ class Signal(BaseModel):
         return self
 
     @property
-    def risk_reward(self) -> float | None:
+    def risk_reward(self) -> Decimal | None:
         """Compute risk/reward ratio using scalp target."""
         risk = abs(self.entry - self.stop_loss)
         reward = abs(self.take_profit[0] - self.entry)
         if risk == 0:
             return None
-        return float(reward / risk)
+        return reward / risk

@@ -38,8 +38,8 @@ class Settings(BaseSettings):
     trading_mode: TradingMode = Field(default=TradingMode.PAPER, description="paper or live")
 
     # ── Alpaca ────────────────────────────────────────────────────────────────
-    alpaca_api_key: str = Field(default="", description="Alpaca API key")
-    alpaca_api_secret: str = Field(default="", description="Alpaca API secret")
+    alpaca_api_key: SecretStr = Field(default=SecretStr(""), description="Alpaca API key")
+    alpaca_api_secret: SecretStr = Field(default=SecretStr(""), description="Alpaca API secret")
     alpaca_base_url: str = Field(
         default="https://paper-api.alpaca.markets",
         description="Alpaca REST base URL",
@@ -50,8 +50,8 @@ class Settings(BaseSettings):
     )
 
     # ── Binance ───────────────────────────────────────────────────────────────
-    binance_api_key: str = Field(default="", description="Binance API key")
-    binance_secret_key: str = Field(default="", description="Binance secret key")
+    binance_api_key: SecretStr = Field(default=SecretStr(""), description="Binance API key")
+    binance_secret_key: SecretStr = Field(default=SecretStr(""), description="Binance secret key")
     binance_testnet: bool = Field(default=True, description="Use Binance testnet")
     binance_rest_url: str = Field(
         default="https://testnet.binance.vision",
@@ -247,12 +247,12 @@ class Settings(BaseSettings):
         default="",
         validation_alias=AliasChoices("alert_smtp_user", "smtp_user"),
     )
-    alert_smtp_password: str = Field(
-        default="",
+    alert_smtp_password: SecretStr = Field(
+        default=SecretStr(""),
         validation_alias=AliasChoices("alert_smtp_password", "smtp_password"),
     )
-    twilio_sid: str | None = Field(default=None, description="Twilio account SID")
-    twilio_token: str | None = Field(default=None, description="Twilio auth token")
+    twilio_sid: SecretStr | None = Field(default=None, description="Twilio account SID")
+    twilio_token: SecretStr | None = Field(default=None, description="Twilio auth token")
     twilio_from_number: str = Field(default="", description="Twilio sender phone number")
     alert_phone_number: str = Field(default="", description="SMS recipient phone number")
 
@@ -261,7 +261,9 @@ class Settings(BaseSettings):
     timescale_port: int = Field(default=5432, description="TimescaleDB port")
     timescale_db: str = Field(default="apex", description="TimescaleDB database name")
     timescale_user: str = Field(default="apex", description="TimescaleDB user")
-    timescale_password: str = Field(default="apex_secret", description="TimescaleDB password")
+    timescale_password: SecretStr = Field(
+        default=SecretStr(""), description="TimescaleDB password (must be set via env)"
+    )
     timescale_pool_min: int = Field(default=2, description="Min asyncpg pool size")
     timescale_pool_max: int = Field(default=10, description="Max asyncpg pool size")
 
@@ -269,13 +271,13 @@ class Settings(BaseSettings):
     def timescale_dsn(self) -> str:
         """Build PostgreSQL DSN from individual components."""
         return (
-            f"postgresql://{self.timescale_user}:{self.timescale_password}"
+            f"postgresql://{self.timescale_user}:{self.timescale_password.get_secret_value()}"
             f"@{self.timescale_host}:{self.timescale_port}/{self.timescale_db}"
         )
 
     # ── Database (optional persistence layer) ─────────────────────────────────
-    db_password: str = Field(
-        default="",
+    db_password: SecretStr = Field(
+        default=SecretStr(""),
         description="Optional database password (consumed by docker-compose / scripts)",
     )
 

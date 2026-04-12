@@ -65,8 +65,8 @@ class DataIngestionService(BaseService):
         self._alpaca_feed = AlpacaFeed(
             symbols=_DEFAULT_EQUITY_SYMBOLS,
             on_tick=self._on_alpaca_tick,
-            api_key=settings.alpaca_api_key,
-            secret_key=settings.alpaca_api_secret,
+            api_key=settings.alpaca_api_key.get_secret_value(),
+            secret_key=settings.alpaca_api_secret.get_secret_value(),
             url=settings.alpaca_data_url,
         )
 

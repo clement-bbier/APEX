@@ -18,13 +18,14 @@ class TestAlpacaSettings:
         mp.setenv("ALPACA_BASE_URL", "https://paper-api.alpaca.markets")
         mp.setenv("ALPACA_DATA_URL", "wss://stream.data.alpaca.markets/v2/iex")
         s = Settings(_env_file=None)  # type: ignore[call-arg]
-        assert s.alpaca_api_key == "PK_TEST_123"
-        assert s.alpaca_api_secret == "SK_TEST_456"
+        assert isinstance(s.alpaca_api_key, SecretStr)
+        assert s.alpaca_api_key.get_secret_value() == "PK_TEST_123"
+        assert s.alpaca_api_secret.get_secret_value() == "SK_TEST_456"
         assert "paper-api" in s.alpaca_base_url
 
     def test_alpaca_defaults(self) -> None:
         s = Settings(_env_file=None)  # type: ignore[call-arg]
-        assert s.alpaca_api_key == ""
+        assert s.alpaca_api_key.get_secret_value() == ""
         assert "paper-api" in s.alpaca_base_url
 
 

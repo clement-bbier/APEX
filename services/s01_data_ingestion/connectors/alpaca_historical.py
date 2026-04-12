@@ -70,8 +70,8 @@ class AlpacaHistoricalConnector(DataConnector):
 
     def __init__(self, settings: Settings) -> None:
         self._client = StockHistoricalDataClient(
-            api_key=settings.alpaca_api_key,
-            secret_key=settings.alpaca_api_secret,
+            api_key=settings.alpaca_api_key.get_secret_value(),
+            secret_key=settings.alpaca_api_secret.get_secret_value(),
         )
         self._semaphore = asyncio.Semaphore(10)
 
