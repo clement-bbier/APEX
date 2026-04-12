@@ -120,14 +120,6 @@ class CBEventGuard:
         """
         return CB_SCALP_SIZE_MULTIPLIER
 
-    def is_blocked(self) -> bool:
-        """Synchronous helper returning cached blocked-state from last async refresh.
-
-        Defaults to False when no refresh has occurred (safe-by-default for
-        a guard: an unknown state must NOT block trading).
-        """
-        return bool(getattr(self, "_legacy_blocked", False))
-
     async def _load_events(self, now: datetime) -> list[datetime]:
         """Load CB events from Redis and filter to next 24 hours.
 

@@ -358,7 +358,7 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 ### Decisions Made
 
-1. CBEventGuard.is_blocked() sync method retained (used elsewhere) but TODO removed
+1. CBEventGuard.is_blocked() sync method removed (dead code — zero internal call sites confirmed via grep)
 2. Integration tests migrated from mocked is_blocked() to real async check() with FakeRedis
 3. Added test_guard_post_event_scalp_window to cover the scalp window path (was untested)
 
