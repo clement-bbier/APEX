@@ -15,6 +15,7 @@ from core.models.data import Bar, BarSize
 from services.s01_data_ingestion.connectors.yahoo_historical import (
     YahooHistoricalConnector,
 )
+from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
 
 _HAS_NETWORK = os.environ.get("APEX_NETWORK_TESTS", "0") == "1"
 
@@ -30,7 +31,7 @@ class TestYahooBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_one_month_spx_daily(self) -> None:
         """Download ~1 month of ^GSPC daily bars from Yahoo Finance."""
-        connector = YahooHistoricalConnector()
+        connector = YahooHistoricalConnector(bar_normalizer_factory=YahooBarNormalizer)
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 2, 1, tzinfo=UTC)
 
@@ -47,7 +48,7 @@ class TestYahooBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_bars_valid_ohlcv(self) -> None:
         """Verify OHLCV data integrity: high >= low, volume >= 0."""
-        connector = YahooHistoricalConnector()
+        connector = YahooHistoricalConnector(bar_normalizer_factory=YahooBarNormalizer)
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 2, 1, tzinfo=UTC)
 

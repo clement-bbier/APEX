@@ -173,7 +173,11 @@ class TestAlpacaHistoricalConnector:
             from core.config import Settings
 
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
-            connector = AlpacaHistoricalConnector(settings)
+            connector = AlpacaHistoricalConnector(
+                settings,
+                bar_normalizer_factory=AlpacaBarNormalizer,
+                trade_normalizer=AlpacaTradeNormalizer(),
+            )
             assert connector.connector_name == "alpaca_historical"
 
     def test_placeholder_asset(self) -> None:
@@ -214,7 +218,11 @@ class TestAlpacaHistoricalConnector:
             from core.config import Settings
 
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
-            connector = AlpacaHistoricalConnector(settings)
+            connector = AlpacaHistoricalConnector(
+                settings,
+                bar_normalizer_factory=AlpacaBarNormalizer,
+                trade_normalizer=AlpacaTradeNormalizer(),
+            )
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)
@@ -241,7 +249,11 @@ class TestAlpacaHistoricalConnector:
             from core.config import Settings
 
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
-            connector = AlpacaHistoricalConnector(settings)
+            connector = AlpacaHistoricalConnector(
+                settings,
+                bar_normalizer_factory=AlpacaBarNormalizer,
+                trade_normalizer=AlpacaTradeNormalizer(),
+            )
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)
@@ -263,7 +275,11 @@ class TestAlpacaHistoricalConnector:
             from core.config import Settings
 
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
-            connector = AlpacaHistoricalConnector(settings)
+            connector = AlpacaHistoricalConnector(
+                settings,
+                bar_normalizer_factory=AlpacaBarNormalizer,
+                trade_normalizer=AlpacaTradeNormalizer(),
+            )
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)
@@ -288,7 +304,11 @@ class TestAlpacaHistoricalConnector:
             from core.config import Settings
 
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
-            connector = AlpacaHistoricalConnector(settings)
+            connector = AlpacaHistoricalConnector(
+                settings,
+                bar_normalizer_factory=AlpacaBarNormalizer,
+                trade_normalizer=AlpacaTradeNormalizer(),
+            )
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)
@@ -322,7 +342,11 @@ class TestAlpacaHistoricalConnector:
             from core.config import Settings
 
             settings = Settings(_env_file=None)  # type: ignore[call-arg]
-            connector = AlpacaHistoricalConnector(settings)
+            connector = AlpacaHistoricalConnector(
+                settings,
+                bar_normalizer_factory=AlpacaBarNormalizer,
+                trade_normalizer=AlpacaTradeNormalizer(),
+            )
 
         start = datetime(2024, 1, 2, tzinfo=UTC)
         end = datetime(2024, 1, 3, tzinfo=UTC)

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 
 import structlog
@@ -23,8 +23,7 @@ from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
 from core.config import Settings
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
 from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
-from services.s01_data_ingestion.normalizers.alpaca_trade import AlpacaTradeNormalizer
+from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
 
 logger = structlog.get_logger(__name__)
 
@@ -68,12 +67,19 @@ class AlpacaHistoricalConnector(DataConnector):
     Rate limiting: ``asyncio.Semaphore(10)`` for concurrent requests.
     """
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[object, Bar]],
+        trade_normalizer: NormalizerStrategy[object, DbTick],
+    ) -> None:
         self._client = StockHistoricalDataClient(
             api_key=settings.alpaca_api_key.get_secret_value(),
             secret_key=settings.alpaca_api_secret.get_secret_value(),
         )
         self._semaphore = asyncio.Semaphore(10)
+        self._bar_normalizer_factory = bar_normalizer_factory
+        self._trade_normalizer = trade_normalizer
 
     @property
     def connector_name(self) -> str:
@@ -99,7 +105,7 @@ class AlpacaHistoricalConnector(DataConnector):
             Lists of up to 1000 :class:`Bar` per batch.
         """
         timeframe = _bar_size_to_timeframe(bar_size)
-        normalizer = AlpacaBarNormalizer(bar_size)
+        normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)
         page_token: str | None = None
 
@@ -167,7 +173,7 @@ class AlpacaHistoricalConnector(DataConnector):
         Yields:
             Lists of up to 1000 :class:`DbTick` per batch.
         """
-        normalizer = AlpacaTradeNormalizer()
+        normalizer = self._trade_normalizer
         placeholder = _placeholder_asset(symbol)
         page_token: str | None = None
 

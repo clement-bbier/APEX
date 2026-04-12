@@ -15,6 +15,7 @@ from core.models.data import Bar, BarSize
 from services.s01_data_ingestion.connectors.binance_historical import (
     BinanceHistoricalConnector,
 )
+from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 
 _HAS_NETWORK = os.environ.get("APEX_NETWORK_TESTS", "0") == "1"
 _HAS_TIMESCALE = bool(os.environ.get("TIMESCALE_HOST"))
@@ -31,7 +32,7 @@ class TestBinanceBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_one_day_klines(self) -> None:
         """Download one day of 1m klines from Binance public archive."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 1, 2, tzinfo=UTC)
 
@@ -47,7 +48,7 @@ class TestBinanceBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_bars_returns_valid_ohlcv(self) -> None:
         """Verify OHLCV data integrity: high >= low, volume >= 0."""
-        connector = BinanceHistoricalConnector()
+        connector = BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 1, 2, tzinfo=UTC)
 

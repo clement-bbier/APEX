@@ -71,8 +71,9 @@ class StateStore:
             self._redis = None
             logger.info("Redis disconnected", service=self._service_id)
 
-    def _ensure_connected(self) -> Any:  # noqa: ANN401
-        """Return the Redis client or raise if not connected.
+    @property
+    def client(self) -> Any:  # noqa: ANN401
+        """Return the underlying Redis client.
 
         Returns:
             Active Redis client.
@@ -85,6 +86,20 @@ class StateStore:
                 f"[{self._service_id}] StateStore not connected. Call connect() first."
             )
         return self._redis
+
+    def _ensure_connected(self) -> Any:  # noqa: ANN401
+        """Return the Redis client or raise if not connected.
+
+        .. deprecated::
+            Use :attr:`client` property instead.
+
+        Returns:
+            Active Redis client.
+
+        Raises:
+            RuntimeError: If connect() has not been called.
+        """
+        return self.client
 
     # ── Key/Value ────────────────────────────────────────────────────────────
 

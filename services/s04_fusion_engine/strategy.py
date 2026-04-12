@@ -2,32 +2,95 @@
 
 Maps strategies to allowable regime conditions and returns per-strategy
 sizing multipliers for use by the Fusion Engine service.
+
+Uses a declarative registry (StrategyProfile dataclass) so that adding
+a new strategy requires only a registry entry — no code change.
+
+Design pattern: Strategy + Registry (Open/Closed Principle).
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
+
 from core.models.regime import Regime, RiskMode, TrendRegime, VolRegime
+
+
+@dataclass(frozen=True)
+class StrategyProfile:
+    """Declarative strategy affinity — which regimes activate it.
+
+    Attributes:
+        name: Unique strategy identifier.
+        active_vol_regimes: Vol regimes where this strategy may run.
+        active_trend_regimes: Trend regimes where this strategy may run.
+            If empty, trend is not constrained.
+        use_or_logic: If True, match trend OR vol (not both).
+            Default is AND (both must match).
+        size_multiplier: Fixed sizing multiplier for this strategy.
+    """
+
+    name: str
+    active_vol_regimes: frozenset[VolRegime] = field(default_factory=frozenset)
+    active_trend_regimes: frozenset[TrendRegime] = field(default_factory=frozenset)
+    use_or_logic: bool = False
+    size_multiplier: float = 1.0
+
+    def is_compatible(self, trend: TrendRegime, vol: VolRegime) -> bool:
+        """Check if the given regime combination activates this strategy."""
+        vol_match = vol in self.active_vol_regimes if self.active_vol_regimes else True
+        trend_match = trend in self.active_trend_regimes if self.active_trend_regimes else True
+        if self.use_or_logic:
+            return vol_match or trend_match
+        return vol_match and trend_match
+
+
+# ── Declarative registry — add a strategy by adding an entry ─────────────────
+
+STRATEGY_REGISTRY: dict[str, StrategyProfile] = {
+    "momentum_scalp": StrategyProfile(
+        name="momentum_scalp",
+        active_vol_regimes=frozenset({VolRegime.NORMAL}),
+        active_trend_regimes=frozenset({TrendRegime.TRENDING_UP, TrendRegime.TRENDING_DOWN}),
+        size_multiplier=1.0,
+    ),
+    "mean_reversion": StrategyProfile(
+        name="mean_reversion",
+        active_vol_regimes=frozenset({VolRegime.LOW, VolRegime.NORMAL}),
+        active_trend_regimes=frozenset({TrendRegime.RANGING}),
+        size_multiplier=0.8,
+    ),
+    "spike_scalp": StrategyProfile(
+        name="spike_scalp",
+        active_vol_regimes=frozenset({VolRegime.HIGH}),
+        size_multiplier=0.5,
+    ),
+    "short_momentum": StrategyProfile(
+        name="short_momentum",
+        active_vol_regimes=frozenset({VolRegime.HIGH, VolRegime.CRISIS}),
+        active_trend_regimes=frozenset({TrendRegime.TRENDING_DOWN}),
+        use_or_logic=True,
+        size_multiplier=0.6,
+    ),
+}
 
 
 class StrategySelector:
     """Check strategy compatibility and retrieve sizing multipliers.
 
-    Each strategy is valid only in specific trend-regime / vol-regime
-    combinations.  All strategies are automatically blocked when
-    ``risk_mode`` is ``BLOCKED`` or ``CRISIS``.
+    Uses :data:`STRATEGY_REGISTRY` for declarative lookup — no if/elif chains.
+    All strategies are automatically blocked when ``risk_mode`` is
+    ``BLOCKED`` or ``CRISIS``.
     """
+
+    def __init__(
+        self,
+        registry: dict[str, StrategyProfile] | None = None,
+    ) -> None:
+        self._registry = registry if registry is not None else STRATEGY_REGISTRY
 
     def is_active(self, strategy: str, regime: Regime) -> bool:
         """Return ``True`` if ``strategy`` is compatible with the current regime.
-
-        Hard-blocked regimes (BLOCKED / CRISIS) disable every strategy.
-
-        Compatibility table:
-
-        - ``"momentum_scalp"`` : TRENDING_UP or TRENDING_DOWN, NORMAL vol.
-        - ``"mean_reversion"`` : RANGING trend, LOW or NORMAL vol.
-        - ``"spike_scalp"``    : HIGH vol only.
-        - ``"short_momentum"`` : TRENDING_DOWN, HIGH vol, or CRISIS vol.
 
         Args:
             strategy: Strategy name string.
@@ -38,45 +101,13 @@ class StrategySelector:
         """
         if regime.risk_mode in (RiskMode.BLOCKED, RiskMode.CRISIS):
             return False
-
-        trend = regime.trend_regime
-        vol = regime.vol_regime
-
-        if strategy == "momentum_scalp":
-            return (
-                trend in (TrendRegime.TRENDING_UP, TrendRegime.TRENDING_DOWN)
-                and vol == VolRegime.NORMAL
-            )
-
-        if strategy == "mean_reversion":
-            return trend == TrendRegime.RANGING and vol in (
-                VolRegime.LOW,
-                VolRegime.NORMAL,
-            )
-
-        if strategy == "spike_scalp":
-            return vol == VolRegime.HIGH
-
-        if strategy == "short_momentum":
-            return trend == TrendRegime.TRENDING_DOWN or vol in (
-                VolRegime.HIGH,
-                VolRegime.CRISIS,
-            )
-
-        return False
+        profile = self._registry.get(strategy)
+        if profile is None:
+            return False
+        return profile.is_compatible(regime.trend_regime, regime.vol_regime)
 
     def get_size_multiplier(self, strategy: str, regime: Regime) -> float:
         """Return the size multiplier for a given strategy and regime.
-
-        If the regime is CRISIS the multiplier is always ``0.0``.
-
-        Multiplier table:
-
-        - ``"momentum_scalp"`` → 1.0
-        - ``"mean_reversion"`` → 0.8
-        - ``"spike_scalp"``    → 0.5
-        - ``"short_momentum"`` → 0.6
-        - Unknown strategy     → 0.0
 
         Args:
             strategy: Strategy name string.
@@ -87,11 +118,7 @@ class StrategySelector:
         """
         if regime.risk_mode == RiskMode.CRISIS:
             return 0.0
-
-        _multipliers: dict[str, float] = {
-            "momentum_scalp": 1.0,
-            "mean_reversion": 0.8,
-            "spike_scalp": 0.5,
-            "short_momentum": 0.6,
-        }
-        return _multipliers.get(strategy, 0.0)
+        profile = self._registry.get(strategy)
+        if profile is None:
+            return 0.0
+        return profile.size_multiplier

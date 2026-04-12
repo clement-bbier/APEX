@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import asyncio
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
+from typing import TYPE_CHECKING
 
 import pandas as pd
 import structlog
@@ -23,7 +24,10 @@ import yfinance as yf
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
 from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
+from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+
+if TYPE_CHECKING:
+    from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarPayload
 
 logger = structlog.get_logger(__name__)
 
@@ -77,8 +81,13 @@ class YahooHistoricalConnector(DataConnector):
     Retry: exponential backoff (1s, 2s, 4s), max 3 attempts.
     """
 
-    def __init__(self, concurrency: int = 5) -> None:
+    def __init__(
+        self,
+        bar_normalizer_factory: Callable[[BarSize], NormalizerStrategy[YahooBarPayload, Bar]],
+        concurrency: int = 5,
+    ) -> None:
         self._semaphore = asyncio.Semaphore(concurrency)
+        self._bar_normalizer_factory = bar_normalizer_factory
 
     @property
     def connector_name(self) -> str:
@@ -104,7 +113,7 @@ class YahooHistoricalConnector(DataConnector):
             Lists of up to 1000 :class:`Bar` per batch.
         """
         interval = _bar_size_to_yahoo_interval(bar_size)
-        normalizer = YahooBarNormalizer(bar_size)
+        normalizer = self._bar_normalizer_factory(bar_size)
         placeholder = _placeholder_asset(symbol)
 
         async with self._semaphore:

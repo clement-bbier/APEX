@@ -64,7 +64,7 @@ def _make_service(redis: fakeredis.aioredis.FakeRedis) -> RiskManagerService:
     svc.state._service_id = "s05_test"
     svc.state._settings = MagicMock()
     svc.state._settings.redis_ttl_seconds = 3600
-    svc.state._redis = redis
+    svc.state._redis = redis  # set underlying client for StateStore.client property
 
     # Wire bus as mock
     svc.bus = MagicMock()

@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-12
-**Updated by**: Session 004
+**Updated by**: Session 005
 
 ---
 
@@ -17,7 +17,7 @@
 | mypy strict | 0 errors (319 files) |
 | Services scaffolded | 10/10 (S01-S10) |
 | S01 fully implemented | Yes (78 files, 9,583 LOC) |
-| ADRs accepted | 3 (ZMQ topology, Quant Methodology, Data Schema) |
+| ADRs accepted | 7 (ZMQ topology, Quant Methodology, Data Schema + 4 Sprint 4/5) |
 
 ## Audit Status
 
@@ -51,7 +51,7 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 
 - GEX validation requires options data (source TBD, may need paid API)
 - Whether all 6 features will pass IC threshold is unknown
-- Remaining P1 audit issues: CI gates, S01 connector Decimal migration (MacroPoint/FundamentalPoint model types)
+- Remaining P1 audit issues: S01 connector Decimal migration (MacroPoint/FundamentalPoint model types)
 
 ## Sprint Status
 
@@ -59,10 +59,30 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 |---|---|---|---|
 | Sprint 1 — Docs quick wins | #100 | #67, #78, #79, #80 | MERGED |
 | Sprint 2 — Security & Config | #101 | #66, #69, #71 | MERGED |
-| Sprint 3 — CI hardening | TBD | #64, #65, #68, #70 | PR PENDING |
+| Sprint 3 — CI hardening | #103 | #64, #65, #68, #70 | MERGED |
+| Sprint 4 — Architecture refactors | TBD | #74, #75, #76, #77 | PR PENDING |
+
+## P1 Issue Progress
+
+| Issue | Sprint | Status |
+|---|---|---|
+| #64 CI coverage | Sprint 3 | CLOSED |
+| #65 CI CVE | Sprint 3 | CLOSED |
+| #66 SecretStr | Sprint 2 | CLOSED |
+| #67 Docs | Sprint 1 | CLOSED |
+| #68 CI backtest | Sprint 3 | CLOSED |
+| #69 Decimal | Sprint 2 | CLOSED |
+| #70 CI linting | Sprint 3 | CLOSED |
+| #71 Config | Sprint 2 | CLOSED |
+| #74 S03 dead code | Sprint 4 | PR PENDING |
+| #75 S04 OCP | Sprint 4 | PR PENDING |
+| #76 S05 DIP | Sprint 4 | PR PENDING |
+| #77 S01 layering | Sprint 4 | PR PENDING |
+
+11/14 P1 closed (will be 11/14 after Sprint 4 merge → remaining: #72, #73, #63).
 
 ## Branch Status
 
-- `main` is clean, all tests passing
-- `sprint3/ci-hardening` — PR pending review
+- `main` is clean, all tests passing (Sprint 3 merged)
+- `sprint4/architecture-refactors` — PR pending
 - Follow-up issue #102 created for backtest-gate continue-on-error removal

@@ -43,9 +43,10 @@ async def test_massive_fetch_aapl_bars() -> None:
     from services.s01_data_ingestion.connectors.massive_historical import (
         MassiveHistoricalConnector,
     )
+    from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
 
     settings = Settings()
-    connector = MassiveHistoricalConnector(settings)
+    connector = MassiveHistoricalConnector(settings, bar_normalizer_factory=MassiveBarNormalizer)
 
     start = datetime(2024, 1, 2, tzinfo=UTC)
     end = datetime(2024, 1, 3, tzinfo=UTC)

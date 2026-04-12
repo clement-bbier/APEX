@@ -14,37 +14,13 @@ Two APIs are provided:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import StrEnum
 from typing import ClassVar
 
 from core.models.regime import (
-    RiskMode as CoreRiskMode,
-)
-from core.models.regime import (
+    RiskMode,
     TrendRegime,
+    VolRegime,
 )
-from core.models.regime import (
-    VolRegime as CoreVolRegime,
-)
-
-# ── Phase-2 local enums ────────────────────────────────────────────────────────
-
-
-class VolRegime(StrEnum):
-    """Volatility regime with Phase-2 granularity."""
-
-    CRISIS = "crisis"
-    HIGH_VOL = "high_vol"
-    NORMAL = "normal"
-    LOW_VOL = "low_vol"
-    TRENDING = "trending"
-
-
-class RiskMode(StrEnum):
-    """System risk mode derived from macro indicators."""
-
-    RISK_ON = "risk_on"
-    RISK_OFF = "risk_off"
 
 
 @dataclass
@@ -77,16 +53,15 @@ class RegimeEngine:
 
     VIX_THRESHOLDS: ClassVar[dict[str, float]] = {
         "crisis": 35.0,
-        "high_vol": 25.0,
+        "high": 25.0,
         "normal": 15.0,
     }
 
     BASE_MULT: ClassVar[dict[VolRegime, float]] = {
         VolRegime.CRISIS: 0.0,
-        VolRegime.HIGH_VOL: 0.3,
+        VolRegime.HIGH: 0.3,
         VolRegime.NORMAL: 1.0,
-        VolRegime.LOW_VOL: 1.2,
-        VolRegime.TRENDING: 1.5,
+        VolRegime.LOW: 1.2,
     }
 
     def compute(
@@ -115,15 +90,15 @@ class RegimeEngine:
         if vix >= self.VIX_THRESHOLDS["crisis"]:
             vol_regime = VolRegime.CRISIS
             reasoning.append(f"VIX={vix:.1f} → CRISIS (> 35)")
-        elif vix >= self.VIX_THRESHOLDS["high_vol"]:
-            vol_regime = VolRegime.HIGH_VOL
-            reasoning.append(f"VIX={vix:.1f} → HIGH_VOL (25-35)")
+        elif vix >= self.VIX_THRESHOLDS["high"]:
+            vol_regime = VolRegime.HIGH
+            reasoning.append(f"VIX={vix:.1f} → HIGH (25-35)")
         elif vix >= self.VIX_THRESHOLDS["normal"]:
             vol_regime = VolRegime.NORMAL
             reasoning.append(f"VIX={vix:.1f} → NORMAL (15-25)")
         else:
-            vol_regime = VolRegime.LOW_VOL
-            reasoning.append(f"VIX={vix:.1f} → LOW_VOL (< 15)")
+            vol_regime = VolRegime.LOW
+            reasoning.append(f"VIX={vix:.1f} → LOW (< 15)")
 
         # Step 2: Base multiplier
         macro_mult = self.BASE_MULT[vol_regime]
@@ -147,13 +122,13 @@ class RegimeEngine:
 
         # Step 4: Risk mode classification
         risk_mode = (
-            RiskMode.RISK_OFF
+            RiskMode.REDUCED
             if (
                 dxy_1h_change_pct > 0.3
                 or yield_inverted
-                or vol_regime in (VolRegime.CRISIS, VolRegime.HIGH_VOL)
+                or vol_regime in (VolRegime.CRISIS, VolRegime.HIGH)
             )
-            else RiskMode.RISK_ON
+            else RiskMode.NORMAL
         )
 
         return RegimeState(
@@ -168,7 +143,7 @@ class RegimeEngine:
 
     # ── Legacy API (used by RegimeDetectorService._tick) ─────────────────────
 
-    def compute_vol_regime(self, vix: float | None) -> CoreVolRegime:
+    def compute_vol_regime(self, vix: float | None) -> VolRegime:
         """Classify the current volatility regime from a VIX reading.
 
         Thresholds:
@@ -181,17 +156,17 @@ class RegimeEngine:
             vix: Current VIX level.  If ``None``, returns NORMAL.
 
         Returns:
-            A :class:`CoreVolRegime` enum value.
+            A :class:`VolRegime` enum value.
         """
         if vix is None:
-            return CoreVolRegime.NORMAL
+            return VolRegime.NORMAL
         if vix < 15.0:
-            return CoreVolRegime.LOW
+            return VolRegime.LOW
         if vix < 25.0:
-            return CoreVolRegime.NORMAL
+            return VolRegime.NORMAL
         if vix < 35.0:
-            return CoreVolRegime.HIGH
-        return CoreVolRegime.CRISIS
+            return VolRegime.HIGH
+        return VolRegime.CRISIS
 
     def compute_macro_mult(
         self,
@@ -255,10 +230,10 @@ class RegimeEngine:
 
     def compute_risk_mode(
         self,
-        vol_regime: CoreVolRegime,
+        vol_regime: VolRegime,
         event_active: bool,
         circuit_open: bool,
-    ) -> CoreRiskMode:
+    ) -> RiskMode:
         """Derive the system-wide risk mode.
 
         Priority order (highest to lowest):
@@ -274,17 +249,17 @@ class RegimeEngine:
             circuit_open:  ``True`` if the circuit breaker is tripped.
 
         Returns:
-            The appropriate :class:`CoreRiskMode`.
+            The appropriate :class:`RiskMode`.
         """
-        if vol_regime == CoreVolRegime.CRISIS:
-            return CoreRiskMode.CRISIS
+        if vol_regime == VolRegime.CRISIS:
+            return RiskMode.CRISIS
         if event_active:
-            return CoreRiskMode.REDUCED
+            return RiskMode.REDUCED
         if circuit_open:
-            return CoreRiskMode.BLOCKED
-        if vol_regime == CoreVolRegime.HIGH:
-            return CoreRiskMode.REDUCED
-        return CoreRiskMode.NORMAL
+            return RiskMode.BLOCKED
+        if vol_regime == VolRegime.HIGH:
+            return RiskMode.REDUCED
+        return RiskMode.NORMAL
 
     # ── Internal helpers ──────────────────────────────────────────────────────
 
