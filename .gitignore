@@ -33,3 +33,7 @@ EXTENSIONS.md
 
 # Claude Code local settings
 .claude/
+
+# Graphify local state
+.graphify_python
+graphify-out/
