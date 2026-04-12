@@ -155,23 +155,23 @@ class Position(BaseModel):
 
 # ── Risk Constants (all from DEVELOPMENT_PLAN.md Section 6) ────────────────────
 
-MAX_DAILY_LOSS_PCT: Final[float] = 0.03  # 3% daily drawdown → trip CB
-MAX_INTRADAY_LOSS_30M_PCT: Final[float] = 0.02  # 2% in 30min → trip CB
-VIX_SPIKE_THRESHOLD_PCT: Final[float] = 0.20  # VIX +20% in 1h → trip CB
+MAX_DAILY_LOSS_PCT: Final[Decimal] = Decimal("0.03")  # 3% daily drawdown → trip CB
+MAX_INTRADAY_LOSS_30M_PCT: Final[Decimal] = Decimal("0.02")  # 2% in 30min → trip CB
+VIX_SPIKE_THRESHOLD_PCT: Final[float] = 0.20  # VIX +20% in 1h → trip CB (float: VIX is float)
 SERVICE_DOWN_SECONDS: Final[int] = 60  # Data/Signal down > 60s → trip
 CB_BLOCK_MINUTES_BEFORE: Final[int] = 45  # Block window before CB event
 CB_SCALP_MINUTES_AFTER: Final[int] = 15  # Post-event reduced scalp window
-CB_SCALP_SIZE_MULTIPLIER: Final[float] = 0.50  # Half size post-event
+CB_SCALP_SIZE_MULTIPLIER: Final[Decimal] = Decimal("0.50")  # Half size post-event
 MAX_POSITIONS: Final[int] = 6  # Max simultaneous open positions
-MAX_TOTAL_EXPOSURE_PCT: Final[float] = 0.20  # 20% of capital max notional
-MAX_CLASS_EXPOSURE_PCT: Final[float] = 0.12  # 12% per asset class
-MAX_RISK_PER_TRADE_PCT: Final[float] = 0.005  # 0.5% capital risk per trade
-MAX_POSITION_SIZE_PCT: Final[float] = 0.10  # 10% of capital max size
-MIN_RR_RATIO: Final[float] = 1.5  # Min reward/risk to enter
-CRYPTO_SIZE_MULTIPLIER: Final[float] = 0.70  # Crypto vol adjustment × 0.70
-MIN_META_CONFIDENCE_TO_TRADE: Final[float] = 0.52  # Below → hard block
-MIN_KELLY_FRACTION: Final[float] = 0.01  # Below after modulation → block
-CORRELATION_BLOCK_THRESHOLD: Final[float] = 0.75  # rho > 0.75 with open pos → block
+MAX_TOTAL_EXPOSURE_PCT: Final[Decimal] = Decimal("0.20")  # 20% of capital max notional
+MAX_CLASS_EXPOSURE_PCT: Final[Decimal] = Decimal("0.12")  # 12% per asset class
+MAX_RISK_PER_TRADE_PCT: Final[Decimal] = Decimal("0.005")  # 0.5% capital risk per trade
+MAX_POSITION_SIZE_PCT: Final[Decimal] = Decimal("0.10")  # 10% of capital max size
+MIN_RR_RATIO: Final[Decimal] = Decimal("1.5")  # Min reward/risk to enter
+CRYPTO_SIZE_MULTIPLIER: Final[Decimal] = Decimal("0.70")  # Crypto vol adjustment × 0.70
+MIN_META_CONFIDENCE_TO_TRADE: Final[float] = 0.52  # Below → hard block (float: confidence is float)
+MIN_KELLY_FRACTION: Final[float] = 0.01  # Below after modulation → block (float: kelly is float)
+CORRELATION_BLOCK_THRESHOLD: Final[float] = 0.75  # rho > 0.75 (float: correlation is float)
 HALF_OPEN_RECOVERY_MINUTES: Final[int] = 30  # Cooldown before HALF_OPEN attempt
 REDIS_CB_KEY: Final[str] = "risk:circuit_breaker:state"
 REDIS_CB_TTL: Final[int] = 86400  # 24h TTL for CB state

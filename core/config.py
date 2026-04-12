@@ -262,7 +262,7 @@ class Settings(BaseSettings):
     timescale_db: str = Field(default="apex", description="TimescaleDB database name")
     timescale_user: str = Field(default="apex", description="TimescaleDB user")
     timescale_password: SecretStr = Field(
-        default=SecretStr("apex_secret"), description="TimescaleDB password"
+        default=SecretStr(""), description="TimescaleDB password (must be set via env)"
     )
     timescale_pool_min: int = Field(default=2, description="Min asyncpg pool size")
     timescale_pool_max: int = Field(default=10, description="Max asyncpg pool size")

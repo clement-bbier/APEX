@@ -93,7 +93,7 @@ def check_total_exposure(
             block_reason=BlockReason.MAX_TOTAL_EXPOSURE,
             reason=f"total exposure {exposure_pct:.1%} > max {MAX_TOTAL_EXPOSURE_PCT:.0%}",
             exposure_pct=float(exposure_pct),
-            max_exposure=MAX_TOTAL_EXPOSURE_PCT,
+            max_exposure=float(MAX_TOTAL_EXPOSURE_PCT),
         )
     return RuleResult.ok(rule_name="check_total_exposure", reason=f"{exposure_pct:.1%} of capital")
 

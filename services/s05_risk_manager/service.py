@@ -205,7 +205,7 @@ class RiskManagerService(BaseService):
         current_size, r_sess = apply_session_multiplier(candidate, session)
         rule_results.append(r_sess)
         if in_scalp_window:
-            current_size = current_size * Decimal(str(CB_SCALP_SIZE_MULTIPLIER))
+            current_size = current_size * CB_SCALP_SIZE_MULTIPLIER
             rationale.append(f"post_event_scalp x{CB_SCALP_SIZE_MULTIPLIER}")
 
         # STEP 5: Exposure Monitor

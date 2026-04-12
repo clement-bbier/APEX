@@ -104,7 +104,7 @@ def check_max_risk_per_trade(order: OrderCandidate, capital: Decimal) -> RuleRes
         return RuleResult.ok(rule_name="check_max_risk_per_trade", reason="capital=0 skipped")
     sl_distance = abs(order.entry - order.stop_loss)
     monetary_risk = sl_distance * order.size
-    max_risk = capital * Decimal(str(MAX_RISK_PER_TRADE_PCT))
+    max_risk = capital * MAX_RISK_PER_TRADE_PCT
     if monetary_risk > max_risk:
         return RuleResult.fail(
             rule_name="check_max_risk_per_trade",
@@ -121,7 +121,7 @@ def check_max_size(order: OrderCandidate, capital: Decimal) -> RuleResult:
     if capital <= Decimal("0"):
         return RuleResult.ok(rule_name="check_max_size", reason="capital=0 skipped")
     notional = order.size * order.entry
-    max_notional = capital * Decimal(str(MAX_POSITION_SIZE_PCT))
+    max_notional = capital * MAX_POSITION_SIZE_PCT
     if notional > max_notional:
         return RuleResult.fail(
             rule_name="check_max_size",
@@ -136,7 +136,7 @@ def check_max_size(order: OrderCandidate, capital: Decimal) -> RuleResult:
 def apply_crypto_multiplier(order: OrderCandidate) -> tuple[Decimal, RuleResult]:
     """Apply CRYPTO_SIZE_MULTIPLIER (0.70) for crypto symbols."""
     if _is_crypto(order.symbol):
-        adjusted = order.size * Decimal(str(CRYPTO_SIZE_MULTIPLIER))
+        adjusted = order.size * CRYPTO_SIZE_MULTIPLIER
         return adjusted, RuleResult.ok(
             rule_name="apply_crypto_multiplier",
             reason=f"crypto x {CRYPTO_SIZE_MULTIPLIER}",

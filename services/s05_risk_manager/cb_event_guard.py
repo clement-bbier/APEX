@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 import structlog
 from redis.asyncio import Redis
@@ -111,7 +112,7 @@ class CBEventGuard:
         return False
 
     @staticmethod
-    def get_post_event_size_multiplier() -> float:
+    def get_post_event_size_multiplier() -> Decimal:
         """Return the size multiplier applied during post-event scalp windows.
 
         Returns:
