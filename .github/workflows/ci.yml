@@ -85,7 +85,10 @@ jobs:
           pytest tests/unit/ -v \
             --cov=services --cov=core --cov=backtesting \
             --cov-report=xml --cov-report=term-missing \
-            --cov-fail-under=40 --timeout=30
+            --cov-fail-under=75 --timeout=30
+            # TODO: Raise to 85% (CLAUDE.md target) progressively in future sprints.
+            # Current gate reflects post-omit-narrowing baseline (80%). Next bumps should
+            # happen after new test sprints in Phase 3.x.
       - uses: codecov/codecov-action@v5
         with:
           files: ./coverage.xml
@@ -124,6 +127,9 @@ jobs:
         run: python scripts/generate_test_fixtures.py
       - name: Backtest regression gate
         env:
+          # TODO: Align with CLAUDE.md targets (Sharpe >= 0.8, DD <= 0.08) in Phase 5
+          # Current thresholds reflect scaffolding-era data. Raise after Phase 3
+          # feature validation completes.
           BACKTEST_MIN_SHARPE: "0.5"
           BACKTEST_MAX_DD: "0.12"
         run: |

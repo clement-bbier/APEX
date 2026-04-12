@@ -124,9 +124,13 @@ omit = [
     # Backtest engine and data loader (integration-only, not unit tests)
     "backtesting/engine.py",
     "backtesting/data_loader.py",
-    # Data feeds and brokers (require live API connections)
-    "services/s01_data_ingestion/*.py",
-    "services/s06_execution/broker_*.py",
+    # S01: only live connectors and serving entry point (not the whole package)
+    "services/s01_data_ingestion/connectors/alpaca_live.py",
+    "services/s01_data_ingestion/connectors/binance_live.py",
+    "services/s01_data_ingestion/serving/main.py",
+    # Brokers (require live API connections)
+    "services/s06_execution/broker_alpaca.py",
+    "services/s06_execution/broker_binance.py",
     "services/s06_execution/order_manager.py",
     # Complex signal modules not yet unit-tested
     "services/s02_signal_engine/crowd_behavior.py",
@@ -142,7 +146,10 @@ omit = [
     # Macro intel - geopolitical and sector rotation (data-source dependent)
     "services/s08_macro_intelligence/geopolitical.py",
     "services/s08_macro_intelligence/sector_rotation.py",
-    "services/s10_monitor/*",
+    # S10: specific UI/API modules only (not wildcard)
+    "services/s10_monitor/dashboard.py",
+    "services/s10_monitor/command_api.py",
+    "services/s10_monitor/alert_engine.py",
 ]
 branch = true
 

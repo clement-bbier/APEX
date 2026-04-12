@@ -136,3 +136,52 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 - Phase 3.1 implementation
 - Sprint 3: remaining P1 audit issues
 - S01 connector Decimal migration (requires MacroPoint/FundamentalPoint model changes)
+
+---
+
+## Session 004 — 2026-04-12
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Mission | Sprint 3 — CI hardening (#64, #65, #68, #70) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~30 minutes |
+
+### Decisions Made
+
+1. Coverage omit narrowed: removed `services/s01_data_ingestion/*.py` wildcard and `services/s10_monitor/*` wildcard, replaced with specific network/UI modules only
+2. Coverage gate raised from 40% to 75% (baseline measured at 80% post-narrowing)
+3. Backtest thresholds (Sharpe 0.5, DD 12%) retained — deferred to Phase 5 pending full_report() Sharpe bug fix
+4. `continue-on-error: true` retained on backtest-gate — follow-up issue #102 created
+5. 9 transitive deps pinned in requirements.txt to patch 19 CVEs
+6. Removed `|| true` from backtest.yml Rust wheel builds (was swallowing failures)
+
+### Files Modified
+
+- `requirements.txt` — added 9 CVE-patched transitive dep pins
+- `pyproject.toml` — narrowed coverage omit from wildcards to specific files
+- `.github/workflows/ci.yml` — coverage gate 40%→75%, backtest TODO comments
+- `.github/workflows/backtest.yml` — removed `|| true` on Rust builds, added threshold TODO
+
+### Coverage Baseline
+
+| Metric | Before | After |
+|---|---|---|
+| With omit config | 83% (6,550 LOC) | 80% (6,861 LOC) |
+| Without any omit | 66% (9,277 LOC) | — |
+| CI gate | 40% | 75% |
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: 317 files unchanged
+- mypy --strict: 319 files, 0 errors
+- pytest: 1228 unit tests passed, coverage 79.60%
+- pip-audit: 0 project CVEs (2 in pip itself, env-managed)
+
+### Next Steps
+
+- Phase 3.1 implementation
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+- Continue raising coverage toward 85% with new test sprints
