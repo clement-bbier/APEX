@@ -380,3 +380,52 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Phase 3.1 implementation
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+
+---
+
+## Session 009 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.1 — Feature Engineering Pipeline Foundation (#87) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1.5 hours |
+
+### Decisions Made
+
+1. TripleBarrierLabeler exposed via Polars adapter (not inheritance) — preserves stability of core/math interface (D013)
+2. ValidationPipeline uses composable ValidationStage ABC — each ADR-0004 step is a pluggable stage, stubs in 3.1, concrete in later sub-phases (D014)
+3. StageContext uses `pl.DataFrame | None` (not `Any`) for data — mypy strict compliance, Polars-only pipeline (D015)
+4. FeatureCalculator.validate_output checks nulls after warm-up window — warm_up_rows parameter allows rolling calculations (D016)
+5. SampleWeighter uses O(n²) concurrency counting — acceptable for offline validation; optimize in later sub-phase if needed
+
+### Files Created
+
+- `features/__init__.py` — package init
+- `features/base.py` — FeatureCalculator ABC
+- `features/pipeline.py` — FeaturePipeline orchestrator
+- `features/labels.py` — TripleBarrierLabelerAdapter
+- `features/weights.py` — SampleWeighter
+- `features/fracdiff.py` — wrapper to core/math/fractional_diff.py
+- `features/store/__init__.py`, `features/store/base.py` — FeatureStore ABC
+- `features/ic/__init__.py`, `features/ic/base.py` — ICMetric ABC + ICResult
+- `features/cv/__init__.py`, `features/cv/base.py` — BacktestSplitter + FeatureValidator ABCs + ValidationReport
+- `features/validation/__init__.py`, `features/validation/stages.py` — ValidationStage ABC + 6 stub stages + PipelineStage enum
+- `features/validation/pipeline.py` — ValidationPipeline orchestrator
+- `tests/unit/features/` — 9 test files, conftest with shared fixtures
+
+### Quality Gates
+
+- ruff check: clean (0 errors)
+- ruff format: clean (30 files)
+- mypy --strict features/: 0 errors, 15 files
+- pytest tests/unit/features/: 55 passed, 0 failed
+- Coverage features/: 97.40% (gate 85%)
+- Full suite: 1,314 passed, 0 regressions
+
+### Next Steps
+
+- Phase 3.2 (Feature Store on TimescaleDB) can start after merge
+- Phase 3.3 (IC Measurement) can start in parallel with 3.2
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate

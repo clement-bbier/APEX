@@ -10,7 +10,7 @@
 
 | Sub-Phase | Status | Notes |
 |---|---|---|
-| 3.1 Pipeline Foundation | PENDING | First to implement |
+| 3.1 Pipeline Foundation | IN_PROGRESS | PR open, awaiting review |
 | 3.2 Feature Store | PENDING | Custom on TimescaleDB |
 | 3.3 IC Measurement | PENDING | |
 | 3.4 HAR-RV | PENDING | S07 har_rv_forecast() ready |
@@ -43,3 +43,7 @@
 - Use NumPy for vectorized math
 - Hypothesis property tests mandatory for math functions
 - Target < 5ms per feature computation per tick (for S02 integration)
+- TripleBarrierLabeler exposed via adapter pattern (D013) — does not inherit from core class
+- ValidationPipeline uses composable ValidationStage ABCs (D014) — 6 stubs in 3.1
+- SampleWeighter.uniqueness_weights uses O(n²) concurrency counting — acceptable for offline
+- 55 tests, 97.40% coverage on features/, 1,314 total tests (0 regressions)
