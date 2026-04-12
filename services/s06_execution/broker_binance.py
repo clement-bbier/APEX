@@ -268,8 +268,8 @@ class BinanceBroker(Broker):
             Active :class:`aiohttp.ClientSession`.
 
         Raises:
-            RuntimeError: If :meth:`connect` has not been called.
+            BrokerConnectionError: If :meth:`connect` has not been called.
         """
         if self._session is None:
-            raise RuntimeError("BinanceBroker not connected. Call connect() first.")
+            raise BrokerConnectionError("BinanceBroker not connected. Call connect() first.")
         return self._session

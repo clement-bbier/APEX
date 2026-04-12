@@ -270,8 +270,8 @@ class AlpacaBroker(Broker):
             Active :class:`~alpaca.trading.client.TradingClient`.
 
         Raises:
-            RuntimeError: If :meth:`connect` has not been called.
+            BrokerConnectionError: If :meth:`connect` has not been called.
         """
         if self._client is None:
-            raise RuntimeError("AlpacaBroker not connected. Call connect() first.")
+            raise BrokerConnectionError("AlpacaBroker not connected. Call connect() first.")
         return self._client

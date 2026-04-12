@@ -12,7 +12,6 @@ Redis cache key:  ``signal:{SYMBOL}``
 from __future__ import annotations
 
 import asyncio
-from decimal import Decimal
 from typing import Any
 
 from core.base_service import BaseService
@@ -67,18 +66,12 @@ class SignalEngineService(BaseService):
         self._vpin: dict[str, VPINCalculator] = {}
         self._adv_counter: dict[str, int] = {}
 
-        # Previous EMA values per symbol - needed for cross detection.
-        self._prev_ema_8: dict[str, Decimal | None] = {}
-        self._prev_ema_21: dict[str, Decimal | None] = {}
-
         # Pipeline encapsulates the full tick-to-signal transformation.
         self._pipeline = SignalPipeline(
             micro_store=self._micro,
             tech_store=self._tech,
             vpin_store=self._vpin,
             adv_counter=self._adv_counter,
-            prev_ema_8=self._prev_ema_8,
-            prev_ema_21=self._prev_ema_21,
             mtf=self._mtf,
             scorer=self._scorer,
             state=self.state,

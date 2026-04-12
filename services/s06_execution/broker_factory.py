@@ -94,7 +94,7 @@ class BrokerFactory:
                 api_key=self._settings.binance_api_key.get_secret_value(),
                 secret_key=self._settings.binance_secret_key.get_secret_value(),
                 base_url=self._settings.binance_rest_url,
-                testnet=False,
+                testnet=self._settings.binance_testnet,
             )
         return self._binance
 

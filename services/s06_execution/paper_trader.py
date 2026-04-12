@@ -123,7 +123,7 @@ class PaperTrader(Broker):
             timestamp_ms=int(time.time() * 1000),
             price=entry,
             volume=size * Decimal("100"),
-            spread_bps=Decimal("5"),
+            spread_bps=_DEFAULT_SPREAD_BPS,
         )
 
     def compute_slippage(

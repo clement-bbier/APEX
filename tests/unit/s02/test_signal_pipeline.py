@@ -50,8 +50,6 @@ def _make_pipeline() -> SignalPipeline:
         tech_store={},
         vpin_store={},
         adv_counter={},
-        prev_ema_8={},
-        prev_ema_21={},
         mtf=MTFAligner(),
         scorer=SignalScorer(min_components=2, min_strength=0.20),
         state=state,

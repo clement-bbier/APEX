@@ -120,8 +120,6 @@ class SignalPipeline:
         tech_store: dict[str, TechnicalAnalyzer],
         vpin_store: dict[str, VPINCalculator],
         adv_counter: dict[str, int],
-        prev_ema_8: dict[str, Decimal | None],
-        prev_ema_21: dict[str, Decimal | None],
         mtf: MTFAligner,
         scorer: SignalScorer,
         state: StateStore,
@@ -130,8 +128,6 @@ class SignalPipeline:
         self._tech_store = tech_store
         self._vpin_store = vpin_store
         self._adv_counter = adv_counter
-        self._prev_ema_8 = prev_ema_8
-        self._prev_ema_21 = prev_ema_21
         self._mtf = mtf
         self._scorer = scorer
         self._state = state
@@ -217,7 +213,6 @@ class SignalPipeline:
         """
         assert ps.micro is not None
         assert ps.tech is not None
-        symbol = ps.symbol
         tech = ps.tech
         micro = ps.micro
 
@@ -227,11 +222,8 @@ class SignalPipeline:
             period=20, std=2.0, timeframe="5m"
         )
 
-        # EMA 5m (for cross detection state persistence)
         ps.ema_8 = tech.ema(period=8, timeframe="5m")
         ps.ema_21 = tech.ema(period=21, timeframe="5m")
-        self._prev_ema_8[symbol] = ps.ema_8
-        self._prev_ema_21[symbol] = ps.ema_21
 
         # EMA 1m and 15m (for MTF alignment scorer)
         ps.ema_8_1m = tech.ema(period=8, timeframe="1m")
