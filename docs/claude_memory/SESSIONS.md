@@ -300,3 +300,47 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 - Phase 3.1 implementation
 - Remaining P1 issue: #63 (S01 connector Decimal migration)
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+
+---
+
+## Session 007 — 2026-04-12
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Mission | Sprint 6 — Meta-governance finalization (#81, #82, #83, #84, #85, #86) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1 hour |
+
+### Decisions Made
+
+1. ADR-0004 Feature Validation Methodology published: 6-step pipeline (IC, stability, multicollinearity, MDA, CPCV, PSR/DSR/PBO) with 11 Tier-1 references (D010)
+2. Academic references centralized in docs/ACADEMIC_REFERENCES.md: 56 Tier-1 references across 9 sections (D011)
+3. ONBOARDING.md published: 15-min quick-start for new dev/session, 11 sections (D012)
+4. Copilot instructions rewritten from French to English, aligned with current ADRs and conventions
+
+### Files Created
+
+- `docs/adr/ADR-0004-feature-validation-methodology.md` — 6-step validation pipeline
+- `docs/ACADEMIC_REFERENCES.md` — 56 references, 9 sections
+- `docs/ONBOARDING.md` — 11-section onboarding guide
+- `docs/ARCHITECTURE.md` — single-page architecture overview with ASCII diagram
+- `.pre-commit-config.yaml` — ruff + mypy + bandit + gitleaks hooks
+
+### Files Modified
+
+- `.github/copilot-instructions.md` — rewritten, aligned with current conventions
+- `docs/claude_memory/CONTEXT.md` — updated to Session 007, all P1 closed
+- `docs/claude_memory/SESSIONS.md` — this entry
+- `docs/claude_memory/DECISIONS.md` — D010, D011, D012
+
+### Quality Gates
+
+- ruff check: clean (zero code production touched)
+- YAML validation: .pre-commit-config.yaml valid
+- All new files are markdown — no code gates needed
+
+### Next Steps
+
+- Phase 3.1 implementation (all blockers removed)
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate

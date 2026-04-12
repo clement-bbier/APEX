@@ -253,3 +253,74 @@ hottest path in the system (every tick). Impossible to unit-test any step in iso
 - SignalPipeline can be reused (e.g. backtesting engine could call individual steps)
 - SignalEngine._process_tick reduced to 3 lines: pipeline.run() + publish
 - 16 new unit tests covering all 7 pipeline steps
+
+---
+
+## D010 — ADR-0004 Feature Validation Methodology Published (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 007 |
+| Decision | Publish ADR-0004 defining canonical 6-step feature validation pipeline |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3 requires validating ~6 candidate features. Without a canonical methodology
+defined before coding begins, the risk of false discovery is extreme (Bailey-LdP 2014:
+~75% of published strategies are artifacts).
+
+### Justification
+
+- 6-step pipeline: IC measurement, IC stability, multicollinearity, MDA feature importance,
+  CPCV backtest, PSR/DSR/PBO statistical significance
+- Each step has quantitative acceptance/rejection thresholds (no subjective judgment)
+- Maps directly to Phase 3 sub-phases (3.3, 3.9, 3.10, 3.11)
+- 11 Tier-1 academic references cited
+
+---
+
+## D011 — Academic References Centralized (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 007 |
+| Decision | Create docs/ACADEMIC_REFERENCES.md as single source of truth for all citations |
+| Status | ACCEPTED |
+
+### Context
+
+References were scattered across ADRs, PHASE_3_SPEC, docstrings, and MANIFEST.md.
+No central index existed for verifying Tier-1 compliance or finding canonical sources.
+
+### Justification
+
+- 56 references across 9 domain sections
+- Tier-1 criteria codified (journals, university presses, approved authors)
+- Forbidden sources explicitly listed (blogs, YouTube, Medium, Reddit)
+- Supports ADR-0002 requirement that all implementations cite canonical references
+
+---
+
+## D012 — ONBOARDING.md Published (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 007 |
+| Decision | Create docs/ONBOARDING.md as 15-min quick-start for new dev or Claude Code session |
+| Status | ACCEPTED |
+
+### Context
+
+New Claude Code sessions had to piece together context from CLAUDE.md, CONTEXT.md,
+PHASE_3_NOTES.md, and various docs. No single entry point existed.
+
+### Justification
+
+- 11 sections covering setup, workflow, conventions, gates, red flags, navigation
+- Explicit "Workflow for new Claude Code session" checklist (step 4)
+- "Where to find things" navigation table
+- Reduces onboarding time from ~30 min to ~15 min
