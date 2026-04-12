@@ -3,19 +3,22 @@ Integration test: Central Bank event full protocol.
 
 Verifies:
 1. S08 CBWatcher detects pre-event block window
-2. S05 CBEventGuard reads and respects the block
+2. S05 CBEventGuard reads and respects the block (async API v2)
 3. No trades execute during window
 4. Post-event scalp is allowed with reduced sizing
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
-from unittest.mock import AsyncMock, patch
+import json
+from datetime import UTC, datetime, timedelta
+from unittest.mock import AsyncMock
 
 import fakeredis.aioredis
+import pytest
 
 from services.s05_risk_manager.cb_event_guard import CBEventGuard
+from services.s05_risk_manager.models import BlockReason
 from services.s08_macro_intelligence.cb_watcher import CBWatcher
 
 
@@ -53,17 +56,46 @@ class TestCBEventProtocol:
         monitoring, _ = watcher.is_in_monitor_window(thirty_after)
         assert monitoring is True
 
-    def test_guard_blocks_new_orders_during_window(self) -> None:
-        """CBEventGuard.is_blocked() returns True during event window."""
-        guard = CBEventGuard(redis=fakeredis.aioredis.FakeRedis())
-        with patch.object(guard, "is_blocked", return_value=True):
-            assert guard.is_blocked() is True
+    @pytest.mark.asyncio
+    async def test_guard_blocks_new_orders_during_window(self) -> None:
+        """CBEventGuard.check() returns failed RuleResult during pre-event block window."""
+        redis = fakeredis.aioredis.FakeRedis()
+        frozen_now = datetime(2026, 4, 11, 14, 0, 0, tzinfo=UTC)
+        event_time = frozen_now + timedelta(minutes=20)
+        await redis.set(
+            "macro:cb_events",
+            json.dumps([event_time.isoformat()]),
+        )
+        guard = CBEventGuard(redis=redis)
+        result = await guard.check(utc_now=frozen_now)
+        assert result.passed is False
+        assert result.block_reason == BlockReason.CB_EVENT_BLOCK
 
-    def test_guard_allows_orders_outside_window(self) -> None:
-        """CBEventGuard.is_blocked() returns False outside any event window."""
-        guard = CBEventGuard(redis=fakeredis.aioredis.FakeRedis())
-        # Default implementation returns False (no Redis state)
-        assert guard.is_blocked() is False
+    @pytest.mark.asyncio
+    async def test_guard_allows_orders_outside_window(self) -> None:
+        """CBEventGuard.check() returns passed RuleResult outside any event window."""
+        redis = fakeredis.aioredis.FakeRedis()
+        frozen_now = datetime(2026, 4, 11, 14, 0, 0, tzinfo=UTC)
+        guard = CBEventGuard(redis=redis)
+        result = await guard.check(utc_now=frozen_now)
+        assert result.passed is True
+        assert result.block_reason is None
+
+    @pytest.mark.asyncio
+    async def test_guard_post_event_scalp_window(self) -> None:
+        """CBEventGuard.check() returns ok during post-event scalp window."""
+        redis = fakeredis.aioredis.FakeRedis()
+        frozen_now = datetime(2026, 4, 11, 14, 0, 0, tzinfo=UTC)
+        event_time = frozen_now - timedelta(minutes=5)
+        await redis.set(
+            "macro:cb_events",
+            json.dumps([event_time.isoformat()]),
+        )
+        guard = CBEventGuard(redis=redis)
+        result = await guard.check(utc_now=frozen_now)
+        assert result.passed is True
+        assert result.block_reason is None
+        assert await guard.is_post_event_scalp_window(utc_now=frozen_now) is True
 
     def test_all_events_have_block_and_monitor_keys(self) -> None:
         """Every hardcoded FOMC event must have block_start and monitor_end."""

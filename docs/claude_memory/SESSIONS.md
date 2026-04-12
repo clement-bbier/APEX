@@ -344,3 +344,39 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Phase 3.1 implementation (all blockers removed)
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+
+---
+
+## Session 008 — 2026-04-12
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Mission | Sprint 7 mini — Migrate test_cb_event_protocol.py to async API (#10) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~15 minutes |
+
+### Decisions Made
+
+1. CBEventGuard.is_blocked() sync method removed (dead code — zero internal call sites confirmed via grep)
+2. Integration tests migrated from mocked is_blocked() to real async check() with FakeRedis
+3. Added test_guard_post_event_scalp_window to cover the scalp window path (was untested)
+
+### Files Modified
+
+- `tests/integration/test_cb_event_protocol.py` — 3 tests migrated to async API, 1 new test added (7 total)
+- `services/s05_risk_manager/cb_event_guard.py` — TODO(APEX-CB-API-V2) removed from is_blocked()
+- `docs/claude_memory/SESSIONS.md` — this entry
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: 322 files unchanged
+- mypy --strict: 324 files, 0 errors
+- Integration test: 7/7 passed
+- Unit tests: 1,259 passed, zero regressions
+
+### Next Steps
+
+- Phase 3.1 implementation
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
