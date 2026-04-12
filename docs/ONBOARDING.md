@@ -19,7 +19,7 @@ and Redis, with Rust extensions for CPU-bound math.
 
 | Item | Value |
 |---|---|
-| Repo root | `C:\Users\cleme\Documents\04_Projets_Personnels\CashMachine` |
+| Repo root | `<where you cloned the repo>` |
 | Language | Python 3.12 + Rust/PyO3 (apex_mc, apex_risk crates) |
 | Services | 10 microservices (S01-S10) |
 | Messaging | ZeroMQ XSUB/XPUB (see ADR-0001) |
@@ -41,7 +41,6 @@ python -m venv .venv
 
 # 3. Install dependencies
 pip install -r requirements.txt
-pip install -e ".[dev]"
 
 # 4. Verify setup
 ruff check .                  # linter
@@ -49,7 +48,7 @@ mypy . --strict               # type checker
 pytest tests/unit/ -q         # unit tests (no Docker needed)
 
 # 5. Infrastructure (optional, for integration tests)
-docker compose up -d redis timescale
+docker compose -f docker/docker-compose.yml up -d redis timescaledb
 pytest tests/integration/ -q
 ```
 
@@ -88,7 +87,7 @@ Every commit must pass the full CI pipeline:
 ```bash
 make lint        # ruff check + ruff format + mypy --strict + bandit
 make test-unit   # pytest tests/unit/ with coverage >= 75%
-make test-int    # integration tests (needs Docker)
+make test-integration  # integration tests (needs Docker)
 ```
 
 Quick local check:

@@ -18,13 +18,24 @@ repos:
       - id: no-commit-to-branch
         args: ['--branch', 'main']
 
+  # Forbid committing .env files (allow .env.example)
+  - repo: local
+    hooks:
+      - id: forbid-env-files
+        name: Forbid committing .env files
+        entry: 'Committing .env files is forbidden (use .env.example instead)'
+        language: fail
+        files: '^\.env(\..+)?$'
+        exclude: '^\.env\.example$'
+
   # Ruff (linter + formatter)
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.11.6
     hooks:
       - id: ruff
-        args: [--fix]
+        # CI-aligned: check only (no --fix). Run 'ruff check --fix' manually.
       - id: ruff-format
+        args: [--check]
 
   # Mypy (type checker)
   - repo: https://github.com/pre-commit/mirrors-mypy

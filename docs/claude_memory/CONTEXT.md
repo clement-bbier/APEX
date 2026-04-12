@@ -26,7 +26,7 @@
 | Whole-codebase (#55) | CLEARED | P0: 0, P1: 15, P2: 13, P3: 6 | #64-#77 |
 | Meta-governance (#59) | CLEARED | P0: 3, P1: 8, P2: 7, P3: 5 | #78-#86 |
 
-**All P1 issues from both audits are now closed (100%).**
+**All P1 findings from audits #55 and #59 are now closed (100%).** Separately tracked items outside those audit issue ranges (e.g., deferred issue #63 for S01 connector Decimal migration) are tracked independently with backlog labels.
 
 ## Phase 3 Design
 
@@ -52,7 +52,7 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 
 - GEX validation requires options data (source TBD, may need paid API)
 - Whether all 6 features will pass IC threshold is unknown
-- #63 S01 connector Decimal migration (P1, deferred — MacroPoint/FundamentalPoint are float by design)
+- #63 S01 connector Decimal migration (backlog — deferred to Phase 3.X when macro/fundamental data is actively consumed; ~30 files in scope)
 - #102 backtest-gate continue-on-error removal (follow-up, pending Sharpe bug fix)
 
 ## Sprint Status

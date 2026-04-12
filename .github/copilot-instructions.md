@@ -19,7 +19,7 @@ This repository is APEX -- an institutional-grade quantitative trading system.
 
 ## Architecture constraints
 
-- **ZMQ topology** (ADR-0001): S01 binds on port 5555 (`bind=True`). All other services connect (`bind=False`).
+- **ZMQ topology** (ADR-0001): The broker (`core/zmq_broker.py`) is the only process that binds sockets (XSUB on 5555, XPUB on 5556). All services including S01 connect to the broker — none binds.
 - **Redis**: Use `ttl` argument (not `expire_seconds`) in `StateStore.set()` calls.
 - **No cross-service imports**: Services communicate only via ZMQ pub/sub and Redis. S0X must never import from S0Y.
 - **DIP**: `core/` never imports from `services/`. Services depend on `core/` abstractions.

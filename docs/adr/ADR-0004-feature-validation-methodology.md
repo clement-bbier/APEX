@@ -107,8 +107,14 @@ existing features already capture the same signal. Mean Decrease Accuracy
 |---|---|
 | Method | Permutation importance (sklearn) |
 | Model | Random Forest classifier (default hyperparameters) |
-| Acceptance criterion | MDA > median MDA of already-accepted features |
+| Acceptance criterion | First feature: MDA > 0 (beats random noise). Subsequent: MDA > median MDA of accepted features. |
 | Cross-validation | 5-fold stratified, no lookahead |
+
+**Bootstrap case rationale:** For the first feature candidate, there is no
+prior baseline. We require strictly positive MDA to ensure the feature
+beats random noise -- a weaker but non-trivial gate. Once the first
+feature is accepted, subsequent features must clear the median bar to
+maintain aggregate information content.
 
 **References:**
 - Breiman, L. (2001). "Random Forests." *Machine Learning*, 45(1), 5-32.
