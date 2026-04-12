@@ -85,14 +85,14 @@ def check_total_exposure(
     existing_notional = sum(p.size * p.entry_price for p in positions)
     new_notional = order.size * order.entry
     total_notional = existing_notional + new_notional
-    exposure_pct = float(total_notional / capital)
+    exposure_pct = total_notional / capital
 
     if exposure_pct > MAX_TOTAL_EXPOSURE_PCT:
         return RuleResult.fail(
             rule_name="check_total_exposure",
             block_reason=BlockReason.MAX_TOTAL_EXPOSURE,
             reason=f"total exposure {exposure_pct:.1%} > max {MAX_TOTAL_EXPOSURE_PCT:.0%}",
-            exposure_pct=exposure_pct,
+            exposure_pct=float(exposure_pct),
             max_exposure=MAX_TOTAL_EXPOSURE_PCT,
         )
     return RuleResult.ok(rule_name="check_total_exposure", reason=f"{exposure_pct:.1%} of capital")
@@ -121,7 +121,7 @@ def check_per_class_exposure(
         p.size * p.entry_price for p in positions if _asset_class(p.symbol) == new_class
     )
     class_notional += order.size * order.entry
-    class_pct = float(class_notional / capital)
+    class_pct = class_notional / capital
 
     if class_pct > MAX_CLASS_EXPOSURE_PCT:
         return RuleResult.fail(
@@ -129,7 +129,7 @@ def check_per_class_exposure(
             block_reason=BlockReason.MAX_CLASS_EXPOSURE,
             reason=f"{new_class} exposure {class_pct:.1%} > max {MAX_CLASS_EXPOSURE_PCT:.0%}",
             asset_class=new_class,
-            class_pct=class_pct,
+            class_pct=float(class_pct),
         )
     return RuleResult.ok(
         rule_name="check_per_class_exposure", reason=f"{new_class} {class_pct:.1%}"

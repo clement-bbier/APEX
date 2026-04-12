@@ -75,14 +75,14 @@ class ExecutionService(BaseService):
 
         if settings.trading_mode == TradingMode.LIVE:
             self._alpaca = AlpacaBroker(
-                api_key=settings.alpaca_api_key,
-                secret_key=settings.alpaca_api_secret,
+                api_key=settings.alpaca_api_key.get_secret_value(),
+                secret_key=settings.alpaca_api_secret.get_secret_value(),
                 base_url=settings.alpaca_base_url,
                 paper=False,
             )
             self._binance = BinanceBroker(
-                api_key=settings.binance_api_key,
-                secret_key=settings.binance_secret_key,
+                api_key=settings.binance_api_key.get_secret_value(),
+                secret_key=settings.binance_secret_key.get_secret_value(),
                 base_url=settings.binance_rest_url,
                 testnet=False,
             )

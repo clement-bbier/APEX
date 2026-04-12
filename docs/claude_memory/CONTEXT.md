@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
-**Last updated**: 2026-04-11
-**Updated by**: Session 001
+**Last updated**: 2026-04-12
+**Updated by**: Session 003
 
 ---
 
@@ -51,9 +51,16 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 
 - GEX validation requires options data (source TBD, may need paid API)
 - Whether all 6 features will pass IC threshold is unknown
-- P1 audit issues should be addressed in parallel (CI gates, float->Decimal, SecretStr)
+- Remaining P1 audit issues: CI gates, S01 connector Decimal migration (MacroPoint/FundamentalPoint model types)
+
+## Sprint Status
+
+| Sprint | PR | Issues | Status |
+|---|---|---|---|
+| Sprint 1 — Docs quick wins | #100 | #67, #78, #79, #80 | MERGED |
+| Sprint 2 — Security & Config | TBD | #66, #69, #71 | PR CREATED |
 
 ## Branch Status
 
 - `main` is clean, all tests passing
-- No active feature branches
+- `sprint2/security-config-hardening` — PR pending review

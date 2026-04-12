@@ -203,13 +203,13 @@ class CircuitBreaker:
         """Pure function: evaluate all triggers. Returns BlockReason or None."""
         # 1. Daily drawdown
         if starting_capital > Decimal("0"):
-            daily_loss_pct = float(-current_daily_pnl / starting_capital)
+            daily_loss_pct = -current_daily_pnl / starting_capital
             if daily_loss_pct > MAX_DAILY_LOSS_PCT:
                 return BlockReason.DAILY_DRAWDOWN_EXCEEDED
 
         # 2. 30-minute intraday loss
         if starting_capital > Decimal("0"):
-            intraday_pct = float(-intraday_loss_30m / starting_capital)
+            intraday_pct = -intraday_loss_30m / starting_capital
             if intraday_pct > MAX_INTRADAY_LOSS_30M_PCT:
                 return BlockReason.INTRADAY_LOSS_EXCEEDED
 
@@ -237,6 +237,7 @@ class CircuitBreaker:
         """Trip the breaker to OPEN, persist snapshot, and return it."""
         now = datetime.now(UTC)
         daily_loss_pct = (
+            # float() needed: CircuitBreakerSnapshot.daily_loss_pct is float
             float(-daily_pnl / starting_capital) if starting_capital > Decimal("0") else 0.0
         )
         new_snap = CircuitBreakerSnapshot(

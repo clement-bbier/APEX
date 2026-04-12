@@ -83,13 +83,13 @@ def check_min_rr(order: OrderCandidate) -> RuleResult:
             reason="zero SL distance",
         )
     tp_distance = abs(order.target_scalp - order.entry)
-    rr = float(tp_distance / sl_distance)
+    rr = tp_distance / sl_distance
     if rr < MIN_RR_RATIO:
         return RuleResult.fail(
             rule_name="check_min_rr",
             block_reason=BlockReason.MIN_RR_NOT_MET,
             reason=f"RR {rr:.3f} < minimum {MIN_RR_RATIO}",
-            rr=rr,
+            rr=float(rr),
         )
     return RuleResult.ok(rule_name="check_min_rr", reason=f"RR {rr:.3f}")
 

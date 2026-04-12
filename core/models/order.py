@@ -207,12 +207,12 @@ class TradeRecord(BaseModel):
         return self.net_pnl > 0
 
     @property
-    def r_multiple(self) -> float | None:
+    def r_multiple(self) -> Decimal | None:
         """Return PnL as multiple of initial risk (R)."""
         risk = abs(self.entry_price - self.exit_price)
         if risk == 0 or self.size == 0:
             return None
-        return float(self.net_pnl / (risk * self.size))
+        return self.net_pnl / (risk * self.size)
 
 
 class NullOrder(BaseModel):

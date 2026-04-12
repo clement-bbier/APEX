@@ -81,3 +81,58 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 - Begin Phase 3.1 (Feature Engineering Pipeline Foundation)
 - Continue Sprint 2 docs: ARCHITECTURE.md (#82), ACADEMIC_REFERENCES.md (#83), ONBOARDING.md (#84)
 - Address P1 audit issues (#64-#77) in parallel with Phase 3
+
+---
+
+## Session 003 — 2026-04-12
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Mission | Sprint 2 — Security & Config hardening (#66, #69, #71) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1 hour |
+
+### Decisions Made
+
+1. Broker API keys (Alpaca, Binance), timescale_password, alert_smtp_password, twilio_sid/token, db_password all converted to SecretStr
+2. Removed mypy ignore_errors for core.models.* — zero errors surfaced (models were already well-typed)
+3. Kept float() in S05 RuleResult kwargs (serialization boundary: RuleResult accepts str|int|float|bool, not Decimal)
+4. Kept float() in CircuitBreakerSnapshot.daily_loss_pct (model field is typed float)
+5. Deferred S01 connector float→Decimal changes: MacroPoint.value and FundamentalPoint.value model fields are float by design (macro indicators/ratios, not financial prices/sizes/pnl)
+6. Deferred S07, S09, S10 float→Decimal (as planned — stats, trade metrics, JSON serialization)
+
+### Files Modified
+
+- `core/config.py` — SecretStr for 8 secret fields, timescale_dsn uses .get_secret_value()
+- `core/models/order.py` — TradeRecord.r_multiple returns Decimal instead of float
+- `core/models/signal.py` — Signal.risk_reward returns Decimal instead of float
+- `pyproject.toml` — removed core.models.* from mypy ignore_errors
+- `services/s01_data_ingestion/service.py` — .get_secret_value() for alpaca keys
+- `services/s01_data_ingestion/connectors/alpaca_historical.py` — .get_secret_value()
+- `services/s06_execution/service.py` — .get_secret_value() for alpaca + binance keys
+- `services/s10_monitor/alert_engine.py` — .get_secret_value() for smtp_password, twilio_sid/token
+- `services/s05_risk_manager/position_rules.py` — Decimal computation (float only at kwargs)
+- `services/s05_risk_manager/circuit_breaker.py` — Decimal computation in _evaluate_triggers
+- `services/s05_risk_manager/exposure_monitor.py` — Decimal computation (float only at kwargs)
+- `tests/unit/test_config.py` — updated assertions for SecretStr
+
+### Files Deferred (with reason)
+
+- S01 connectors (FRED, ECB, BoJ, EDGAR, SimFin): model fields MacroPoint.value and FundamentalPoint.value are typed float — changing requires model migration
+- S07 quant_analytics: float() for statistical computations (Hurst, GARCH) — not financial
+- S09 trade_analyzer: dedicated metrics sprint
+- S10 command_api: 20+ float() for JSON serialization — not financial
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: 317 files formatted
+- mypy --strict: 319 files, 0 errors
+- pytest: 1228 unit tests passed, 0 failures
+
+### Next Steps
+
+- Phase 3.1 implementation
+- Sprint 3: remaining P1 audit issues
+- S01 connector Decimal migration (requires MacroPoint/FundamentalPoint model changes)
