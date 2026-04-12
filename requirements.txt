@@ -41,3 +41,13 @@ opentelemetry-exporter-otlp-proto-grpc>=1.24.0
 croniter>=2.0.0,<4.0.0
 types-PyYAML>=6.0.0
 types-croniter>=2.0.0
+# --- Transitive deps pinned for CVE remediation (Sprint 3, #68) ---
+urllib3>=2.6.3
+tornado>=6.5.5
+requests>=2.33.0
+pillow>=12.1.1
+protobuf>=6.33.5
+pygments>=2.20.0
+streamlit>=1.54.0
+curl-cffi>=0.15.0
+wheel>=0.46.2

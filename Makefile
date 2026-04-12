@@ -22,7 +22,7 @@ type:
 test-unit:
 	$(PYTHON) -m pytest tests/unit/ -v \
 		--cov=services --cov=core --cov=backtesting \
-		--cov-report=term-missing --cov-fail-under=40 --timeout=30
+		--cov-report=term-missing --cov-fail-under=75 --timeout=30
 
 test-integration:
 	$(PYTHON) -m pytest tests/integration/ -v --timeout=60

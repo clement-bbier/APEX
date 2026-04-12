@@ -30,9 +30,9 @@ jobs:
       - name: Build Rust wheels
         run: |
           pip install "maturin>=1.9.4"
-          (cd rust/apex_mc   && maturin build --release) || true
-          (cd rust/apex_risk && maturin build --release) || true
-          python -m pip install ./rust/target/wheels/*.whl 2>/dev/null || true
+          (cd rust/apex_mc   && maturin build --release)
+          (cd rust/apex_risk && maturin build --release)
+          python -m pip install ./rust/target/wheels/*.whl
 
       - name: Generate test fixture (if missing)
         run: |
@@ -43,6 +43,7 @@ jobs:
       - name: Run backtest regression
         run: PYTHONPATH="."  python scripts/backtest_regression.py --fixture tests/fixtures/30d_btcusdt_1m.parquet
         env:
+          # TODO: Align with CLAUDE.md targets (Sharpe >= 0.8, DD <= 0.08) in Phase 5
           BACKTEST_MIN_SHARPE: "0.5"
           BACKTEST_MAX_DD: "0.12"
 

@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-12
-**Updated by**: Session 003
+**Updated by**: Session 004
 
 ---
 
@@ -58,9 +58,11 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 | Sprint | PR | Issues | Status |
 |---|---|---|---|
 | Sprint 1 — Docs quick wins | #100 | #67, #78, #79, #80 | MERGED |
-| Sprint 2 — Security & Config | TBD | #66, #69, #71 | PR CREATED |
+| Sprint 2 — Security & Config | #101 | #66, #69, #71 | MERGED |
+| Sprint 3 — CI hardening | TBD | #64, #65, #68, #70 | PR PENDING |
 
 ## Branch Status
 
 - `main` is clean, all tests passing
-- `sprint2/security-config-hardening` — PR pending review
+- `sprint3/ci-hardening` — PR pending review
+- Follow-up issue #102 created for backtest-gate continue-on-error removal
