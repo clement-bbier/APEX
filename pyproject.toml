@@ -125,7 +125,6 @@ omit = [
     "backtesting/engine.py",
     "backtesting/data_loader.py",
     # S01: only live connectors and serving entry point (not the whole package)
-    "services/s01_data_ingestion/connectors/alpaca_live.py",
     "services/s01_data_ingestion/connectors/binance_live.py",
     "services/s01_data_ingestion/serving/main.py",
     # Brokers (require live API connections)
