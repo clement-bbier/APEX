@@ -46,7 +46,7 @@ class FeaturePipeline:
         labeler: TripleBarrierLabelerAdapter,
         weighter: SampleWeighter,
     ) -> None:
-        self._calculators = calculators
+        self._calculators = list(calculators)
         self._labeler = labeler
         self._weighter = weighter
 

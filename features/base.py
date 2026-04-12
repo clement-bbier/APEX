@@ -124,3 +124,12 @@ class FeatureCalculator(ABC):
                     f"'{col}' has {null_count} null(s) outside warm-up "
                     f"window (warm_up_rows={warm_up_rows})."
                 )
+            # Polars null_count does not detect float NaN values.
+            if check_df[col].dtype in (pl.Float32, pl.Float64):
+                nan_count = check_df[col].is_nan().sum()
+                if nan_count > 0:
+                    raise ValueError(
+                        f"FeatureCalculator '{self.name()}' output column "
+                        f"'{col}' contains {nan_count} NaN values outside "
+                        f"warm-up window (warm_up_rows={warm_up_rows})."
+                    )

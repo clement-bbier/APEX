@@ -38,9 +38,13 @@ class SampleWeighter:
     ) -> npt.NDArray[np.float64]:
         """Compute average-uniqueness sample weights.
 
-        For each sample *i*, uniqueness at time *t* is defined as
-        1 / (number of concurrent labels at *t*).  The weight of
-        sample *i* is the average uniqueness over its lifespan.
+        For each sample *i*, concurrency c(t) is the number of active
+        labels at time *t*.  Uniqueness u(t, i) = 1 / c(t).  The
+        weight of sample *i* is the duration-weighted average of
+        u(t, i) over its lifespan [entry_i, exit_i].
+
+        Concurrency is piecewise-constant between sorted unique
+        entry/exit timestamps, so we integrate over segments.
 
         Args:
             entry_times: Entry timestamp for each sample.
@@ -51,7 +55,15 @@ class SampleWeighter:
             All weights > 0 when inputs are valid.
 
         Raises:
-            ValueError: If inputs have different lengths or are empty.
+            ValueError: If inputs have different lengths.
+
+        Notes:
+            Returns an empty float64 array when both inputs are empty.
+
+        Reference:
+            Lopez de Prado, M. (2018). *Advances in Financial Machine
+            Learning*. Wiley, Ch. 4, Section 4.2, formula for average
+            uniqueness ū_i = (1/|T_i|) Σ_{t∈T_i} (1/c_t).
         """
         n = len(entry_times)
         if n != len(exit_times):
@@ -61,33 +73,44 @@ class SampleWeighter:
         if n == 0:
             return np.array([], dtype=np.float64)
 
-        # Build the concurrency matrix.
-        # For each sample i, count how many other samples are alive
-        # at each point in sample i's lifespan.
+        # Sorted unique endpoints define piecewise-constant segments.
+        endpoints = sorted(set(entry_times + exit_times))
         weights = np.zeros(n, dtype=np.float64)
 
         for i in range(n):
-            # Time points within sample i's lifespan: all entry/exit
-            # times that fall within [entry_i, exit_i].
             t_start = entry_times[i]
             t_end = exit_times[i]
 
-            # O(n^2) approach: count concurrent labels for sample i.
-            n_concurrent = 0
+            # Zero-duration sample: fallback to point-in-time concurrency.
+            if t_start == t_end:
+                n_concurrent = sum(
+                    1 for j in range(n) if entry_times[j] <= t_start <= exit_times[j]
+                )
+                weights[i] = 1.0 / n_concurrent if n_concurrent > 0 else 1.0
+                continue
+
+            # Duration-weighted average of 1/c(t) over [t_start, t_end].
             total_uniqueness = 0.0
+            total_duration = 0.0
 
-            for j in range(n):
-                # j overlaps with i if entry_j <= exit_i AND exit_j >= entry_i
-                if entry_times[j] <= t_end and exit_times[j] >= t_start:
-                    n_concurrent += 1
+            for k in range(len(endpoints) - 1):
+                seg_start, seg_end = endpoints[k], endpoints[k + 1]
+                overlap_start = max(t_start, seg_start)
+                overlap_end = min(t_end, seg_end)
+                seg_duration = (overlap_end - overlap_start).total_seconds()
+                if seg_duration <= 0.0:
+                    continue
+                # Count labels active during this segment (open interval).
+                n_concurrent = sum(
+                    1
+                    for j in range(n)
+                    if entry_times[j] < overlap_end and exit_times[j] > overlap_start
+                )
+                if n_concurrent > 0:
+                    total_uniqueness += seg_duration * (1.0 / n_concurrent)
+                    total_duration += seg_duration
 
-            if n_concurrent > 0:
-                # Average uniqueness = 1 / n_concurrent for each point
-                total_uniqueness = 1.0 / n_concurrent
-            else:
-                total_uniqueness = 1.0
-
-            weights[i] = total_uniqueness
+            weights[i] = total_uniqueness / total_duration if total_duration > 0 else 1.0
 
         return weights
 
@@ -103,8 +126,9 @@ class SampleWeighter:
         sample proportionally to its uniqueness contribution.
 
         .. note::
-            Full implementation deferred to a later sub-phase.
-            Currently delegates to :meth:`uniqueness_weights`.
+            Raises ``NotImplementedError`` in Phase 3.1.  Use
+            :meth:`uniqueness_weights` directly until wired in a
+            later sub-phase.
 
         Reference:
             Lopez de Prado, M. (2018). *Advances in Financial Machine

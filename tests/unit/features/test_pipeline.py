@@ -10,7 +10,7 @@ from features.labels import TripleBarrierLabelerAdapter
 from features.pipeline import FeaturePipeline
 from features.weights import SampleWeighter
 
-# ── Helpers ───────────────────────────────���───────────────────────────
+# -- Helpers --
 
 
 class _IdentityCalculator(FeatureCalculator):
@@ -32,7 +32,7 @@ class _IdentityCalculator(FeatureCalculator):
         return [self._col]
 
 
-# ── Tests ────────────────────────────────────────────���────────────────
+# -- Tests --
 
 
 class TestFeaturePipelineConstruction:

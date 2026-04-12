@@ -39,7 +39,6 @@ def compute_fracdiff(
 
 def find_minimum_d(
     series: list[float],
-    adf_threshold: float = 0.05,
     d_low: float = 0.0,
     d_high: float = 1.0,
     n_steps: int = 20,
@@ -47,11 +46,10 @@ def find_minimum_d(
     """Find the minimum *d* that achieves stationarity.
 
     Wrapper around :meth:`FractionalDifferentiator.find_minimum_d`.
+    The ADF test uses a fixed 5% significance level internally.
 
     Args:
         series: Input time series (log-prices recommended).
-        adf_threshold: Not used directly (ADF test is internal at 5%).
-            Kept in signature for interface compatibility.
         d_low: Lower bound for the d search.
         d_high: Upper bound for the d search.
         n_steps: Number of candidate d values to test.

@@ -15,7 +15,7 @@ from hypothesis import strategies as st
 
 from features.weights import SampleWeighter
 
-# ── Deterministic unit tests ────────────────────────────��─────────────
+# -- Deterministic unit tests --
 
 
 class TestUniquenessWeights:
@@ -64,8 +64,65 @@ class TestUniquenessWeights:
         with pytest.raises(NotImplementedError, match="deferred"):
             w.return_attribution_weights([], [], np.array([]))
 
+    def test_partial_overlap_uses_duration_weighted_average(self) -> None:
+        """3 samples with partial overlap — weight reflects duration-weighted avg.
 
-# ── Hypothesis property-based tests ──────────────────────────────────
+        Timeline (1h segments):
+            A: [0h, 2h)
+            B: [1h, 3h)
+            C: [2h, 4h)
+
+        For sample A [0h, 2h):
+            Segment [0h, 1h): only A active => uniqueness = 1/1 = 1.0, dur = 1h
+            Segment [1h, 2h): A+B active   => uniqueness = 1/2 = 0.5, dur = 1h
+            Duration-weighted avg = (1*1.0 + 1*0.5) / 2 = 0.75
+
+        For sample B [1h, 3h):
+            Segment [1h, 2h): A+B active   => uniqueness = 1/2 = 0.5, dur = 1h
+            Segment [2h, 3h): B+C active   => uniqueness = 1/2 = 0.5, dur = 1h
+            Duration-weighted avg = (1*0.5 + 1*0.5) / 2 = 0.50
+
+        For sample C [2h, 4h):
+            Segment [2h, 3h): B+C active   => uniqueness = 1/2 = 0.5, dur = 1h
+            Segment [3h, 4h): only C active => uniqueness = 1/1 = 1.0, dur = 1h
+            Duration-weighted avg = (1*0.5 + 1*1.0) / 2 = 0.75
+
+        Ref: LdP (2018) AFML §4.2.
+        """
+        w = SampleWeighter()
+        t = [datetime(2024, 1, 1, hour=h, tzinfo=UTC) for h in range(5)]
+        entries = [t[0], t[1], t[2]]
+        exits = [t[2], t[3], t[4]]
+        result = w.uniqueness_weights(entries, exits)
+        np.testing.assert_allclose(result, [0.75, 0.50, 0.75], atol=1e-9)
+
+    def test_concurrency_varies_over_lifespan(self) -> None:
+        """Sample overlaps 50% with another, then 50% alone.
+
+        Timeline:
+            A: [0h, 2h)
+            B: [0h, 1h)
+
+        For sample A [0h, 2h):
+            Segment [0h, 1h): A+B active => uniqueness = 1/2, dur = 1h
+            Segment [1h, 2h): only A     => uniqueness = 1/1, dur = 1h
+            Duration-weighted avg = (0.5 + 1.0) / 2 = 0.75
+
+        For sample B [0h, 1h):
+            Segment [0h, 1h): A+B active => uniqueness = 1/2, dur = 1h
+            Duration-weighted avg = 0.5
+
+        Ref: LdP (2018) AFML §4.2.
+        """
+        w = SampleWeighter()
+        t = [datetime(2024, 1, 1, hour=h, tzinfo=UTC) for h in range(3)]
+        entries = [t[0], t[0]]
+        exits = [t[2], t[1]]
+        result = w.uniqueness_weights(entries, exits)
+        np.testing.assert_allclose(result, [0.75, 0.50], atol=1e-9)
+
+
+# -- Hypothesis property-based tests --
 
 
 def _make_datetimes(n: int, base: datetime | None = None) -> list[datetime]:

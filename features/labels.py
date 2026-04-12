@@ -64,6 +64,9 @@ class TripleBarrierLabelerAdapter:
             DataFrame with columns: ``label`` (int), ``t1`` (datetime),
             ``pt_touch`` (bool), ``sl_touch`` (bool).
         """
+        if side not in (-1, 1):
+            raise ValueError(f"side must be +1 (long) or -1 (short), got {side}")
+
         closes: list[Decimal] = [Decimal(str(v)) for v in df[close_col].to_list()]
         timestamps: list[datetime] = df[timestamp_col].to_list()
 

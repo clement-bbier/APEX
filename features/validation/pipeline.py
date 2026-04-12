@@ -45,7 +45,7 @@ class ValidationPipeline:
     """
 
     def __init__(self, stages: list[ValidationStage]) -> None:
-        self._stages = stages
+        self._stages = list(stages)
 
     @property
     def stages(self) -> list[ValidationStage]:

@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import polars as pl
+import pytest
 
 from core.math.labeling import TripleBarrierConfig, TripleBarrierLabeler
 from features.labels import TripleBarrierLabelerAdapter
@@ -78,7 +79,13 @@ class TestTripleBarrierLabelerAdapter:
         labels = set(result["label"].to_list())
         assert labels.issubset({-1, 0, 1})
 
-    # ── Helpers ───────────────────────────────────────��──────────────
+    def test_invalid_side_raises(self) -> None:
+        adapter = TripleBarrierLabelerAdapter()
+        df = self._make_bars(10)
+        with pytest.raises(ValueError, match="side must be"):
+            adapter.label(df, side=0)
+
+    # -- Helpers --
 
     @staticmethod
     def _make_bars(n: int) -> pl.DataFrame:

@@ -7,7 +7,7 @@ import pytest
 
 from features.base import FeatureCalculator
 
-# ── Concrete test implementation ───────────────────��──────────────────
+# -- Concrete test implementation --
 
 
 class _DummyCalculator(FeatureCalculator):
@@ -26,7 +26,7 @@ class _DummyCalculator(FeatureCalculator):
         return ["dummy_signal"]
 
 
-# ── Tests ────────────────────────────��───────────────────────────���────
+# -- Tests --
 
 
 class TestFeatureCalculatorABC:
@@ -107,3 +107,9 @@ class TestValidateOutput:
         calc = _DummyCalculator()
         df = pl.DataFrame({"dummy_signal": [None, None]})
         calc.validate_output(df, warm_up_rows=2)  # should not raise
+
+    def test_nan_outside_warmup_raises(self) -> None:
+        calc = _DummyCalculator()
+        df = pl.DataFrame({"dummy_signal": [1.0, float("nan"), 3.0]})
+        with pytest.raises(ValueError, match="NaN"):
+            calc.validate_output(df)
