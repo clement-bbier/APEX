@@ -249,3 +249,54 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 - Phase 3.1 implementation
 - Continue P1 audit issues (Sprint 5+)
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+
+---
+
+## Session 006 — 2026-04-12
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Mission | Sprint 5 — Architecture heavy refactors (#72, #73) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1.5 hours |
+
+### Decisions Made
+
+1. Broker ABC (`broker_base.py`): `place_order(ApprovedOrder) -> ExecutedOrder | None` unifies sync (paper=ExecutedOrder) and async (live=None) fill models (D008)
+2. BrokerFactory with lazy singleton pattern: paper mode → PaperTrader, live crypto → BinanceBroker, live equity → AlpacaBroker
+3. Raw venue methods renamed to `_submit_raw_order()` (Alpaca, Binance) to avoid ABC method name collision while preserving venue-specific access
+4. PaperTrader accepts optional `StateStore` for tick fetching in `place_order()`; `PaperTrader()` (no args) remains backward compatible
+5. SignalPipeline with PipelineState dataclass: 7 steps with explicit inter-step data flow (D009)
+6. Pipeline constants (_OFI_THRESHOLD, _SL_ATR_MULT, etc.) moved from service.py to pipeline.py
+
+### Files Created
+
+- `services/s06_execution/broker_base.py` — Broker ABC + exceptions
+- `services/s06_execution/broker_factory.py` — BrokerFactory
+- `services/s02_signal_engine/pipeline.py` — SignalPipeline + PipelineState
+- `tests/unit/s06/test_broker_base.py` — 15 tests (ABC, is_connected, factory)
+- `tests/unit/s02/test_signal_pipeline.py` — 16 tests (all 7 pipeline steps)
+
+### Files Modified
+
+- `services/s06_execution/broker_alpaca.py` — inherits Broker, is_connected, place_order(ApprovedOrder)
+- `services/s06_execution/broker_binance.py` — inherits Broker, is_connected, place_order(ApprovedOrder), _order_symbols tracking
+- `services/s06_execution/paper_trader.py` — inherits Broker, connect/disconnect no-ops, place_order, _get_or_build_tick
+- `services/s06_execution/service.py` — refactored to use BrokerFactory, _execute() simplified from 35 to 5 lines
+- `services/s02_signal_engine/service.py` — _process_tick now 3 lines delegating to pipeline.run()
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: 322 files
+- mypy --strict: 324 files, 0 errors
+- pytest: 1259 unit tests passed (+31 new), coverage 79.68%
+- Integration tests: 21 passed, 27 skipped (no network/Docker), 7 TimescaleDB errors (pre-existing)
+- Zero behavior regression
+
+### Next Steps
+
+- Phase 3.1 implementation
+- Remaining P1 issue: #63 (S01 connector Decimal migration)
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate

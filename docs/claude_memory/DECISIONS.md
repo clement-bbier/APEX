@@ -188,3 +188,68 @@ way to get the Redis client.
 - `.client` property is the natural public API complement to `connect()`
 - `_ensure_connected()` kept as deprecated delegate for backward compat
 - All 4 call sites (S05, S06, S10×2) migrated to `state.client`
+
+---
+
+## D008 — S06 Broker ABC + BrokerFactory (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 006 |
+| Decision | Extract Broker ABC from 3 concrete brokers; route via BrokerFactory |
+| Status | ACCEPTED |
+
+### Context
+
+S06 Execution had 3 brokers (Alpaca, Binance, PaperTrader) with no common interface.
+ExecutionService imported all 3 concrete classes and used if/elif branching to route
+orders (DIP + OCP violation, issue #72).
+
+### Alternatives Considered
+
+1. **Protocol-based**: Define a `SupportsOrderPlacement` Protocol. Lighter-weight but
+   doesn't enforce lifecycle methods (connect/disconnect).
+2. **ABC (chosen)**: `Broker` ABC with `connect/disconnect/is_connected/place_order/cancel_order`.
+   Strongly typed, enforces contract at class definition time.
+
+### Justification
+
+- `place_order(ApprovedOrder) -> ExecutedOrder | None` unifies sync (paper) and async
+  (live) fill models: paper returns ExecutedOrder, live returns None.
+- BrokerFactory centralises routing: paper mode always returns PaperTrader, live mode
+  routes by crypto suffix. Adding IBKR = 1 new file + 1 factory entry.
+- ExecutionService._execute() reduced from 35 lines with 4 branches to 5 lines.
+- Raw venue-specific methods preserved as `_submit_raw_order()` for direct access.
+
+---
+
+## D009 — S02 SignalPipeline Stepwise Decomposition (2026-04-12)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-12 |
+| Session | 006 |
+| Decision | Decompose _process_tick into SignalPipeline with PipelineState dataclass |
+| Status | ACCEPTED |
+
+### Context
+
+S02 SignalEngine._process_tick was ~270 lines performing 7 distinct operations on the
+hottest path in the system (every tick). Impossible to unit-test any step in isolation
+(SRP violation, issue #73).
+
+### Alternatives Considered
+
+1. **Simple helper methods on SignalEngine**: Extract 7 private methods. Simple but
+   still couples all state to the service class; no reusable state object.
+2. **PipelineState + SignalPipeline (chosen)**: Separate class with shared mutable state
+   dataclass. Each step reads/writes explicit fields.
+
+### Justification
+
+- PipelineState makes inter-step data flow explicit and inspectable
+- Each step is independently unit-testable with minimal fixtures
+- SignalPipeline can be reused (e.g. backtesting engine could call individual steps)
+- SignalEngine._process_tick reduced to 3 lines: pipeline.run() + publish
+- 16 new unit tests covering all 7 pipeline steps
