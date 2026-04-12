@@ -1,0 +1,39 @@
+﻿# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+.coverage
+*.egg-info/
+
+# Rust
+target/
+rust/target/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker / Logs
+logs/
+*.log
+
+# Claude local
+.claude/
+
+# Graphify itself
+graphify-out/
+
+# Git internals
+.git/
+
+# Large generated files
+docs/audits/coupling_graph.svg
