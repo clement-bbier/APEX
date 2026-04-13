@@ -1006,3 +1006,92 @@ Implement cross-calculator multicollinearity analysis for 8 signal columns from 
 
 - Push branch, open PR for Copilot review
 - Phase 3.10 (CPCV) after merge
+
+---
+
+## Session 023 -- 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.10 -- CPCV with Purging |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/cpcv-purging` |
+| PR | #119 |
+| Issue | #96 |
+
+### Objective
+
+Implement Combinatorial Purged Cross-Validation (CPCV) from Lopez de Prado (2018) Ch. 7. Scikit-learn-compatible splitter with temporal purging and embargo to eliminate label leakage in financial time series CV.
+
+### Files Created
+
+- `features/cv/cpcv.py` (~280 LOC) -- `CombinatoriallyPurgedKFold` class
+- `features/cv/purging.py` (~65 LOC) -- `purge_train_indices()` helper
+- `features/cv/embargo.py` (~65 LOC) -- `apply_embargo()` helper
+- `features/cv/__init__.py` (modified) -- exports added
+- `tests/unit/features/cv/test_cpcv.py` (~575 LOC, 35 tests)
+- `tests/unit/features/cv/test_purging.py` (~100 LOC, 10 tests)
+- `tests/unit/features/cv/test_embargo.py` (~65 LOC, 7 tests)
+- `reports/phase_3_10/cpcv_diagnostic_report.md` -- Leakage stress test report
+
+### Key Results
+
+- 52 new tests, all passing (57 total in features/cv/)
+- Leakage stress test: Random K-fold 82.7% vs CPCV 57.5% (25.2pp drop)
+- Zero regressions on full suite (1586 passed)
+- mypy strict: 0 errors, ruff: 0 errors
+
+### Decisions
+
+- No new ADR decisions needed -- followed existing PHASE_3_SPEC S3.10 contract exactly
+- Used `BacktestSplitter` ABC from `features/cv/base.py` as reference (did not subclass because API differs: CPCV needs `t1` parameter)
+- scikit-learn installed as dependency for leakage characterization tests (RandomForestClassifier)
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors (5 files)
+- 52 new tests passed
+- Full suite: 1,586 passed, 53 deselected (pre-existing hypothesis timeouts), 0 regressions
+
+### Next Steps
+
+- Await Copilot re-review on PR #119 (hotfix pushed)
+- Phase 3.11 (DSR/PBO) depends on CPCV splits from this implementation
+
+---
+
+## Session 024 -- 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.10 -- PR #119 Copilot Review Hotfix |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/cpcv-purging` |
+| PR | #119 (updated) |
+
+### Objective
+
+Address 5 Copilot review comments + CI failure (sklearn missing) on PR #119.
+
+### Fixes Applied
+
+1. **Methodological bug (Lopez de Prado S7.4.1)**: Purging interval start used `t1[group_start]` instead of `t0[group_start]`. `split()` now accepts optional `t0` parameter. With t0, purging removes ~2x more samples (avg 26.7 vs 13.3). Test characterizing the bug added.
+2. **Performance #1**: train_candidates O(n) Python loop replaced with group-based `np.concatenate`.
+3. **Performance #2**: embargo Python `set` replaced with vectorized `np.arange` + `np.isin`.
+4. **CI red + sklearn dependency**: 3 leakage tests rewritten with deterministic 1-NN classifier in pure numpy. No sklearn dependency.
+5. **Brittle assertions**: RF-based accuracy bands replaced with deterministic 1-NN. Larger drop (33.8pp vs 25.2pp).
+
+### Key Results
+
+- 58 tests passing (53 before + 1 new t0 characterization + 4 parametrized already counted)
+- Leakage drop: K-fold 85.5% vs CPCV 51.7% (33.8pp, improved from 25.2pp before t0 fix)
+- mypy strict: 0 errors, ruff: 0 errors
+- Scope: 4 files only (cpcv.py, embargo.py, test_cpcv.py, report)
+
+### Next Steps
+
+- Await Copilot re-review on PR #119
+- Phase 3.11 (DSR/PBO) after merge
