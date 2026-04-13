@@ -14,9 +14,9 @@ Note on S02 MicrostructureAnalyzer.ofi():
     S02 is NOT modified (anti-scope-creep).
 
 Output columns (all realization-like at tick t):
-    ofi_10: OFI over the last 10 ticks [t-9, t].
-    ofi_50: OFI over the last 50 ticks [t-49, t].
-    ofi_100: OFI over the last 100 ticks [t-99, t].
+    ofi_{w}: OFI over the last w ticks [t-w+1, t] for each configured
+        window. Default windows (10, 50, 100) produce ofi_10, ofi_50,
+        ofi_100. Column names are generated dynamically from windows.
     ofi_signal: tanh-normalized weighted combination in [-1, +1].
 
 D028 classification:
@@ -89,12 +89,6 @@ class OFICalculator(FeatureCalculator):
         "quantity",
         "side",
     ]
-    _OUTPUT_COLUMNS: ClassVar[list[str]] = [
-        "ofi_10",
-        "ofi_50",
-        "ofi_100",
-        "ofi_signal",
-    ]
 
     def __init__(
         self,
@@ -106,13 +100,15 @@ class OFICalculator(FeatureCalculator):
 
         Args:
             windows: Rolling window sizes in ticks for OFI computation.
-                Must have the same length as ``weights``.
+                Must be non-empty and have the same length as ``weights``.
             signal_k: Multiplier for the rolling std used to normalize
                 the combined signal via tanh (D025 pattern).
             weights: Weights for the linear combination of OFI windows
-                used in ``ofi_signal``. Must sum to ~1.0 and have the
+                used in ``ofi_signal``. Must sum to 1.0 and have the
                 same length as ``windows``.
         """
+        if len(windows) == 0:
+            raise ValueError("windows must contain at least one value")
         if len(windows) != len(weights):
             raise ValueError(
                 f"windows and weights must have the same length, "
@@ -120,6 +116,8 @@ class OFICalculator(FeatureCalculator):
             )
         if any(w < 2 for w in windows):
             raise ValueError(f"All windows must be >= 2, got {windows}")
+        if abs(sum(weights) - 1.0) > 1e-9:
+            raise ValueError(f"weights must sum to 1.0, got {sum(weights)}")
         self._windows = windows
         self._signal_k = signal_k
         self._weights = weights
@@ -139,7 +137,7 @@ class OFICalculator(FeatureCalculator):
         return list(self._REQUIRED_COLUMNS)
 
     def output_columns(self) -> list[str]:
-        return list(self._OUTPUT_COLUMNS)
+        return [f"ofi_{w}" for w in self._windows] + ["ofi_signal"]
 
     def compute(self, df: pl.DataFrame) -> pl.DataFrame:
         """Compute multi-window OFI and combined signal.
@@ -168,7 +166,7 @@ class OFICalculator(FeatureCalculator):
 
         if n_rows == 0:
             return df.with_columns(
-                *[pl.Series(col, [], dtype=pl.Float64) for col in self._OUTPUT_COLUMNS]
+                *[pl.Series(col, [], dtype=pl.Float64) for col in self.output_columns()]
             )
 
         # Detect mode: book-based vs trade-based.
@@ -182,30 +180,26 @@ class OFICalculator(FeatureCalculator):
             per_tick_ofi = self._compute_trade_ofi(df)
             logger.info("ofi.mode.trade_fallback", n_rows=n_rows)
 
-        # Step 2: Rolling sums for each window.
-        max_window = max(self._windows)
+        # Step 2: Rolling means for each window (normalized OFI intensity).
         ofi_columns: list[npt.NDArray[np.float64]] = []
         for w in self._windows:
             rolling = self._rolling_mean(per_tick_ofi, w)
             ofi_columns.append(rolling)
 
         # Step 3: Combined signal via tanh normalization (D025 pattern).
-        ofi_signal = self._compute_signal(ofi_columns, max_window)
+        ofi_signal = self._compute_signal(ofi_columns)
 
         logger.info(
             "ofi.compute.complete",
             n_rows=n_rows,
             mode="book" if has_book else "trade",
-            warm_up=max_window - 1,
+            warm_up=max(self._windows) - 1,
             outputs_produced=int(np.sum(~np.isnan(ofi_signal))),
         )
 
-        return df.with_columns(
-            pl.Series("ofi_10", ofi_columns[0]),
-            pl.Series("ofi_50", ofi_columns[1]),
-            pl.Series("ofi_100", ofi_columns[2]),
-            pl.Series("ofi_signal", ofi_signal),
-        )
+        series_list = [pl.Series(f"ofi_{w}", ofi_columns[i]) for i, w in enumerate(self._windows)]
+        series_list.append(pl.Series("ofi_signal", ofi_signal))
+        return df.with_columns(series_list)
 
     # ------------------------------------------------------------------
     # Internals
@@ -287,19 +281,20 @@ class OFICalculator(FeatureCalculator):
     def _compute_signal(
         self,
         ofi_columns: list[npt.NDArray[np.float64]],
-        max_window: int,
     ) -> npt.NDArray[np.float64]:
         """Compute tanh-normalized weighted combination of OFI windows.
 
         Signal = tanh(weighted_combination / (k * rolling_std)).
-        Uses expanding std until enough data points, then rolling.
+
+        Warm-up is handled upstream: ofi_columns already contain NaN
+        during their respective warm-up periods. The ``all_valid`` mask
+        ensures the signal is NaN until all windows have data.
 
         Args:
             ofi_columns: List of rolling OFI arrays (one per window).
-            max_window: Largest window size (determines warm-up).
 
         Returns:
-            Signal array in [-1, +1] with NaN during warm-up.
+            tanh-normalized signal in [-1, +1] (NaN during warm-up).
         """
         n = len(ofi_columns[0])
         signal = np.full(n, np.nan, dtype=np.float64)

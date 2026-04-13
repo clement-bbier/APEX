@@ -1,8 +1,9 @@
 """Unit tests for OFICalculator (Phase 3.6).
 
-23 tests covering ABC conformity, correctness, look-ahead defense,
-D028 compliance, mode detection, edge cases, integration with
-ValidationPipeline, signal variance gate (D029), and report schema.
+27 tests covering ABC conformity, correctness, look-ahead defense,
+D028 compliance, mode detection, edge cases, constructor validation
+(D031), integration with ValidationPipeline, signal variance gate
+(D029), and report schema.
 
 Reference:
     Cont, R., Kukanov, A. & Stoikov, S. (2014). "The Price Impact
@@ -139,7 +140,8 @@ class TestABCConformity:
         for col in ["timestamp", "price", "quantity", "side"]:
             assert col in req
 
-    def test_output_columns_are_four_expected(self) -> None:
+    def test_output_columns_default_config_are_four_expected(self) -> None:
+        """Default windows=(10, 50, 100) produce ofi_10, ofi_50, ofi_100, ofi_signal."""
         calc = OFICalculator()
         out = calc.output_columns()
         assert out == ["ofi_10", "ofi_50", "ofi_100", "ofi_signal"]
@@ -467,6 +469,43 @@ class TestEdgeCases:
         df_unsorted = df.sort("timestamp", descending=True)
         with pytest.raises(ValueError, match="ascending-sorted"):
             calc.compute(df_unsorted)
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Constructor validation (4 tests — D031 configurable params)
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestConstructorValidation:
+    """Verify constructor validates and honors configurable parameters."""
+
+    def test_custom_windows_generate_correct_column_names(self) -> None:
+        """Non-default windows produce correctly named columns and compute output."""
+        calc = OFICalculator(windows=(5, 20, 60), weights=(0.4, 0.3, 0.3))
+        assert calc.output_columns() == ["ofi_5", "ofi_20", "ofi_60", "ofi_signal"]
+
+        df = _make_trade_ticks(100, seed=42)
+        result = calc.compute(df)
+        for col in ["ofi_5", "ofi_20", "ofi_60", "ofi_signal"]:
+            assert col in result.columns, f"Missing column {col}"
+        # ofi_5 should have values after warm-up (tick 4).
+        ofi_5 = result["ofi_5"].to_numpy()
+        assert not np.isnan(ofi_5[4])
+
+    def test_windows_weights_length_mismatch_raises(self) -> None:
+        """windows and weights must have the same length."""
+        with pytest.raises(ValueError, match="same length"):
+            OFICalculator(windows=(10, 50), weights=(0.5, 0.3, 0.2))
+
+    def test_weights_not_summing_to_one_raises(self) -> None:
+        """weights must sum to 1.0."""
+        with pytest.raises(ValueError, match=r"sum to 1\.0"):
+            OFICalculator(weights=(0.5, 0.3, 0.3))
+
+    def test_empty_windows_raises(self) -> None:
+        """Empty windows tuple must raise."""
+        with pytest.raises(ValueError, match="at least one"):
+            OFICalculator(windows=(), weights=())
 
 
 # ══════════════════════════════════════════════════════════════════════
