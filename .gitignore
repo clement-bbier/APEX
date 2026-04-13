@@ -27,12 +27,9 @@ repomix-output*.xml
 prompt_phase*.md
 EXTENSIONS.md
 
-# Claude Code internal worktree state — never commit
+# Claude Code — track project settings, hooks, skills; ignore local/internal state
 .claude/worktrees/
 .claude/settings.local.json
-
-# Claude Code local settings
-.claude/
 
 # Graphify local state
 .graphify_python
