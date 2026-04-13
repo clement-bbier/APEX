@@ -3,9 +3,8 @@
 Constructor injection pattern (PHASE_3_SPEC Section 3.4): the pipeline
 receives its calculators, labeler, and weighter at construction time.
 
-In Phase 3.1, ``run()`` raises ``NotImplementedError`` (requires
-TimescaleDB wiring from Phase 3.2).  ``run_on_frame()`` is functional
-for tests.
+Phase 3.2 wires ``run()`` to fetch bars from TimescaleDB, compute
+features, and persist them to the FeatureStore.
 
 Reference:
     Lopez de Prado, M. (2018). *Advances in Financial Machine Learning*.
@@ -15,13 +14,20 @@ Reference:
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import UTC, datetime
+from uuid import UUID
 
 import polars as pl
 import structlog
 
 from features.base import FeatureCalculator
 from features.labels import TripleBarrierLabelerAdapter
+from features.store.base import FeatureStore
+from features.versioning import (
+    FeatureVersion,
+    compute_content_hash,
+    compute_version_string,
+)
 from features.weights import SampleWeighter
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
@@ -34,6 +40,10 @@ class FeaturePipeline:
     all dependencies are provided at construction, not discovered at
     runtime.
 
+    Phase 3.2: ``feature_store`` is optional — if not provided,
+    ``run_on_frame()`` remains functional as in 3.1 but ``run()``
+    raises a clear error.
+
     Reference:
         Lopez de Prado, M. (2018). *Advances in Financial Machine
         Learning*. Wiley, Ch. 3 (Labels), Ch. 4 (Weights), Ch. 5
@@ -45,10 +55,12 @@ class FeaturePipeline:
         calculators: list[FeatureCalculator],
         labeler: TripleBarrierLabelerAdapter,
         weighter: SampleWeighter,
+        feature_store: FeatureStore | None = None,
     ) -> None:
         self._calculators = list(calculators)
         self._labeler = labeler
         self._weighter = weighter
+        self._feature_store = feature_store
 
     @property
     def calculators(self) -> list[FeatureCalculator]:
@@ -57,25 +69,69 @@ class FeaturePipeline:
 
     async def run(
         self,
-        symbol: str,
+        asset_id: UUID,
+        bars: pl.DataFrame,
         start: datetime,
         end: datetime,
-        bar_size: str = "5m",
+        as_of: datetime | None = None,
     ) -> pl.DataFrame:
-        """Fetch data from store and compute full feature matrix.
+        """Compute features on bars and persist them to the store.
 
-        .. note::
-            This method is a placeholder for Phase 3.2 which wires the
-            TimescaleDB data source.  Call :meth:`run_on_frame` for
-            testing with synthetic data.
+        If ``as_of`` is provided, backtest mode: features are persisted
+        with ``computed_at=as_of``.  This guarantees point-in-time
+        correctness for historical backtests.
+
+        Args:
+            asset_id: Asset UUID.
+            bars: Polars DataFrame with bar data (OHLCV + timestamp).
+            start: Start of the computation range.
+            end: End of the computation range.
+            as_of: Wall-clock time of computation for PIT semantics.
+                Defaults to ``datetime.now(UTC)`` if not provided.
+
+        Returns:
+            Augmented DataFrame with all feature columns added.
 
         Raises:
-            NotImplementedError: Always — wired in Phase 3.2.
+            RuntimeError: If ``feature_store`` was not injected.
         """
-        raise NotImplementedError(
-            "FeaturePipeline.run() requires TimescaleDB data source — "
-            "wired in Phase 3.2.  Use run_on_frame() for testing."
+        if self._feature_store is None:
+            raise RuntimeError(
+                "FeaturePipeline.run() requires a FeatureStore. "
+                "Inject via constructor or use run_on_frame() for testing."
+            )
+
+        computed_at = as_of if as_of is not None else datetime.now(UTC)
+        result = self.run_on_frame(bars, str(asset_id))
+
+        for calc in self._calculators:
+            feature_df = result.select(["timestamp", *calc.output_columns()])
+            for col_name in calc.output_columns():
+                single_feature = feature_df.select(["timestamp", col_name])
+                content_hash = compute_content_hash(single_feature)
+                version_str = compute_version_string(calc.name(), {}, computed_at)
+                version = FeatureVersion(
+                    asset_id=asset_id,
+                    feature_name=col_name,
+                    version=version_str,
+                    computed_at=computed_at,
+                    content_hash=content_hash,
+                    calculator_name=calc.name(),
+                    calculator_params={},
+                    row_count=len(single_feature),
+                    start_ts=start,
+                    end_ts=end,
+                )
+                await self._feature_store.save(asset_id, single_feature, version)
+
+        logger.info(
+            "feature_pipeline.run_complete",
+            asset_id=str(asset_id),
+            n_calculators=len(self._calculators),
+            n_bars=len(bars),
+            computed_at=computed_at.isoformat(),
         )
+        return result
 
     def run_on_frame(self, df: pl.DataFrame, symbol: str) -> pl.DataFrame:
         """Compute features on an already-loaded DataFrame.

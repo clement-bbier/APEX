@@ -429,3 +429,57 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 - Phase 3.2 (Feature Store on TimescaleDB) can start after merge
 - Phase 3.3 (IC Measurement) can start in parallel with 3.2
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+
+---
+
+## Session 010 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.2 — Feature Store Architecture (#88) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~2 hours |
+
+### Decisions Made
+
+1. FeatureStore ABC extended with `asset_id: UUID` parameter on all methods (D017) — 3.1 ABC had no asset awareness, but multi-asset system requires it. No concrete implementation existed yet, so safe to change.
+2. Content-addressable versioning: `compute_version_string(calculator_name, params, computed_at)` produces `{name}-{hash8}` deterministic ID. SHA-256 hash on canonical JSON ensures same inputs → same version.
+3. Redis cache strategy: TTL-based (300s default), no manual invalidation. Cache key includes `as_of` to prevent PIT cache poisoning.
+4. `feature_values` uses `DOUBLE PRECISION` (not NUMERIC) — feature values are statistical quantities, not financial prices. CLAUDE.md Decimal rule applies to prices/PnL/fees.
+5. `FeaturePipeline.run()` takes pre-fetched `bars: pl.DataFrame` instead of `bars_repository` — keeps pipeline independent of repository layer, caller is responsible for data fetching.
+
+### Files Created
+
+- `db/migrations/002_feature_store.sql` — feature_values hypertable + feature_versions catalog
+- `features/exceptions.py` — FeatureStoreError hierarchy (4 exceptions)
+- `features/versioning.py` — FeatureVersion frozen dataclass + compute_version_string + compute_content_hash
+- `features/registry.py` — FeatureRegistry (asyncpg on feature_versions table)
+- `features/store/timescale.py` — TimescaleFeatureStore (Repository pattern, Redis cache, PIT queries)
+- `tests/unit/features/test_versioning.py` — 14 tests (incl. 2 Hypothesis 1000-example property tests)
+- `tests/unit/features/test_exceptions.py` — 5 tests
+- `tests/unit/features/test_registry.py` — 10 tests
+- `tests/unit/features/test_store.py` — 14 tests
+- `tests/unit/features/test_pipeline_with_store.py` — 4 tests
+- `tests/integration/test_feature_store_integration.py` — 3 integration tests
+
+### Files Modified
+
+- `features/store/base.py` — FeatureStore ABC extended with asset_id + FeatureVersion (D017)
+- `features/store/__init__.py` — exports TimescaleFeatureStore
+- `features/pipeline.py` — run() wired to compute + persist features
+- `tests/unit/features/test_pipeline.py` — updated test for new run() signature
+
+### Quality Gates
+
+- ruff check: clean (0 errors)
+- ruff format: clean
+- mypy --strict features/: 0 errors, 19 files
+- pytest tests/unit/features/: 108 passed, 0 failed
+- Coverage features/: 95.02% (gate 85%)
+- Full suite: 1,367 passed (+53 new), 0 regressions
+
+### Next Steps
+
+- Phase 3.3 (IC Measurement) can start after merge
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate

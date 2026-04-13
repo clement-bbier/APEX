@@ -75,13 +75,15 @@ class TestRunOnFrame:
         assert result.shape == synthetic_bars.shape
 
 
-class TestRunNotImplemented:
-    """FeaturePipeline.run raises NotImplementedError in Phase 3.1."""
+class TestRunRequiresStore:
+    """FeaturePipeline.run requires a FeatureStore (Phase 3.2)."""
 
     @pytest.mark.asyncio
-    async def test_run_raises(self) -> None:
+    async def test_run_without_store_raises(self) -> None:
         from datetime import UTC, datetime
+        from uuid import uuid4
 
         pipeline = FeaturePipeline([], TripleBarrierLabelerAdapter(), SampleWeighter())
-        with pytest.raises(NotImplementedError, match=r"Phase 3\.2"):
-            await pipeline.run("BTCUSD", datetime.now(UTC), datetime.now(UTC))
+        bars = pl.DataFrame({"timestamp": [], "close": []})
+        with pytest.raises(RuntimeError, match=r"requires a FeatureStore"):
+            await pipeline.run(uuid4(), bars, datetime.now(UTC), datetime.now(UTC))
