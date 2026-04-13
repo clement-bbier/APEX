@@ -31,6 +31,7 @@ import polars as pl
 pytestmark = [
     pytest.mark.integration,
     pytest.mark.skipif(asyncpg is None, reason="asyncpg not installed"),
+    pytest.mark.skipif(fakeredis is None, reason="fakeredis not installed"),
 ]
 
 TEST_DSN = "postgresql://apex_test:apex_test@localhost:5433/apex_test"

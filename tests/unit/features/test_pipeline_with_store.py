@@ -145,3 +145,39 @@ class TestPipelineRunWithStore:
         save_call = mock_store.save.call_args
         version_arg = save_call[0][2]  # third positional: version
         assert version_arg.computed_at == as_of
+
+    @pytest.mark.asyncio
+    async def test_pipeline_includes_calculator_version_in_metadata(self) -> None:
+        """calc.version is included in calculator_params (Fix 6)."""
+        mock_store = AsyncMock(spec=FeatureStore)
+
+        class _V2Calculator(_StubCalculator):
+            @property
+            def version(self) -> str:
+                return "v2"
+
+        pipeline = FeaturePipeline(
+            [_V2Calculator("feat_a")],
+            TripleBarrierLabelerAdapter(),
+            SampleWeighter(),
+            feature_store=mock_store,
+        )
+        bars = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)],
+                "open": [100.0],
+                "high": [101.0],
+                "low": [99.0],
+                "close": [100.5],
+                "volume": [1000.0],
+            }
+        )
+        await pipeline.run(
+            uuid4(),
+            bars,
+            datetime(2024, 1, 1, tzinfo=UTC),
+            datetime(2024, 6, 1, tzinfo=UTC),
+        )
+        save_call = mock_store.save.call_args
+        version_arg = save_call[0][2]
+        assert version_arg.calculator_params["version"] == "v2"

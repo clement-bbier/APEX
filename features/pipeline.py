@@ -106,10 +106,19 @@ class FeaturePipeline:
 
         for calc in self._calculators:
             feature_df = result.select(["timestamp", *calc.output_columns()])
+            calc_params: dict[str, object] = getattr(calc, "params", {})
             for col_name in calc.output_columns():
                 single_feature = feature_df.select(["timestamp", col_name])
+                version_meta = {
+                    "version": calc.version,
+                    "params": calc_params,
+                    "output": col_name,
+                }
                 content_hash = compute_content_hash(single_feature)
-                version_str = compute_version_string(calc.name(), {}, computed_at)
+                version_str = compute_version_string(calc.name(), version_meta, computed_at)
+                # start_ts/end_ts from actual DataFrame, not params
+                ts_min = single_feature["timestamp"].min()
+                ts_max = single_feature["timestamp"].max()
                 version = FeatureVersion(
                     asset_id=asset_id,
                     feature_name=col_name,
@@ -117,10 +126,14 @@ class FeaturePipeline:
                     computed_at=computed_at,
                     content_hash=content_hash,
                     calculator_name=calc.name(),
-                    calculator_params={},
+                    calculator_params={
+                        "version": calc.version,
+                        **dict(calc_params),
+                        "output_column": col_name,
+                    },
                     row_count=len(single_feature),
-                    start_ts=start,
-                    end_ts=end,
+                    start_ts=ts_min if isinstance(ts_min, datetime) else start,
+                    end_ts=ts_max if isinstance(ts_max, datetime) else end,
                 )
                 await self._feature_store.save(asset_id, single_feature, version)
 

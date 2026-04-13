@@ -16,7 +16,7 @@ References:
 
 from __future__ import annotations
 
-import json
+import io
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -86,7 +86,19 @@ class TimescaleFeatureStore(FeatureStore):
 
         Raises:
             FeatureVersionExistsError: If the version already exists.
+            ValueError: If asset_id != version.asset_id or
+                feature_name not in DataFrame columns.
         """
+        if asset_id != version.asset_id:
+            raise ValueError(
+                f"asset_id mismatch: got {asset_id}, version.asset_id={version.asset_id}"
+            )
+        if version.feature_name not in features.columns:
+            raise ValueError(
+                f"feature_name '{version.feature_name}' not found "
+                f"in DataFrame columns {features.columns}"
+            )
+
         existing = await self._registry.get(asset_id, version.feature_name, version.version)
         if existing is not None:
             raise FeatureVersionExistsError(
@@ -191,6 +203,13 @@ class TimescaleFeatureStore(FeatureStore):
                         f"asset {asset_id} as of {as_of.isoformat()}."
                     )
                 resolved_version = ver_record.version
+            else:
+                ver_record = await self._registry.get(asset_id, fname, resolved_version)
+                if ver_record is None:
+                    raise FeatureVersionNotFoundError(
+                        f"Version '{resolved_version}' not found for "
+                        f"feature '{fname}' on asset {asset_id}."
+                    )
 
             cache_key = self._cache_key(asset_id, fname, resolved_version, start, end, as_of)
             cached = await self._cache_get(cache_key)
@@ -200,7 +219,7 @@ class TimescaleFeatureStore(FeatureStore):
 
             rows = await self._pool.fetch(
                 """
-                SELECT timestamp, value
+                SELECT timestamp, value, computed_at
                 FROM feature_values
                 WHERE asset_id = $1
                   AND feature_name = $2
@@ -223,10 +242,14 @@ class TimescaleFeatureStore(FeatureStore):
                     {
                         "timestamp": [r["timestamp"] for r in rows],
                         "value": [r["value"] for r in rows],
+                        "computed_at": [r["computed_at"] for r in rows],
                     }
                 )
-                # Structural safety check (§5.1)
+                # Structural safety check (§5.1) — effective
+                # because computed_at is now in the DataFrame
                 self._assert_no_lookahead(df, as_of, fname)
+                # Drop computed_at before caching/returning
+                df = df.drop("computed_at")
                 await self._cache_set(cache_key, df)
                 frames.append(df.rename({"value": fname}))
             else:
@@ -277,17 +300,26 @@ class TimescaleFeatureStore(FeatureStore):
         as_of: datetime,
         feature_name: str,
     ) -> None:
-        """Guard: verify no row has a future computed_at (structural bug check)."""
-        if "computed_at" in df.columns:
-            raw_max = df["computed_at"].max()
-            if raw_max is not None:
-                max_computed = datetime.fromisoformat(str(raw_max)) if not isinstance(raw_max, datetime) else raw_max
-                if max_computed > as_of:
-                    raise LookAheadViolationError(
-                        f"Feature '{feature_name}' returned rows with "
-                        f"computed_at={max_computed!r} > as_of={as_of!r}. "
-                        f"This is a structural bug in the query."
-                    )
+        """Guard: verify no row has computed_at > as_of.
+
+        This is a structural bug check — the SQL WHERE clause should
+        already prevent such rows.  If this fires, the query logic
+        has a bug.
+        """
+        if "computed_at" not in df.columns or df.is_empty():
+            return
+        max_computed = df["computed_at"].max()
+        if max_computed is None:
+            return
+        # Polars max() returns a Python datetime for Datetime columns
+        if isinstance(max_computed, datetime):
+            if max_computed > as_of:
+                raise LookAheadViolationError(
+                    f"Structural bug: feature '{feature_name}' "
+                    f"returned row with computed_at="
+                    f"{max_computed.isoformat()} > "
+                    f"as_of={as_of.isoformat()}"
+                )
 
     @staticmethod
     def _cache_key(
@@ -306,21 +338,26 @@ class TimescaleFeatureStore(FeatureStore):
         )
 
     async def _cache_get(self, key: str) -> pl.DataFrame | None:
-        """Try to load a cached DataFrame from Redis."""
+        """Try to load a cached DataFrame from Redis (IPC format)."""
         try:
             data = await self._redis.get(key)
             if data is None:
                 return None
-            parsed = json.loads(data)
-            return pl.DataFrame(parsed)
-        except Exception:
+            return pl.read_ipc(io.BytesIO(data))
+        except Exception as exc:
+            logger.debug(
+                "feature_store.cache_get_failed",
+                key=key,
+                error=str(exc),
+            )
             return None
 
     async def _cache_set(self, key: str, df: pl.DataFrame) -> None:
-        """Cache a DataFrame in Redis with TTL."""
+        """Cache a DataFrame in Redis with TTL (IPC format)."""
         try:
-            data = df.to_dict(as_series=False)
-            await self._redis.setex(key, self._cache_ttl, json.dumps(data, default=str))
+            buf = io.BytesIO()
+            df.write_ipc(buf, compression="uncompressed")
+            await self._redis.setex(key, self._cache_ttl, buf.getvalue())
         except Exception as exc:
             logger.debug(
                 "feature_store.cache_set_failed",

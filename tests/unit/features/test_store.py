@@ -163,10 +163,11 @@ class TestStoreLoad:
         ts1 = datetime(2024, 1, 1, tzinfo=UTC)
         ts2 = datetime(2024, 6, 1, tzinfo=UTC)
         as_of = datetime(2024, 7, 1, tzinfo=UTC)
+        computed = datetime(2024, 5, 1, tzinfo=UTC)
 
         mock_pool.fetch.return_value = [
-            {"timestamp": ts1, "value": 1.0},
-            {"timestamp": ts1 + timedelta(minutes=5), "value": 2.0},
+            {"timestamp": ts1, "value": 1.0, "computed_at": computed},
+            {"timestamp": ts1 + timedelta(minutes=5), "value": 2.0, "computed_at": computed},
         ]
 
         result = await store.load(aid, ["har_rv"], ts1, ts2, as_of=as_of)
@@ -184,14 +185,26 @@ class TestStoreLoad:
         ts1 = datetime(2024, 1, 1, tzinfo=UTC)
         ts2 = datetime(2024, 6, 1, tzinfo=UTC)
         as_of = datetime(2024, 7, 1, tzinfo=UTC)
+        computed = datetime(2024, 5, 1, tzinfo=UTC)
 
+        # Explicit version must exist in registry
+        mock_registry.get.return_value = _make_version(asset_id=aid, version="har_rv-explicit")
         mock_pool.fetch.return_value = [
-            {"timestamp": ts1, "value": 1.0},
+            {"timestamp": ts1, "value": 1.0, "computed_at": computed},
         ]
 
-        result = await store.load(aid, ["har_rv"], ts1, ts2, as_of=as_of, version="har_rv-explicit")
+        result = await store.load(
+            aid,
+            ["har_rv"],
+            ts1,
+            ts2,
+            as_of=as_of,
+            version="har_rv-explicit",
+        )
         # Should NOT call latest_version when version is explicit
         mock_registry.latest_version.assert_not_awaited()
+        # Should call get() to verify version exists
+        mock_registry.get.assert_awaited()
         assert "har_rv" in result.columns
 
     @pytest.mark.asyncio
@@ -245,10 +258,11 @@ class TestStoreLoad:
         ver_b = _make_version(asset_id=aid, feature_name="feat_b", version="feat_b-xyz")
         mock_registry.latest_version.side_effect = [ver_a, ver_b]
 
+        computed = datetime(2024, 5, 1, tzinfo=UTC)
         # First call for feat_a, second for feat_b
         mock_pool.fetch.side_effect = [
-            [{"timestamp": ts1, "value": 1.0}],
-            [{"timestamp": ts1, "value": 2.0}],
+            [{"timestamp": ts1, "value": 1.0, "computed_at": computed}],
+            [{"timestamp": ts1, "value": 2.0, "computed_at": computed}],
         ]
 
         result = await store.load(aid, ["feat_a", "feat_b"], ts1, ts2, as_of=as_of)
@@ -297,8 +311,9 @@ class TestStoreCache:
         version = _make_version(asset_id=aid)
         mock_registry.latest_version.return_value = version
 
+        computed = datetime(2024, 5, 1, tzinfo=UTC)
         mock_pool.fetch.return_value = [
-            {"timestamp": ts1, "value": 42.0},
+            {"timestamp": ts1, "value": 42.0, "computed_at": computed},
         ]
 
         # First load: cache miss, hits DB
@@ -370,7 +385,9 @@ class TestStoreLookAhead:
         store = TimescaleFeatureStore(mock_pool, redis_client, registry)
 
         # as_of=t1 resolves v1
-        mock_pool.fetch.return_value = [{"timestamp": ts_bar, "value": 10.0}]
+        mock_pool.fetch.return_value = [
+            {"timestamp": ts_bar, "value": 10.0, "computed_at": t1},
+        ]
         await store.load(aid, ["har_rv"], ts_bar, ts_bar, as_of=t1)
         call_args = mock_pool.fetch.call_args
         assert call_args[0][3] == "v1"  # version param
@@ -380,7 +397,9 @@ class TestStoreLookAhead:
         # Clear cache to force DB hit
         await redis_client.flushall()
 
-        mock_pool.fetch.return_value = [{"timestamp": ts_bar, "value": 20.0}]
+        mock_pool.fetch.return_value = [
+            {"timestamp": ts_bar, "value": 20.0, "computed_at": t2},
+        ]
         await store.load(aid, ["har_rv"], ts_bar, ts_bar, as_of=t2)
         call_args = mock_pool.fetch.call_args
         assert call_args[0][3] == "v2"
@@ -411,3 +430,115 @@ class TestStoreDelegates:
         result = await store.latest_version(aid, "har_rv")
         mock_registry.latest_version.assert_awaited_once()
         assert result is None
+
+
+# ── New tests for PR #109 fixes ──────────────────────────────────────────
+
+
+class TestStoreValidation:
+    """Input validation in save() (Fix 5)."""
+
+    @pytest.mark.asyncio
+    async def test_save_rejects_asset_id_mismatch(self, store: TimescaleFeatureStore) -> None:
+        aid_1 = uuid4()
+        aid_2 = uuid4()
+        version = _make_version(asset_id=aid_1)
+        df = _make_feature_df()
+        with pytest.raises(ValueError, match="asset_id mismatch"):
+            await store.save(aid_2, df, version)
+
+    @pytest.mark.asyncio
+    async def test_save_rejects_missing_feature_column(self, store: TimescaleFeatureStore) -> None:
+        aid = uuid4()
+        version = _make_version(asset_id=aid, feature_name="nonexistent")
+        df = _make_feature_df(feature_name="har_rv")
+        with pytest.raises(ValueError, match="not found in DataFrame"):
+            await store.save(aid, df, version)
+
+
+class TestAssertNoLookaheadEffective:
+    """_assert_no_lookahead is effective when computed_at is present (Fix 2)."""
+
+    @pytest.mark.asyncio
+    async def test_assert_no_lookahead_raises_on_future_computed_at(
+        self,
+        mock_pool: AsyncMock,
+        redis_client: fakeredis.aioredis.FakeRedis,
+        mock_registry: AsyncMock,
+    ) -> None:
+        """Monkeypatch fetch to return rows with future computed_at."""
+        aid = uuid4()
+        ts1 = datetime(2024, 1, 1, tzinfo=UTC)
+        ts2 = datetime(2024, 6, 1, tzinfo=UTC)
+        as_of = datetime(2024, 3, 1, tzinfo=UTC)
+        future_computed = datetime(2024, 9, 1, tzinfo=UTC)  # > as_of
+
+        mock_registry.latest_version.return_value = _make_version(asset_id=aid)
+        # Simulate a bug: row with computed_at in the future
+        mock_pool.fetch.return_value = [
+            {"timestamp": ts1, "value": 1.0, "computed_at": future_computed},
+        ]
+
+        store = TimescaleFeatureStore(mock_pool, redis_client, mock_registry)
+        from features.exceptions import LookAheadViolationError
+
+        with pytest.raises(LookAheadViolationError, match="Structural bug"):
+            await store.load(aid, ["har_rv"], ts1, ts2, as_of=as_of)
+
+
+class TestCacheIpcRoundtrip:
+    """Cache uses IPC bytes, preserving dtypes (Fix 3)."""
+
+    @pytest.mark.asyncio
+    async def test_cache_roundtrip_preserves_dtypes(
+        self,
+        store: TimescaleFeatureStore,
+        mock_pool: AsyncMock,
+        mock_registry: AsyncMock,
+        redis_client: fakeredis.aioredis.FakeRedis,
+    ) -> None:
+        aid = uuid4()
+        ts1 = datetime(2024, 1, 1, tzinfo=UTC)
+        ts2 = datetime(2024, 6, 1, tzinfo=UTC)
+        as_of = datetime(2024, 7, 1, tzinfo=UTC)
+        computed = datetime(2024, 5, 1, tzinfo=UTC)
+        version = _make_version(asset_id=aid)
+        mock_registry.latest_version.return_value = version
+
+        mock_pool.fetch.return_value = [
+            {"timestamp": ts1, "value": 42.0, "computed_at": computed},
+        ]
+
+        # First load populates cache
+        r1 = await store.load(aid, ["har_rv"], ts1, ts2, as_of=as_of)
+        assert r1["timestamp"].dtype == pl.Datetime("us", "UTC")
+
+        # Second load from cache — dtypes must match
+        r2 = await store.load(aid, ["har_rv"], ts1, ts2, as_of=as_of)
+        assert r2["timestamp"].dtype == r1["timestamp"].dtype
+        assert r2["har_rv"].dtype == r1["har_rv"].dtype
+
+
+class TestExplicitVersionNotFound:
+    """load() with explicit version that doesn't exist (Fix 8)."""
+
+    @pytest.mark.asyncio
+    async def test_load_explicit_version_not_found_raises(
+        self,
+        store: TimescaleFeatureStore,
+        mock_registry: AsyncMock,
+    ) -> None:
+        mock_registry.get.return_value = None
+        aid = uuid4()
+        with pytest.raises(
+            FeatureVersionNotFoundError,
+            match="not found for feature",
+        ):
+            await store.load(
+                aid,
+                ["har_rv"],
+                datetime(2024, 1, 1, tzinfo=UTC),
+                datetime(2024, 6, 1, tzinfo=UTC),
+                as_of=datetime(2024, 7, 1, tzinfo=UTC),
+                version="nonexistent-version",
+            )
