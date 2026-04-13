@@ -765,3 +765,36 @@ S02 `MicrostructureAnalyzer.ofi()` (`services/s02_signal_engine/microstructure.p
 - D026 (wrapper strict — honored where applicable)
 - Cont, Kukanov & Stoikov (2014) JFE 104(2)
 - S02 `services/s02_signal_engine/microstructure.py` lines 61-81
+
+---
+
+## D031 — Configurable Parameters Must Honor Configurability Everywhere (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 017 |
+| Decision | When a constructor parameter is exposed as configurable, every downstream reference must honor it dynamically |
+| Status | ACCEPTED |
+
+### Context
+
+PR #113 Phase 3.6 OFI. Constructor accepted `windows` tuple but `output_columns()` and `with_columns()` were hardcoded to `ofi_10/50/100`. Custom windows (e.g. `(5, 20, 60)`) would produce silently mislabeled columns (values for window=5 stored in column named `ofi_10`). Copilot caught this during review.
+
+### Rule (applies to 3.7, 3.8, retrofits)
+
+For every FeatureCalculator constructor parameter:
+- Generate derived names/sizes/indices dynamically from the parameter, never hardcode.
+- Validate parameter invariants in `__init__` (length match, range, sum-to-one if weights, etc.) — raise `ValueError` with explicit message.
+- Add tests that instantiate with non-default values and verify downstream propagation.
+
+### Audit Results
+
+- **HAR-RV (3.4)**: NOT affected — column names invariant of constructor params.
+- **Rough Vol (3.5)**: NOT affected — column names invariant of constructor params.
+- **OFI (3.6)**: Fixed in this hotfix — dynamic column names from `self._windows`.
+
+### References
+
+- PR #113 Copilot review comment #1
+- D026 (strict wrapper)

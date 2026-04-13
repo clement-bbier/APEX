@@ -757,3 +757,43 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot review on PR #113
 - Phase 3.7 CVD + Kyle after merge
+
+---
+
+## Session 017 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | PR #113 Copilot review hotfix — API landmine + hygiene |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~20 min |
+
+### Decisions Made
+
+1. D031: Configurable constructor parameters must honor configurability everywhere. Generate output names dynamically, never hardcode.
+2. HAR-RV and Rough Vol audited: NOT affected (column names invariant of constructor params).
+
+### What Changed
+
+- MODIFIED: `features/calculators/ofi.py` — dynamic column names from `self._windows`, remove `_OUTPUT_COLUMNS` ClassVar, add constructor validation (empty windows, weights sum), remove unused `max_window` param, fix "Rolling sums" comment
+- MODIFIED: `tests/unit/features/calculators/test_ofi.py` — 4 new tests (27 total), renamed `test_output_columns_are_four_expected` to `test_output_columns_default_config_are_four_expected`
+
+### Key Fixes
+
+- **Bug #1 API landmine**: `windows` configurable but output columns hardcoded to ofi_10/50/100. Custom windows would silently produce mislabeled columns. Fixed: dynamic generation.
+- **Bug #2 dead parameter**: `_compute_signal(max_window)` never used `max_window`. Removed.
+- **Bug #3 misleading comment**: "Rolling sums" → "Rolling means" to match implementation.
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors
+- ofi.py coverage: 94%
+- features/ coverage: 92.38% (> 85% gate)
+- 236 features/ tests passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot re-review on PR #113
+- Phase 3.7 CVD + Kyle after merge

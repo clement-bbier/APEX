@@ -81,3 +81,6 @@
 - D029: signal variance gate — test_ofi_signal_varies_across_inputs (100 DataFrames, std > 0.01)
 - Book-based mode auto-detected via bid_size/ask_size columns; trade-based fallback uses signed volume
 - 232 tests on features/, 1,491 total tests (0 regressions)
+- 3.6 hotfix: dynamic column names from self._windows (D031), remove dead max_window param, fix comment
+- D031: configurable params must honor configurability everywhere. HAR-RV/Rough Vol audited: NOT affected
+- 236 tests on features/, 27 OFI tests (0 regressions after hotfix)
