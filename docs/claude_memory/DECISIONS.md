@@ -555,3 +555,69 @@ A perfect predictor (feature == forward_return) produces IC=1.0 on every block. 
 - Set ic_ir=1e6, t_stat=1e6, p_value=0.0 — effectively infinite significance
 - This correctly passes ADR-0004 thresholds (|IC|>=0.02 AND IC_IR>=0.50)
 - The degenerate case only arises with synthetic/test data; real features will have IC variance
+
+---
+
+## D024 — Expanding-Window Refit for HAR-RV (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 012 |
+| Decision | Use expanding-window refit (fit on [0, t-1] to forecast t) rather than global fit or rolling window |
+| Status | ACCEPTED |
+
+### Context
+
+The HAR-RV model fits OLS coefficients β_D, β_W, β_M. A single global fit on the entire series then "forecasting" past points leaks future information through the coefficients — this is the primary look-ahead trap (PHASE_3_SPEC §5.1).
+
+### Justification
+
+- Expanding window guarantees forecasts at time t never see data at or after t
+- O(n²) cost is acceptable for offline feature computation (252 daily rows in ~1-2s)
+- Future optimization path: incremental OLS / Kalman filter (out of scope 3.4)
+- Characterized by 2 dedicated look-ahead tests (identical-past-different-future)
+
+---
+
+## D025 — tanh Normalization with k=3.0 (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 012 |
+| Decision | Normalize HAR-RV residual to signal via tanh(residual / (k * rolling_std)) with k=3.0 |
+| Status | ACCEPTED |
+
+### Context
+
+The HAR-RV residual (realized - forecast) has unbounded range. The signal must be in [-1, +1] for downstream consumption. Three options: z-score clipped, min-max on rolling window, tanh scaling.
+
+### Justification
+
+- tanh is smooth, strictly bounded in (-1, +1), and does not saturate abruptly
+- k=3.0 maps ±1σ residuals to ≈±0.32 and ±3σ to ≈±0.71 — good spread, not saturated
+- rolling_std (window=60, expanding until 60 available) adapts to local volatility regime
+- Validated by test: mean |signal| < 0.7 on well-behaved synthetic data
+
+---
+
+## D026 — Strict Wrapper over S07 har_rv_forecast (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 012 |
+| Decision | HARRVCalculator wraps S07 RealizedVolEstimator.har_rv_forecast() — no reimplementation of OLS |
+| Status | ACCEPTED |
+
+### Context
+
+S07 already implements the HAR-RV OLS regression. Reimplementing in features/ would create divergence risk (same as TripleBarrierLabeler adapter decision D013).
+
+### Justification
+
+- Single source of truth for HAR-RV math remains in S07
+- Parity test verifies calculator output matches direct S07 call
+- Pattern consistent with D013 (adapter/wrapper, not reimplementation)
+- Establishes the template for 3.5-3.8 calculators

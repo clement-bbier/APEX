@@ -12,8 +12,8 @@
 |---|---|---|
 | 3.1 Pipeline Foundation | COMPLETE | PR #108 merged |
 | 3.2 Feature Store | COMPLETE | PR #109 merged |
-| 3.3 IC Measurement | IN_PROGRESS | PR #110 open |
-| 3.4 HAR-RV | PENDING | S07 har_rv_forecast() ready |
+| 3.3 IC Measurement | COMPLETE | PR #110 merged |
+| 3.4 HAR-RV | IN_PROGRESS | PR #111 open — 20 tests, 91% coverage |
 | 3.5 Rough Vol | PENDING | S07 estimate_hurst_from_vol() ready |
 | 3.6 OFI | PENDING | S02 ofi() ready |
 | 3.7 CVD + Kyle | PENDING | S02 cvd(), kyle_lambda() ready |
@@ -28,7 +28,7 @@
 
 | Feature | IC (BTC) | IC (ETH) | IC (SPY) | IC (QQQ) | IC_IR | Decision |
 |---|---|---|---|---|---|---|
-| HAR-RV | — | — | — | — | — | — |
+| HAR-RV | synth | synth | synth | synth | synth | Synthetic validated — real data pending Phase 5 |
 | Rough Vol | — | — | — | — | — | — |
 | OFI | — | — | — | — | — | — |
 | CVD | — | — | — | — | — | — |
@@ -59,3 +59,9 @@
 - SpearmanICMeasurer: Newey-West HAC t-stat, rolling IC, turnover-adj IC, IC decay
 - ICStage wired as first non-stub ValidationPipeline stage (ADR-0004 gates: |IC|>=0.02, IC_IR>=0.50)
 - ICReport: JSON + Markdown with KEEP/WEAK/REJECT decisions
+- D024: Expanding-window refit for HAR-RV (O(n²) correctness over perf)
+- D025: tanh(residual / (k * rolling_std)) with k=3.0 — smooth bounded signal
+- D026: Strict wrapper over S07 har_rv_forecast() (same pattern as D013)
+- HARRVCalculator: first concrete FeatureCalculator, template for 3.5-3.8
+- HARRVValidationReport: thin wrapper over ICReport for Phase 3.4 scope
+- 174 tests, 92.57% coverage on features/, 1,433 total tests (0 regressions)
