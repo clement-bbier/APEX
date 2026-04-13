@@ -8,8 +8,14 @@ Reference:
     PHASE_3_SPEC §2.4-2.8.
 """
 
+from features.calculators.cvd_kyle import CVDKyleCalculator
 from features.calculators.har_rv import HARRVCalculator
 from features.calculators.ofi import OFICalculator
 from features.calculators.rough_vol import RoughVolCalculator
 
-__all__ = ["HARRVCalculator", "OFICalculator", "RoughVolCalculator"]
+__all__ = [
+    "CVDKyleCalculator",
+    "HARRVCalculator",
+    "OFICalculator",
+    "RoughVolCalculator",
+]
