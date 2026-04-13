@@ -836,3 +836,43 @@ Phase 3.7 CVDKyleCalculator needs (a) raw cumulative CVD, (b) Kyle lambda via OL
 - D030 (OFI precedent: implement directly when S02 formula differs)
 - Kyle (1985) Econometrica 53(6)
 - S02 `services/s02_signal_engine/microstructure.py` lines 83-126
+
+---
+
+## D033 — GEX Implemented Directly (Not Wrapping S02) (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 020 |
+| Decision | GEXCalculator implements GEX directly, not wrapping S02 CrowdBehaviorAnalyzer.update_gex() |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3.8 GEXCalculator needs dealer-adjusted gamma exposure per Barbon-Buraschi (2020): calls contribute negatively, puts positively, with S² dollar scaling and strict-past z-score. S02 provides `update_gex()` but with fundamentally different semantics:
+
+- S02 sign convention: calls = +1, puts = -1 (**opposite** of Barbon-Buraschi)
+- S02 formula: `gamma * OI * 100` (no S² scaling for dollar GEX)
+- S02 uses `float`, no strict-past protection, no rolling z-score
+
+### Why Not Wrap S02
+
+- Sign convention is **inverted** — wrapping would require negating the result and re-signing every option, defeating the wrapper purpose
+- Formula lacks S² factor for proper dollar GEX — wrapping would require multiplying by S² post-hoc
+- No rolling z-score or regime classification in S02
+- Same pattern as D030 (OFI) and D032 (CVD/Kyle): implement directly when S02 formula differs
+
+### Justification
+
+- S02 is NOT modified (anti-scope-creep)
+- D026 (wrapper strict) honored in spirit — would wrap if sign convention and formula matched
+- Barbon-Buraschi sign convention characterized by 2 dedicated tests
+- GEX formula: `Σ(sign_i * OI_i * gamma_i * S² * multiplier)` where sign = -1 calls, +1 puts
+
+### References
+
+- D026 (strict wrapper — honored where applicable)
+- D030 (OFI precedent), D032 (CVD/Kyle precedent)
+- Barbon & Buraschi (2020) "Gamma Fragility"
+- S02 `services/s02_signal_engine/crowd_behavior.py` lines 43-79

@@ -875,3 +875,49 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot re-review on PR #114
 - Phase 3.8 GEX after merge
+
+---
+
+## Session 020 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.8 — GEX Validation (Barbon & Buraschi 2020) (#94) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~45 min |
+
+### Decisions Made
+
+1. D033: GEX implemented inline (not wrapping S02 update_gex). S02 uses opposite sign convention (calls=+1, puts=-1 vs Barbon-Buraschi calls=-1, puts=+1), simpler formula (no S²), no strict-past protection.
+
+### Files Created
+
+- `features/calculators/gex.py` — GEXCalculator (310 LOC)
+- `features/validation/gex_report.py` — GEX validation report (107 LOC)
+- `tests/unit/features/calculators/test_gex.py` — 31 tests (719 LOC)
+
+### Files Modified
+
+- `features/calculators/__init__.py` — added GEXCalculator export
+
+### Key Findings
+
+- S02 `CrowdBehaviorAnalyzer.update_gex()` has **inverted** sign convention vs Barbon-Buraschi 2020. S02: calls=+1, puts=-1. Academic: calls=-1, puts=+1. Cannot wrap.
+- S07 has no options/GEX logic at all (gamma references are HMM forward-backward).
+- GEX magnitude sanity: synthetic SPY chain (S=400, 500 options, OI~1000, gamma~0.02) → |gex_raw| ∈ [1e7, 1e12]. Unit test confirms.
+- This completes the 3.4-3.8 calculator wave (5/5 calculators validated).
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors (390 files)
+- 298 features/ tests passed (31 new GEX), 0 regressions
+- features/ coverage: 92.32%
+- gex.py coverage: 98%
+- Full suite: 1,582 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot review on PR #116
+- Phase 3.9 Multicollinearity + Orthogonalization after merge

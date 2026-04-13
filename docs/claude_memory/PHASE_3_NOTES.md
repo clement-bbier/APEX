@@ -17,7 +17,7 @@
 | 3.5 Rough Vol | IN_PROGRESS | PR #112 open — 23 tests, 94% coverage |
 | 3.6 OFI | IN_PROGRESS | PR #113 open — 23 tests, 93% coverage |
 | 3.7 CVD + Kyle | IN_PROGRESS | PR #114 open — 31 tests, 94% coverage |
-| 3.8 GEX | PENDING | Risk: options data availability |
+| 3.8 GEX | IN_PROGRESS | PR #116 open — 31 tests, 98% coverage |
 | 3.9 Multicollinearity | PENDING | |
 | 3.10 CPCV | PENDING | |
 | 3.11 DSR/PBO | PENDING | backtesting/metrics.py has PSR/DSR |
@@ -96,3 +96,12 @@
 - 3.7 hotfix: doc "expanding" → "rolling window" for Kyle lambda, test rename. Zero real bugs found by Copilot.
 - 3 perf suggestions deferred to Phase 5 (ADR-0002 correctness-first). Tracking issue #115.
 - Kyle lambda clamp rate: 50-73% on random walk (expected), 0% on illiquid data (correct). Not a bug.
+- GEXCalculator: implements GEX inline (D033), NOT wrapping S02 (sign convention inverted, no S² formula)
+- S02 update_gex() sign: calls=+1, puts=-1. Barbon-Buraschi: calls=-1, puts=+1. Irreconcilable.
+- D028 applied: gex_raw/gex_normalized realization at t; gex_zscore/gex_regime/gex_signal forecast-like
+- D029 variance gates × 3: gex_raw, gex_zscore, gex_signal
+- D030 proactive: 3 ValueError constraints (zscore_lookback, regime thresholds, contract_multiplier)
+- Magnitude sanity: SPY-like chain → |gex_raw| ∈ [1e7, 1e12], confirmed by dedicated test
+- 298 tests on features/, 31 GEX tests, 1,582+ total tests (0 regressions)
+- **Phase 3.4-3.8 calculator wave COMPLETE**: 5/5 calculators validated (HAR-RV, Rough Vol, OFI, CVD+Kyle, GEX)
+- Route open for Phase 3.9 Multicollinearity + Orthogonalization
