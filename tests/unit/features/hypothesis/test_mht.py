@@ -83,6 +83,19 @@ class TestHolmBonferroni:
         with pytest.raises(ValueError, match="non-empty"):
             holm_bonferroni(np.array([], dtype=np.float64))
 
+    def test_holm_accepts_python_list(self) -> None:
+        """holm_bonferroni() must accept Python list input, not just np.ndarray.
+
+        Bug regression: previously p_values[order] crashed on list input
+        because advanced indexing requires ndarray.
+        """
+        p_list = [0.001, 0.04, 0.03, 0.20, 0.50]
+        rejected, p_adj = holm_bonferroni(p_list, alpha=0.05)
+        assert isinstance(rejected, np.ndarray)
+        assert isinstance(p_adj, np.ndarray)
+        assert len(rejected) == 5
+        assert len(p_adj) == 5
+
 
 class TestBenjaminiHochberg:
     """Benjamini-Hochberg FDR control (Benjamini & Hochberg 1995)."""
@@ -147,6 +160,13 @@ class TestBenjaminiHochberg:
         p = np.array([0.05], dtype=np.float64)
         with pytest.raises(ValueError, match="alpha must be in"):
             benjamini_hochberg(p, alpha=0.0)
+
+    def test_bh_accepts_python_list(self) -> None:
+        """benjamini_hochberg() must accept Python list input."""
+        p_list = [0.001, 0.04, 0.03, 0.20, 0.50]
+        rejected, p_adj = benjamini_hochberg(p_list, alpha=0.05)
+        assert isinstance(rejected, np.ndarray)
+        assert len(rejected) == 5
 
     @given(
         n=st.integers(1, 50),

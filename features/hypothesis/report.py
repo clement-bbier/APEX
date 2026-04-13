@@ -153,6 +153,7 @@ class HypothesisTestingReport:
 def build_report(
     dsr_results: list[DSRResult],
     pbo_result: PBOResult | None = None,
+    *,
     p_values_holm: dict[str, float] | None = None,
     p_values_bh: dict[str, float] | None = None,
     p_values_raw: dict[str, float] | None = None,
@@ -181,7 +182,30 @@ def build_report(
     Returns
     -------
     HypothesisTestingReport
+
+    Raises
+    ------
+    ValueError
+        If MHT correction is requested for multiple features but the
+        corresponding p-values dict is missing.  Pass
+        ``mht_correction="none"`` to explicitly skip MHT.
     """
+    # Validate MHT contract — prevent silent skip
+    if mht_correction == "holm" and len(dsr_results) > 1 and p_values_holm is None:
+        msg = (
+            "mht_correction='holm' requires p_values_holm dict when "
+            "evaluating multiple features. Pass mht_correction='none' "
+            "explicitly to skip MHT correction."
+        )
+        raise ValueError(msg)
+    if mht_correction == "bh" and len(dsr_results) > 1 and p_values_bh is None:
+        msg = (
+            "mht_correction='bh' requires p_values_bh dict when "
+            "evaluating multiple features. Pass mht_correction='none' "
+            "explicitly to skip MHT correction."
+        )
+        raise ValueError(msg)
+
     decisions: list[FeatureDecision] = []
 
     for dsr in dsr_results:

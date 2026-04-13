@@ -116,3 +116,42 @@ class TestDeflatedSharpeCalculator:
             DeflatedSharpeCalculator(significance_threshold=0.0)
         with pytest.raises(ValueError, match="significance_threshold"):
             DeflatedSharpeCalculator(significance_threshold=1.0)
+
+    def test_sharpe_in_dsr_result_consistent_with_psr_input(self) -> None:
+        """Sharpe stored in DSRResult must use rf=0 to match PSR/DSR convention.
+
+        Bug regression: previously sharpe_ratio() was called with default
+        rf=0.05, making DSRResult.sharpe_ratio inconsistent with the SR
+        used internally by PSR/DSR (which assume excess returns input).
+        """
+        rng = np.random.default_rng(42)
+        returns = rng.standard_normal(252) * 0.01
+
+        calc = DeflatedSharpeCalculator()
+        results = calc.compute_from_returns({"flat": pl.Series("r", returns.tolist())})
+        result = results[0]
+
+        # Manual Sharpe with rf=0 should match
+        expected_sharpe = float(np.mean(returns) / np.std(returns, ddof=1))
+        # Allow for annualisation factor difference — compare per-period SR
+        # sharpe_ratio() with rf=0 returns annualised SR = per_period * sqrt(252)
+        expected_annualised = expected_sharpe * np.sqrt(252)
+        assert abs(result.sharpe_ratio - expected_annualised) < 0.01
+
+    def test_negative_sharpe_returns_sentinel_min_trl(self) -> None:
+        """Losing strategy must propagate Min-TRL sentinel, not arbitrary large value.
+
+        Bug regression: previously target_sharpe was clamped to max(sr, 1e-10),
+        bypassing the function's "non-viable" sentinel.
+        """
+        rng = np.random.default_rng(42)
+        losing_returns = rng.standard_normal(252) * 0.01 - 0.005
+
+        calc = DeflatedSharpeCalculator()
+        results = calc.compute_from_returns({"loser": pl.Series("r", losing_returns.tolist())})
+        result = results[0]
+
+        assert result.sharpe_ratio < 0, "Setup check: strategy should have negative Sharpe"
+        assert result.min_trl >= 1_000_000_000, (
+            f"Losing strategy should get sentinel Min-TRL (1e9), got {result.min_trl}"
+        )

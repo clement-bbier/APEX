@@ -20,10 +20,13 @@ import numpy.typing as npt
 
 
 def _validate_inputs(
-    p_values: npt.NDArray[np.float64],
+    p_values: npt.NDArray[np.float64] | list[float],
     alpha: float,
-) -> None:
-    """Validate p_values and alpha shared by both corrections.
+) -> npt.NDArray[np.float64]:
+    """Validate and coerce p_values; validate alpha.
+
+    Returns the coerced ``np.float64`` array so callers use the
+    ndarray (not the raw input) for advanced indexing.
 
     Raises
     ------
@@ -44,10 +47,11 @@ def _validate_inputs(
     if np.any(arr < 0.0) or np.any(arr > 1.0):
         msg = "All p_values must be in [0, 1]"
         raise ValueError(msg)
+    return arr
 
 
 def holm_bonferroni(
-    p_values: npt.NDArray[np.float64],
+    p_values: npt.NDArray[np.float64] | list[float],
     alpha: float = 0.05,
 ) -> tuple[npt.NDArray[np.bool_], npt.NDArray[np.float64]]:
     """Holm-Bonferroni step-down correction (Holm 1979).
@@ -82,10 +86,10 @@ def holm_bonferroni(
     ---------
     Holm, S. (1979). *Scand. J. Statist.* 6:65-70.
     """
-    _validate_inputs(p_values, alpha)
-    m = len(p_values)
-    order = np.argsort(p_values)
-    sorted_p = p_values[order]
+    arr = _validate_inputs(p_values, alpha)
+    m = len(arr)
+    order = np.argsort(arr)
+    sorted_p = arr[order]
 
     # Compute adjusted p-values in sorted order
     adjusted = np.empty(m, dtype=np.float64)
@@ -105,7 +109,7 @@ def holm_bonferroni(
 
 
 def benjamini_hochberg(
-    p_values: npt.NDArray[np.float64],
+    p_values: npt.NDArray[np.float64] | list[float],
     alpha: float = 0.05,
 ) -> tuple[npt.NDArray[np.bool_], npt.NDArray[np.float64]]:
     """Benjamini-Hochberg FDR control (Benjamini & Hochberg 1995).
@@ -139,10 +143,10 @@ def benjamini_hochberg(
     ---------
     Benjamini, Y. & Hochberg, Y. (1995). *JRSS B* 57(1):289-300.
     """
-    _validate_inputs(p_values, alpha)
-    m = len(p_values)
-    order = np.argsort(p_values)
-    sorted_p = p_values[order]
+    arr = _validate_inputs(p_values, alpha)
+    m = len(arr)
+    order = np.argsort(arr)
+    sorted_p = arr[order]
 
     # Compute adjusted p-values in sorted order (step-up)
     adjusted = np.empty(m, dtype=np.float64)

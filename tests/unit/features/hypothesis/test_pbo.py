@@ -88,3 +88,12 @@ class TestPBOCalculator:
     def test_no_folds_raises(self, calculator: PBOCalculator) -> None:
         with pytest.raises(ValueError, match="No folds"):
             calculator.compute({"a": [], "b": []}, {"a": [], "b": []})
+
+    def test_pbo_thresholds_validated(self) -> None:
+        """D030: PBO thresholds must be validated to (0, 1)."""
+        with pytest.raises(ValueError, match="must be strictly between 0 and 1"):
+            PBOCalculator(overfit_threshold=1.5)
+        with pytest.raises(ValueError, match="must be strictly between 0 and 1"):
+            PBOCalculator(adr0004_threshold=0.0)
+        with pytest.raises(ValueError, match="must be strictly between 0 and 1"):
+            PBOCalculator(adr0004_threshold=-0.1)

@@ -125,7 +125,7 @@ class DeflatedSharpeCalculator:
                 benchmark_sharpe=benchmark_sharpe,
             )
             min_trl = minimum_track_record_length(
-                target_sharpe=max(sr, 1e-10),
+                target_sharpe=sr,
                 benchmark_sharpe=benchmark_sharpe,
                 skewness=skew,
                 excess_kurtosis=kurt,
@@ -168,6 +168,7 @@ class DeflatedSharpeCalculator:
         list[DSRResult]
         """
         feature_sharpes = {
-            name: sharpe_ratio(series.to_list()) for name, series in returns_data.items()
+            name: sharpe_ratio(series.to_list(), risk_free_rate=0.0)
+            for name, series in returns_data.items()
         }
         return self.compute(feature_sharpes, returns_data, benchmark_sharpe)

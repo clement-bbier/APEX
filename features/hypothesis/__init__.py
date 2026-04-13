@@ -10,7 +10,7 @@ to quantify overfitting risk.  Three pillars:
 Reference
 ---------
 - Bailey & López de Prado (2014). "The Deflated Sharpe Ratio." JPM.
-- Bailey, Borwein, López de Prado, Zhu (2017). "Probability of Backtest
+- Bailey, Borwein, López de Prado, Zhu (2014). "Probability of Backtest
   Overfitting." J. Computational Finance.
 - Holm (1979). "A simple sequentially rejective multiple test procedure."
 - Benjamini & Hochberg (1995). "Controlling the FDR." JRSS B.

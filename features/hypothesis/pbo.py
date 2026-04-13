@@ -73,8 +73,17 @@ class PBOCalculator:
         overfit_threshold: float = _PBO_OVERFIT_THRESHOLD,
         adr0004_threshold: float = _PBO_ADR0004_THRESHOLD,
     ) -> None:
+        self._validate_threshold(overfit_threshold, "overfit_threshold")
+        self._validate_threshold(adr0004_threshold, "adr0004_threshold")
         self._overfit_threshold = overfit_threshold
         self._adr0004_threshold = adr0004_threshold
+
+    @staticmethod
+    def _validate_threshold(value: float, name: str) -> None:
+        """D030: thresholds must be strictly between 0 and 1."""
+        if not (0.0 < value < 1.0):
+            msg = f"{name} must be strictly between 0 and 1, got {value}"
+            raise ValueError(msg)
 
     def compute(
         self,

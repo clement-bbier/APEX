@@ -15,16 +15,16 @@ Generated from synthetic data (seed=42, N=1000 obs, n_strategies=10, n_folds=15)
 
 | Strategy | Sharpe | PSR | DSR | Min-TRL | p_raw | p_holm | p_BH | Decision |
 |---|---|---|---|---|---|---|---|---|
-| true_alpha | 8.846 | 1.000 | 1.000 | 12 | 0.0000 | 0.0000 | 0.0000 | PASS |
-| random_05 | 0.456 | 0.935 | 0.477 | 3291 | 0.5226 | 1.0000 | 1.0000 | FAIL |
-| random_02 | 0.216 | 0.852 | 0.299 | 14565 | 0.7011 | 1.0000 | 1.0000 | FAIL |
-| random_08 | -0.037 | 0.709 | 0.153 | >1e6 | 0.8472 | 1.0000 | 1.0000 | FAIL |
-| random_06 | -0.082 | 0.673 | 0.130 | >1e6 | 0.8702 | 1.0000 | 1.0000 | FAIL |
-| random_03 | -0.346 | 0.481 | 0.052 | >1e6 | 0.9476 | 1.0000 | 1.0000 | FAIL |
-| random_04 | -0.655 | 0.249 | 0.012 | >1e6 | 0.9878 | 1.0000 | 1.0000 | FAIL |
-| random_09 | -0.937 | 0.104 | 0.002 | >1e6 | 0.9977 | 1.0000 | 1.0000 | FAIL |
-| random_07 | -1.021 | 0.082 | 0.002 | >1e6 | 0.9985 | 1.0000 | 1.0000 | FAIL |
-| random_01 | -1.584 | 0.006 | 0.000 | >1e6 | 1.0000 | 1.0000 | 1.0000 | FAIL |
+| true_alpha | 9.165 | 1.000 | 1.000 | 11 | 0.0000 | 0.0000 | 0.0000 | PASS |
+| random_05 | 0.765 | 0.935 | 0.477 | 1174 | 0.5226 | 1.0000 | 1.0000 | FAIL |
+| random_02 | 0.526 | 0.852 | 0.299 | 2467 | 0.7011 | 1.0000 | 1.0000 | FAIL |
+| random_08 | 0.276 | 0.709 | 0.153 | 8936 | 0.8472 | 1.0000 | 1.0000 | FAIL |
+| random_06 | 0.225 | 0.673 | 0.130 | 13510 | 0.8702 | 1.0000 | 1.0000 | FAIL |
+| random_03 | -0.024 | 0.481 | 0.052 | >1e9 | 0.9476 | 1.0000 | 1.0000 | FAIL |
+| random_04 | -0.340 | 0.249 | 0.012 | >1e9 | 0.9878 | 1.0000 | 1.0000 | FAIL |
+| random_09 | -0.634 | 0.104 | 0.002 | >1e9 | 0.9977 | 1.0000 | 1.0000 | FAIL |
+| random_07 | -0.698 | 0.082 | 0.002 | >1e9 | 0.9985 | 1.0000 | 1.0000 | FAIL |
+| random_01 | -1.273 | 0.006 | 0.000 | >1e9 | 1.0000 | 1.0000 | 1.0000 | FAIL |
 
 ## PBO Results
 
@@ -45,7 +45,7 @@ Generated from synthetic data (seed=42, N=1000 obs, n_strategies=10, n_folds=15)
 - 1 / 10 strategies would pass at raw alpha=0.05
 - 0 false positives in this run (true_alpha is strongly significant)
 - DSR deflation alone (n_trials=10) is sufficient to reject all randoms here
-  because the true_alpha has such a strong signal (Sharpe ~8.8)
+  because the true_alpha has such a strong signal (Sharpe ~9.2)
 - In cases with weaker true signals, MHT correction becomes critical to
   prevent false discoveries from marginal strategies (e.g. random_05 at
   raw PSR=0.935 would almost pass without n_trials deflation)
@@ -63,9 +63,10 @@ Generated from synthetic data (seed=42, N=1000 obs, n_strategies=10, n_folds=15)
    providing zero false positives at the cost of some power -- acceptable
    when the stakes are real capital deployment.
 
-4. **Min-TRL diagnostic**: true_alpha needs only 12 observations to be significant
-   at 95% confidence, while random strategies need thousands+, confirming the
-   signal strength gap.
+4. **Min-TRL diagnostic**: true_alpha needs only 11 observations to be significant
+   at 95% confidence. Positive-Sharpe randoms need thousands; negative-Sharpe
+   strategies correctly show the sentinel value (>1e9 = "non-viable"), confirming
+   the signal strength gap.
 
 ## Existing Code Reuse
 

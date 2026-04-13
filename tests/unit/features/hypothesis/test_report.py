@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 import polars as pl
+import pytest
 
 from features.hypothesis.dsr import DeflatedSharpeCalculator
 from features.hypothesis.mht import benjamini_hochberg, holm_bonferroni
@@ -27,8 +28,12 @@ class TestHypothesisTestingReport:
             oos_metrics={"alpha": [2.5] * 10, "noise": [0.5] * 10},
         )
 
-        report = build_report(dsr_results, pbo_result)
-        assert report.n_pass >= 1 or report.n_fail >= 0  # basic structure
+        report = build_report(dsr_results, pbo_result, mht_correction="none")
+        assert report.n_features == 1
+        assert report.n_pass == 1
+        assert report.n_fail == 0
+        fd = report.feature_decisions[0]
+        assert fd.decision == "pass"
 
     def test_fail_when_dsr_low(self) -> None:
         """DSR < 0.95 → fail with reason."""
@@ -74,6 +79,47 @@ class TestHypothesisTestingReport:
         assert isinstance(report.n_features, int)
         assert report.n_features == 1
         assert report.n_pass + report.n_fail == report.n_features
+
+    def test_build_report_raises_when_holm_requested_but_pvalues_missing(self) -> None:
+        """build_report must reject silent MHT skip on multi-feature input.
+
+        Bug regression: previously build_report(mht_correction="holm") with
+        multiple features but no p_values_holm silently skipped MHT while
+        the markdown still claimed Holm was applied.
+        """
+        from features.hypothesis.dsr import DSRResult
+
+        dsr_a = DSRResult(
+            feature_name="a",
+            sharpe_ratio=1.0,
+            psr=0.9,
+            dsr=0.85,
+            n_trials=2,
+            n_obs=200,
+            skewness=0.1,
+            kurtosis=0.2,
+            min_trl=100,
+            is_significant=False,
+        )
+        dsr_b = DSRResult(
+            feature_name="b",
+            sharpe_ratio=0.5,
+            psr=0.6,
+            dsr=0.55,
+            n_trials=2,
+            n_obs=200,
+            skewness=0.0,
+            kurtosis=0.1,
+            min_trl=500,
+            is_significant=False,
+        )
+
+        with pytest.raises(ValueError, match="requires p_values_holm"):
+            build_report([dsr_a, dsr_b], mht_correction="holm")
+
+        # Explicit "none" should pass
+        report = build_report([dsr_a, dsr_b], mht_correction="none")
+        assert report.n_features == 2
 
 
 class TestMHTIntegration:
