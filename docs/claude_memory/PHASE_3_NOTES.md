@@ -10,8 +10,8 @@
 
 | Sub-Phase | Status | Notes |
 |---|---|---|
-| 3.1 Pipeline Foundation | IN_PROGRESS | PR open, awaiting review |
-| 3.2 Feature Store | PENDING | Custom on TimescaleDB |
+| 3.1 Pipeline Foundation | COMPLETE | PR #108 merged |
+| 3.2 Feature Store | IN_PROGRESS | PR open, awaiting review |
 | 3.3 IC Measurement | PENDING | |
 | 3.4 HAR-RV | PENDING | S07 har_rv_forecast() ready |
 | 3.5 Rough Vol | PENDING | S07 estimate_hurst_from_vol() ready |
@@ -46,4 +46,9 @@
 - TripleBarrierLabeler exposed via adapter pattern (D013) — does not inherit from core class
 - ValidationPipeline uses composable ValidationStage ABCs (D014) — 6 stubs in 3.1
 - SampleWeighter.uniqueness_weights uses O(n²) concurrency counting — acceptable for offline
-- 55 tests, 97.40% coverage on features/, 1,314 total tests (0 regressions)
+- 108 tests, 95.02% coverage on features/, 1,367 total tests (0 regressions)
+- D017: FeatureStore ABC extended with asset_id (no concrete impl existed in 3.1)
+- D018: Content-addressable versioning: `{calculator}-{hash8}` from SHA-256 of canonical JSON
+- D019: Redis TTL cache (300s), as_of in cache key prevents PIT poisoning
+- TimescaleFeatureStore: COPY protocol for bulk insert, point-in-time via computed_at <= as_of
+- FeaturePipeline.run() wired: takes pre-fetched bars, computes, persists per-calculator

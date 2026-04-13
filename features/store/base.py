@@ -4,6 +4,9 @@ This interface defines the contract for storing and retrieving
 computed features.  The concrete implementation (TimescaleDB-backed)
 arrives in Phase 3.2.
 
+Phase 3.2 revision: added ``asset_id`` parameter to all methods
+to support multi-asset feature storage (D017).
+
 Reference:
     Sculley, D. et al. (2015). "Hidden Technical Debt in Machine
     Learning Systems". *NeurIPS*, 2503-2511.
@@ -15,8 +18,11 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
+from uuid import UUID
 
 import polars as pl
+
+from features.versioning import FeatureVersion
 
 
 class FeatureStore(ABC):
@@ -34,55 +40,78 @@ class FeatureStore(ABC):
     @abstractmethod
     async def save(
         self,
-        name: str,
-        version: str,
-        df: pl.DataFrame,
+        asset_id: UUID,
+        features: pl.DataFrame,
+        version: FeatureVersion,
     ) -> None:
         """Persist a versioned feature DataFrame.
 
         Args:
-            name: Feature name (e.g. ``'har_rv'``).
-            version: Semantic version string (e.g. ``'0.1.0'``).
-            df: Feature data to store.
+            asset_id: Asset UUID.
+            features: Feature data to store.
+            version: Immutable version record.
+
+        Raises:
+            FeatureVersionExistsError: If the version already exists.
         """
 
     @abstractmethod
     async def load(
         self,
-        name: str,
-        version: str,
+        asset_id: UUID,
+        feature_names: list[str],
+        start: datetime,
+        end: datetime,
         as_of: datetime | None = None,
+        version: str | None = None,
     ) -> pl.DataFrame:
-        """Load a versioned feature DataFrame.
+        """Load feature data with point-in-time semantics.
 
         Args:
-            name: Feature name.
-            version: Semantic version string.
-            as_of: Point-in-time cutoff — only rows computed before
-                this timestamp are returned.  Prevents look-ahead bias.
+            asset_id: Asset UUID.
+            feature_names: Feature names to load.
+            start: Start of time range (inclusive).
+            end: End of time range (inclusive).
+            as_of: Point-in-time cutoff — only data computed before
+                this timestamp is returned.  Prevents look-ahead bias.
+            version: Specific version to load.  If None, the latest
+                version as of ``as_of`` is resolved automatically.
 
         Returns:
-            Polars DataFrame of stored features.
+            Polars DataFrame with timestamp + one column per feature.
         """
 
     @abstractmethod
-    async def list_versions(self, name: str) -> list[str]:
-        """List all stored versions for a given feature name.
+    async def list_versions(
+        self,
+        asset_id: UUID,
+        feature_name: str,
+    ) -> list[FeatureVersion]:
+        """List all stored versions for a given asset + feature.
 
         Args:
-            name: Feature name.
+            asset_id: Asset UUID.
+            feature_name: Feature name.
 
         Returns:
-            Sorted list of version strings (oldest first).
+            List of FeatureVersion records, oldest first.
         """
 
     @abstractmethod
-    async def latest_version(self, name: str) -> str | None:
-        """Return the latest version for a given feature name.
+    async def latest_version(
+        self,
+        asset_id: UUID,
+        feature_name: str,
+        as_of: datetime | None = None,
+    ) -> FeatureVersion | None:
+        """Return the latest version for a given asset + feature.
 
         Args:
-            name: Feature name.
+            asset_id: Asset UUID.
+            feature_name: Feature name.
+            as_of: If provided, only versions computed before this
+                timestamp are considered.
 
         Returns:
-            Latest version string, or None if no versions exist.
+            Latest FeatureVersion, or None if no versions exist.
         """

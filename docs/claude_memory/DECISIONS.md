@@ -376,3 +376,86 @@ concrete stages arrive in sub-phases 3.3, 3.9, 3.10, 3.11.
 - Stages can be added/removed without modifying ValidationPipeline (Strategy pattern)
 - Stub stages log and return `skipped` — observable in tests
 - Pipeline propagates StageContext for inter-stage communication
+
+---
+
+## D017 — FeatureStore ABC Extended with asset_id (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 010 |
+| Decision | Add `asset_id: UUID` parameter to all FeatureStore ABC methods |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3.1 FeatureStore ABC was feature-name-scoped only (`save(name, version, df)`).
+The multi-asset system requires per-asset feature storage.
+
+### Alternatives Considered
+
+1. **Encode asset_id in name** (e.g. `f"{asset_id}:{feature_name}"`): Hacky, loses type safety, breaks registry queries.
+2. **Add asset_id parameter (chosen)**: Clean, typed, aligns with PHASE_3_SPEC §2.2 which uses `symbol: str`.
+
+### Justification
+
+- No concrete implementation existed yet (3.2 creates the first one)
+- All abstract methods updated: `save`, `load`, `list_versions`, `latest_version`
+- ABC now also uses `FeatureVersion` dataclass instead of raw `str` version parameter
+- Backward compatible in spirit: 3.1 tests still pass (ABC test checks method names, not signatures)
+
+---
+
+## D018 — Content-Addressable Versioning Strategy (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 010 |
+| Decision | Use `{calculator_name}-{sha256_hash8}` as version identifier |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3.2 needs a deterministic versioning scheme for feature batches.
+
+### Alternatives Considered
+
+1. **Semver** (`0.1.0`, `0.2.0`): Requires manual version bumps, no content awareness.
+2. **Timestamp-based** (`har_rv-20260413`): Not content-addressable, different params could collide.
+3. **Content-addressable hash (chosen)**: SHA-256 of canonical JSON `(calculator_name, params, computed_at)` truncated to 8 hex chars.
+
+### Justification
+
+- Deterministic: same inputs always produce the same version string (Hypothesis-verified, 1000 examples)
+- Discriminating: different params produce different versions
+- Short: `har_rv-a1b2c3d4` is human-readable
+- Content hash on IPC bytes provides separate integrity verification (`content_hash` field)
+
+---
+
+## D019 — Redis TTL Cache Strategy (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 010 |
+| Decision | Use TTL-based Redis cache (300s) with as_of in cache key, no manual invalidation |
+| Status | ACCEPTED |
+
+### Context
+
+Feature Store needs a read cache to avoid repeated TimescaleDB queries for the same data.
+
+### Alternatives Considered
+
+1. **Event-based invalidation**: Invalidate cache on new version registration. Complex, premature.
+2. **TTL-only (chosen)**: Simple, self-healing, no invalidation logic needed.
+
+### Justification
+
+- Feature data is immutable (versions are append-only), so stale cache = missing a new version, not stale data
+- Including `as_of` in cache key prevents PIT cache poisoning (different as_of = different cache entry)
+- TTL keeps memory bounded without explicit eviction
+- Manual invalidation deferred to Phase 9+ (observability)

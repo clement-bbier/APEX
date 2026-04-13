@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-13
-**Updated by**: Session 008
+**Updated by**: Session 010
 
 ---
 
@@ -9,16 +9,16 @@
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 3 — Feature Validation Harness (3.1 PR OPEN) |
+| Active Phase | Phase 3 — Feature Validation Harness (3.2 PR OPEN) |
 | Previous Phase | Phase 2 — Universal Data Infrastructure (DONE) |
-| Total tests | 1,369 (1,314 unit + 55 integration) |
-| Production LOC | ~32,300 |
-| Test LOC | ~18,800 |
-| mypy strict | 0 errors (339 files) |
+| Total tests | 1,422+ (1,367 unit + 55 integration) |
+| Production LOC | ~33,000 |
+| Test LOC | ~19,500 |
+| mypy strict | 0 errors (19 files in features/) |
 | Services scaffolded | 10/10 (S01-S10) |
 | S01 fully implemented | Yes (78 files, 9,583 LOC) |
 | ADRs accepted | 10 (+ ADR-0004 Feature Validation Methodology) |
-| features/ coverage | 97.40% (55 tests) |
+| features/ coverage | 95.02% (108 tests) |
 
 ## Audit Status
 
