@@ -1057,5 +1057,41 @@ Implement Combinatorial Purged Cross-Validation (CPCV) from Lopez de Prado (2018
 
 ### Next Steps
 
-- Await Copilot review on PR #119
+- Await Copilot re-review on PR #119 (hotfix pushed)
 - Phase 3.11 (DSR/PBO) depends on CPCV splits from this implementation
+
+---
+
+## Session 024 -- 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.10 -- PR #119 Copilot Review Hotfix |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/cpcv-purging` |
+| PR | #119 (updated) |
+
+### Objective
+
+Address 5 Copilot review comments + CI failure (sklearn missing) on PR #119.
+
+### Fixes Applied
+
+1. **Methodological bug (Lopez de Prado S7.4.1)**: Purging interval start used `t1[group_start]` instead of `t0[group_start]`. `split()` now accepts optional `t0` parameter. With t0, purging removes ~2x more samples (avg 26.7 vs 13.3). Test characterizing the bug added.
+2. **Performance #1**: train_candidates O(n) Python loop replaced with group-based `np.concatenate`.
+3. **Performance #2**: embargo Python `set` replaced with vectorized `np.arange` + `np.isin`.
+4. **CI red + sklearn dependency**: 3 leakage tests rewritten with deterministic 1-NN classifier in pure numpy. No sklearn dependency.
+5. **Brittle assertions**: RF-based accuracy bands replaced with deterministic 1-NN. Larger drop (33.8pp vs 25.2pp).
+
+### Key Results
+
+- 58 tests passing (53 before + 1 new t0 characterization + 4 parametrized already counted)
+- Leakage drop: K-fold 85.5% vs CPCV 51.7% (33.8pp, improved from 25.2pp before t0 fix)
+- mypy strict: 0 errors, ruff: 0 errors
+- Scope: 4 files only (cpcv.py, embargo.py, test_cpcv.py, report)
+
+### Next Steps
+
+- Await Copilot re-review on PR #119
+- Phase 3.11 (DSR/PBO) after merge
