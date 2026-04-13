@@ -1006,3 +1006,56 @@ Implement cross-calculator multicollinearity analysis for 8 signal columns from 
 
 - Push branch, open PR for Copilot review
 - Phase 3.10 (CPCV) after merge
+
+---
+
+## Session 023 -- 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.10 -- CPCV with Purging |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/cpcv-purging` |
+| PR | #119 |
+| Issue | #96 |
+
+### Objective
+
+Implement Combinatorial Purged Cross-Validation (CPCV) from Lopez de Prado (2018) Ch. 7. Scikit-learn-compatible splitter with temporal purging and embargo to eliminate label leakage in financial time series CV.
+
+### Files Created
+
+- `features/cv/cpcv.py` (~280 LOC) -- `CombinatoriallyPurgedKFold` class
+- `features/cv/purging.py` (~65 LOC) -- `purge_train_indices()` helper
+- `features/cv/embargo.py` (~65 LOC) -- `apply_embargo()` helper
+- `features/cv/__init__.py` (modified) -- exports added
+- `tests/unit/features/cv/test_cpcv.py` (~575 LOC, 35 tests)
+- `tests/unit/features/cv/test_purging.py` (~100 LOC, 10 tests)
+- `tests/unit/features/cv/test_embargo.py` (~65 LOC, 7 tests)
+- `reports/phase_3_10/cpcv_diagnostic_report.md` -- Leakage stress test report
+
+### Key Results
+
+- 52 new tests, all passing (57 total in features/cv/)
+- Leakage stress test: Random K-fold 82.7% vs CPCV 57.5% (25.2pp drop)
+- Zero regressions on full suite (1586 passed)
+- mypy strict: 0 errors, ruff: 0 errors
+
+### Decisions
+
+- No new ADR decisions needed -- followed existing PHASE_3_SPEC S3.10 contract exactly
+- Used `BacktestSplitter` ABC from `features/cv/base.py` as reference (did not subclass because API differs: CPCV needs `t1` parameter)
+- scikit-learn installed as dependency for leakage characterization tests (RandomForestClassifier)
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors (5 files)
+- 52 new tests passed
+- Full suite: 1,586 passed, 53 deselected (pre-existing hypothesis timeouts), 0 regressions
+
+### Next Steps
+
+- Await Copilot review on PR #119
+- Phase 3.11 (DSR/PBO) depends on CPCV splits from this implementation
