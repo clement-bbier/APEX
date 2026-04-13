@@ -27,12 +27,13 @@ import numpy.typing as npt
 class ICResult:
     """Result of IC measurement for a single feature.
 
-    All fields are populated by the concrete ICMetric implementation
-    (Phase 3.3).
+    Core fields are populated by Phase 3.1 stubs; extended fields
+    (``ic_std`` through ``newey_west_lags``) are populated by the
+    concrete :class:`SpearmanICMeasurer` in Phase 3.3.
 
     Reference:
         Grinold, R. C. & Kahn, R. N. (1999). *Active Portfolio
-        Management* (2nd ed.), Ch. 6. McGraw-Hill.
+        Management* (2nd ed.), Ch. 6, 16. McGraw-Hill.
     """
 
     ic: float
@@ -52,6 +53,35 @@ class ICResult:
 
     ci_high: float
     """Upper bound of the 95% confidence interval for IC."""
+
+    # ── Phase 3.3 extensions (optional, backward-compatible) ─────────
+
+    feature_name: str | None = None
+    """Name of the feature measured (None for legacy results)."""
+
+    ic_std: float | None = None
+    """Standard deviation of per-period IC values."""
+
+    ic_t_stat: float | None = None
+    """Newey-West HAC-corrected t-statistic for H0: IC == 0."""
+
+    ic_hit_rate: float | None = None
+    """Fraction of per-period IC values with the correct sign."""
+
+    turnover_adj_ic: float | None = None
+    """IC adjusted for estimated feature-turnover cost."""
+
+    ic_decay: tuple[float, ...] | None = None
+    """IC values at multiple horizons (e.g. 1, 5, 10, 20 bars)."""
+
+    is_significant: bool | None = None
+    """True if ``|ic_t_stat| > 1.96`` (95% confidence)."""
+
+    horizon_bars: int | None = None
+    """Forward-return horizon in bars used for this measurement."""
+
+    newey_west_lags: int | None = None
+    """Number of Newey-West lags used for HAC correction."""
 
 
 class ICMetric(ABC):

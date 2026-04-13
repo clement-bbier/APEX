@@ -15,10 +15,17 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 
+import numpy as np
 import polars as pl
 import structlog
 
+from features.ic.base import ICMetric
+
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
+
+# ADR-0004 acceptance thresholds.
+_IC_THRESHOLD: float = 0.02
+_IC_IR_THRESHOLD: float = 0.50
 
 
 class PipelineStage(Enum):
@@ -100,25 +107,90 @@ class ValidationStage(ABC):
 
 
 class ICStage(ValidationStage):
-    """IC measurement stage — stub for Phase 3.1.
+    """IC measurement stage — Phase 3.3 concrete implementation.
 
-    Concrete implementation wired in Phase 3.3.
+    Computes Spearman rank IC between a feature and forward returns,
+    then gates on ADR-0004 thresholds: ``|IC| >= 0.02`` and
+    ``IC_IR > 0.50``.
+
+    The feature vector and forward returns must be provided via
+    ``context.metadata``:
+
+    - ``"feature_values"``: 1-D ``np.ndarray`` of feature values.
+    - ``"forward_returns"``: 1-D ``np.ndarray`` of forward returns.
+    - ``"horizon_bars"`` (optional, default 1): int horizon.
+
+    Reference:
+        ADR-0004, PHASE_3_SPEC Section 2.3.
     """
+
+    def __init__(self, measurer: ICMetric) -> None:
+        self._measurer = measurer
 
     def name(self) -> PipelineStage:
         return PipelineStage.IC
 
     def run(self, context: StageContext) -> StageResult:
+        feature_values = context.metadata.get("feature_values")
+        forward_returns = context.metadata.get("forward_returns")
+
+        if feature_values is None or forward_returns is None:
+            logger.info(
+                "validation_stage.skipped",
+                stage="ic",
+                feature=context.feature_name,
+                reason="feature_values or forward_returns not in metadata",
+            )
+            return StageResult(
+                stage=PipelineStage.IC,
+                passed=False,
+                skipped="feature_values or forward_returns not in metadata",
+            )
+
+        feat_arr = np.asarray(feature_values, dtype=np.float64)
+        fwd_arr = np.asarray(forward_returns, dtype=np.float64)
+        raw_horizon = context.metadata.get("horizon_bars", 1)
+        horizon: int = int(raw_horizon) if isinstance(raw_horizon, (int, float, str)) else 1
+
+        result = self._measurer.measure(feat_arr, fwd_arr)
+
+        # For richer metrics, re-measure with horizon awareness if the
+        # measurer is a SpearmanICMeasurer (duck-typing via hasattr).
+        if hasattr(self._measurer, "measure_rich"):
+            result = self._measurer.measure_rich(
+                feature=feat_arr,
+                forward_returns=fwd_arr,
+                feature_name=context.feature_name,
+                horizon_bars=horizon,
+            )
+
+        passed = abs(result.ic) >= _IC_THRESHOLD and result.ic_ir >= _IC_IR_THRESHOLD
+
+        metrics: dict[str, object] = {
+            "ic": result.ic,
+            "ic_ir": result.ic_ir,
+            "p_value": result.p_value,
+            "ci_low": result.ci_low,
+            "ci_high": result.ci_high,
+            "n_samples": result.n_samples,
+        }
+        if result.ic_t_stat is not None:
+            metrics["ic_t_stat"] = result.ic_t_stat
+        if result.is_significant is not None:
+            metrics["is_significant"] = result.is_significant
+
         logger.info(
-            "validation_stage.skipped",
-            stage="ic",
+            "validation_stage.ic.complete",
             feature=context.feature_name,
-            reason="wired in sub-phase 3.3",
+            ic=result.ic,
+            ic_ir=result.ic_ir,
+            passed=passed,
         )
+
         return StageResult(
             stage=PipelineStage.IC,
-            passed=False,
-            skipped="wired in sub-phase 3.3",
+            passed=passed,
+            metrics=metrics,
         )
 
 
