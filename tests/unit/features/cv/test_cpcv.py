@@ -261,6 +261,36 @@ class TestPurging:
                         f"Train index {i} has t1 inside test group [{g_min}, {g_max}]"
                     )
 
+    def test_purging_uses_t0_start_not_t1(self) -> None:
+        """Lopez de Prado S7.4.1: purge interval start = t0, not t1.
+
+        A train sample whose label STARTS before the test fold but ENDS
+        during the test fold must be purged.  With the old implementation
+        (t1 as interval start), it would survive because
+        ``t1[group_start]`` is strictly later than ``t0[group_start]``.
+        """
+        n = 60
+        # t0 = observation timestamps; t1 = t0 + 10 hours (label horizon)
+        t0 = _make_timestamps(n)
+        t1 = _make_t1_with_horizon(t0, horizon=10)
+        x = np.zeros(n)
+
+        cv = CombinatoriallyPurgedKFold(n_splits=6, n_test_splits=1, embargo_pct=0.0)
+
+        # With explicit t0: purge interval = [t0[group_start], t1[group_end-1]]
+        # This is wider than [t1[group_start], t1[group_end-1]], catching more leakage.
+        splits_with_t0 = list(cv.split(x, t1=t1, t0=t0))
+        splits_without_t0 = list(cv.split(x, t1=t1))
+
+        total_train_with_t0 = sum(len(tr) for tr, _ in splits_with_t0)
+        total_train_without_t0 = sum(len(tr) for tr, _ in splits_without_t0)
+
+        # With t0, more samples are purged (wider interval), so train set is smaller
+        assert total_train_with_t0 < total_train_without_t0, (
+            f"Passing t0 should purge more samples (wider interval). "
+            f"With t0: {total_train_with_t0}, without: {total_train_without_t0}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Embargo correctness
@@ -467,8 +497,9 @@ class TestLeakageCharacterization:
 
     Synthetic dataset with strongly autocorrelated features (random walk)
     and overlapping labels (y[i] depends on data at i + horizon).
-    Without CPCV, a classifier exploits temporal leakage from overlapping
-    train/test samples.  With CPCV + purging, this leakage is eliminated.
+    Uses a deterministic 1-NN classifier in pure numpy (no sklearn
+    dependency) that is sensitive to temporal-proximity leakage on
+    autocorrelated features.
     """
 
     @staticmethod
@@ -479,96 +510,112 @@ class TestLeakageCharacterization:
 
         Features are cumulative sums (random walk), making nearby
         observations highly correlated.  The label y[i] is the sign of
-        the price move from i to i + horizon.  The features at time i
-        contain information about prices at i + horizon through
-        autocorrelation, creating exploitable leakage.
+        the price move from i to i + horizon.
+
+        Returns (x, y, t0, t1) where t0 = observation timestamps and
+        t1 = label end times (t0 + horizon).
         """
         rng = np.random.default_rng(seed)
-        # Random walk features -- strongly autocorrelated
         increments = rng.standard_normal((n, 5))
         x = np.cumsum(increments, axis=0)
-        timestamps = _make_timestamps(n)
 
-        # Forward return label: 1 if price goes up over horizon, else 0
-        # This creates overlapping labels because y[i] uses data at i+horizon
         y = np.zeros(n, dtype=np.int64)
         for i in range(n - horizon):
             y[i] = 1 if x[i + horizon, 0] > x[i, 0] else 0
 
-        t1 = _make_t1_with_horizon(timestamps, horizon)
-        return x, y, timestamps, t1
+        t0 = _make_timestamps(n)
+        t1 = _make_t1_with_horizon(t0, horizon)
+        return x, y, t0, t1
+
+    @staticmethod
+    def _shuffled_kfold_indices(
+        n_samples: int, n_splits: int, seed: int
+    ) -> list[tuple[np.ndarray, np.ndarray]]:
+        """Deterministic shuffled K-fold (replaces sklearn KFold)."""
+        indices = np.arange(n_samples, dtype=np.intp)
+        rng = np.random.default_rng(seed)
+        rng.shuffle(indices)
+        fold_sizes = np.full(n_splits, n_samples // n_splits, dtype=np.int64)
+        fold_sizes[: n_samples % n_splits] += 1
+        folds: list[tuple[np.ndarray, np.ndarray]] = []
+        current = 0
+        for fold_size in fold_sizes:
+            start = current
+            stop = current + int(fold_size)
+            test_idx = indices[start:stop]
+            train_idx = np.concatenate((indices[:start], indices[stop:]))
+            folds.append((train_idx, test_idx))
+            current = stop
+        return folds
+
+    @staticmethod
+    def _predict_1nn(
+        x_train: np.ndarray,
+        y_train: np.ndarray,
+        x_test: np.ndarray,
+    ) -> np.ndarray:
+        """Deterministic 1-NN classifier (replaces sklearn RandomForest).
+
+        1-NN is sensitive to the same temporal-proximity leakage as RF
+        on autocorrelated features: a test sample whose temporal neighbor
+        is in the train set will be classified by that neighbor's label.
+        """
+        sq_dist = np.sum(
+            (x_test[:, np.newaxis, :] - x_train[np.newaxis, :, :]) ** 2,
+            axis=2,
+        )
+        nearest = np.argmin(sq_dist, axis=1)
+        return y_train[nearest]
+
+    def _mean_cv_accuracy(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        folds: list[tuple[np.ndarray, np.ndarray]],
+    ) -> float:
+        """Compute mean accuracy across CV folds using 1-NN."""
+        accs: list[float] = []
+        for train_idx, test_idx in folds:
+            if len(train_idx) < 2 or len(test_idx) < 1:
+                continue
+            preds = self._predict_1nn(x[train_idx], y[train_idx], x[test_idx])
+            accs.append(float(np.mean(preds == y[test_idx])))
+        return float(np.mean(accs)) if accs else float("nan")
 
     def test_random_kfold_shows_leakage(self) -> None:
-        """Without purging, random shuffled K-fold exploits autocorrelation."""
-        from sklearn.ensemble import RandomForestClassifier
-        from sklearn.model_selection import KFold
-
+        """Shuffled K-fold on autocorrelated data shows leakage via proximity."""
         n, horizon, seed = 1000, 20, 42
-        x, y, _, _ = self._build_leaky_dataset(n, horizon, seed)
-
-        kf = KFold(n_splits=5, shuffle=True, random_state=seed)
-        accuracies: list[float] = []
-        for train_idx, test_idx in kf.split(x):
-            clf = RandomForestClassifier(n_estimators=100, random_state=seed)
-            clf.fit(x[train_idx], y[train_idx])
-            acc = float(np.mean(clf.predict(x[test_idx]) == y[test_idx]))
-            accuracies.append(acc)
-
-        mean_acc = float(np.mean(accuracies))
-        # Shuffled K-fold on autocorrelated data should exploit leakage
-        assert mean_acc > 0.55, f"Expected leaky K-fold accuracy > 0.55, got {mean_acc:.3f}"
+        x, y, _t0, _t1 = self._build_leaky_dataset(n, horizon, seed)
+        folds = self._shuffled_kfold_indices(n_samples=len(x), n_splits=5, seed=seed)
+        mean_acc = self._mean_cv_accuracy(x, y, folds)
+        assert mean_acc > 0.55, (
+            f"Shuffled K-fold should expose leakage on autocorrelated data; "
+            f"expected > 0.55, got {mean_acc:.3f}"
+        )
 
     def test_cpcv_eliminates_leakage(self) -> None:
-        """With CPCV + purging + embargo, accuracy drops toward chance."""
-        from sklearn.ensemble import RandomForestClassifier
-
+        """CPCV with purging + embargo brings 1-NN accuracy toward chance."""
         n, horizon, seed = 1000, 20, 42
-        x, y, _timestamps, t1 = self._build_leaky_dataset(n, horizon, seed)
-
+        x, y, t0, t1 = self._build_leaky_dataset(n, horizon, seed)
         cv = CombinatoriallyPurgedKFold(n_splits=6, n_test_splits=2, embargo_pct=0.02)
-
-        accuracies: list[float] = []
-        for train_idx, test_idx in cv.split(x, t1):
-            if len(train_idx) < 10 or len(test_idx) < 5:
-                continue
-            clf = RandomForestClassifier(n_estimators=100, random_state=seed)
-            clf.fit(x[train_idx], y[train_idx])
-            acc = float(np.mean(clf.predict(x[test_idx]) == y[test_idx]))
-            accuracies.append(acc)
-
-        mean_acc = float(np.mean(accuracies))
-        # CPCV should bring accuracy close to chance (0.5)
+        folds = list(cv.split(x, t1=t1, t0=t0))
+        mean_acc = self._mean_cv_accuracy(x, y, folds)
         assert mean_acc < 0.62, (
-            f"CPCV accuracy should be near chance (<0.62), got {mean_acc:.3f}. "
-            f"Purging may not be working correctly."
+            f"CPCV should bring accuracy near chance (<0.62); got {mean_acc:.3f}. "
+            f"Purging may not be working."
         )
 
     def test_cpcv_accuracy_lower_than_kfold(self) -> None:
-        """CPCV accuracy must be strictly lower than random K-fold on leaky data."""
-        from sklearn.ensemble import RandomForestClassifier
-        from sklearn.model_selection import KFold
-
+        """Direct comparison: CPCV accuracy < shuffled K-fold by >= 10pp."""
         n, horizon, seed = 1000, 20, 42
-        x, y, _timestamps, t1 = self._build_leaky_dataset(n, horizon, seed)
+        x, y, t0, t1 = self._build_leaky_dataset(n, horizon, seed)
 
-        # Random K-fold accuracy
-        kf = KFold(n_splits=5, shuffle=True, random_state=seed)
-        kf_accs: list[float] = []
-        for train_idx, test_idx in kf.split(x):
-            clf = RandomForestClassifier(n_estimators=100, random_state=seed)
-            clf.fit(x[train_idx], y[train_idx])
-            kf_accs.append(float(np.mean(clf.predict(x[test_idx]) == y[test_idx])))
-
-        # CPCV accuracy
+        kfold_acc = self._mean_cv_accuracy(x, y, self._shuffled_kfold_indices(len(x), 5, seed))
         cv = CombinatoriallyPurgedKFold(n_splits=6, n_test_splits=2, embargo_pct=0.02)
-        cpcv_accs: list[float] = []
-        for train_idx, test_idx in cv.split(x, t1):
-            if len(train_idx) < 10 or len(test_idx) < 5:
-                continue
-            clf = RandomForestClassifier(n_estimators=100, random_state=seed)
-            clf.fit(x[train_idx], y[train_idx])
-            cpcv_accs.append(float(np.mean(clf.predict(x[test_idx]) == y[test_idx])))
+        cpcv_acc = self._mean_cv_accuracy(x, y, list(cv.split(x, t1=t1, t0=t0)))
 
-        assert float(np.mean(cpcv_accs)) < float(np.mean(kf_accs)), (
-            f"CPCV acc ({np.mean(cpcv_accs):.3f}) should be < K-fold acc ({np.mean(kf_accs):.3f})"
+        assert cpcv_acc < kfold_acc - 0.10, (
+            f"CPCV must reduce leakage by at least 10pp vs shuffled K-fold. "
+            f"K-fold={kfold_acc:.3f}, CPCV={cpcv_acc:.3f}, "
+            f"drop={kfold_acc - cpcv_acc:.3f}"
         )

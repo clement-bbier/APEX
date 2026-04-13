@@ -124,19 +124,30 @@ class CombinatoriallyPurgedKFold:
         self,
         X: pl.DataFrame | npt.NDArray[Any],  # noqa: N803
         t1: pl.Series | npt.NDArray[np.datetime64],
+        t0: pl.Series | npt.NDArray[np.datetime64] | None = None,
     ) -> Iterator[tuple[npt.NDArray[np.intp], npt.NDArray[np.intp]]]:
         """Yield ``(train_idx, test_idx)`` for each combinatorial split.
 
         Parameters
         ----------
         X:
-            Feature matrix or array — only ``len(X)`` matters; columns
+            Feature matrix or array -- only ``len(X)`` matters; columns
             are ignored.
         t1:
             Array/Series of datetime values.  ``t1[i]`` is the time when
             the label for observation ``i`` is known (e.g. Triple
             Barrier hit time, or ``t_i + horizon``).
             Must be monotonically non-decreasing.
+        t0:
+            Optional array/Series of label start times.  ``t0[i]`` is
+            the time when observation ``i`` enters the market (e.g. the
+            bar timestamp).  When provided, the purging interval for
+            each test group uses ``[t0[group_start], t1[group_end - 1]]``
+            per Lopez de Prado (2018) S7.4.1.
+
+            If omitted, ``t1`` is used as both start and end, which
+            assumes labels are point-in-time.  This may **under-purge**
+            with horizon-based labels where ``t1[i] > t0[i]``.
 
         Yields
         ------
@@ -147,11 +158,13 @@ class CombinatoriallyPurgedKFold:
         Raises
         ------
         ValueError
-            If ``len(X) < n_splits``, ``len(t1) != len(X)``, or
-            ``t1`` is not monotonically non-decreasing.
+            If ``len(X) < n_splits``, ``len(t1) != len(X)``,
+            ``t1`` is not monotonically non-decreasing, or
+            ``t0`` is provided with mismatched length or ``t0[i] > t1[i]``.
         """
         n = len(X)
         t1_ns = self._validate_and_convert_t1(t1, n)
+        t0_ns = self._validate_and_convert_t0(t0, t1_ns, n)
 
         # Partition [0, n) into n_splits contiguous groups
         groups = self._make_groups(n)
@@ -170,19 +183,25 @@ class CombinatoriallyPurgedKFold:
 
             for gi in test_group_indices:
                 group_start, group_end = groups[gi]
-                group_indices = np.arange(group_start, group_end, dtype=np.intp)
-                test_idx_parts.append(group_indices)
+                test_idx_parts.append(np.arange(group_start, group_end, dtype=np.intp))
 
-                # Temporal interval for purging: [t1 of first obs, t1 of last obs]
-                # We use the actual timestamps of group boundaries
-                test_intervals.append((t1_ns[group_start], t1_ns[group_end - 1]))
+                # Purge interval: [t0 of first test obs, t1 of last test obs]
+                # per Lopez de Prado (2018) S7.4.1
+                test_intervals.append((t0_ns[group_start], t1_ns[group_end - 1]))
                 test_end_indices.append(group_end - 1)
 
             test_idx = np.concatenate(test_idx_parts)
 
-            # Build initial train set: all indices not in test
-            test_set = set(test_idx.tolist())
-            train_candidates = np.array([i for i in range(n) if i not in test_set], dtype=np.intp)
+            # Build train set from non-test groups (vectorized)
+            test_group_set = set(test_group_indices)
+            train_parts = [
+                np.arange(gs, ge, dtype=np.intp)
+                for gid, (gs, ge) in enumerate(groups)
+                if gid not in test_group_set
+            ]
+            train_candidates = (
+                np.concatenate(train_parts) if train_parts else np.empty(0, dtype=np.intp)
+            )
 
             # Apply purging
             train_idx = purge_train_indices(train_candidates, t1_ns, test_intervals)
@@ -249,6 +268,42 @@ class CombinatoriallyPurgedKFold:
             raise ValueError(msg)
 
         return t1_ns
+
+    def _validate_and_convert_t0(
+        self,
+        t0: pl.Series | npt.NDArray[np.datetime64] | None,
+        t1_ns: npt.NDArray[np.int64],
+        n: int,
+    ) -> npt.NDArray[np.int64]:
+        """Validate optional t0 and convert to int64 nanosecond timestamps.
+
+        If ``t0`` is ``None``, returns ``t1_ns`` (legacy fallback:
+        point-in-time label assumption).
+
+        Raises
+        ------
+        ValueError
+            If length mismatch or any ``t0[i] > t1[i]``.
+        """
+        if t0 is None:
+            return t1_ns
+
+        if isinstance(t0, pl.Series):
+            t0_arr: npt.NDArray[np.datetime64] = t0.to_numpy().astype("datetime64[ns]")
+        else:
+            t0_arr = np.asarray(t0, dtype="datetime64[ns]")
+
+        if len(t0_arr) != n:
+            msg = f"len(t0)={len(t0_arr)} != len(X)={n}"
+            raise ValueError(msg)
+
+        t0_ns: npt.NDArray[np.int64] = t0_arr.view(np.int64)
+
+        if np.any(t0_ns > t1_ns):
+            msg = "t0[i] must be <= t1[i] for all i. Label start cannot exceed label end."
+            raise ValueError(msg)
+
+        return t0_ns
 
     def _make_groups(self, n: int) -> list[tuple[int, int]]:
         """Partition ``[0, n)`` into ``n_splits`` contiguous groups.

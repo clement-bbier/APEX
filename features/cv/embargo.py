@@ -52,20 +52,26 @@ def apply_embargo(
     if embargo_size <= 0 or len(test_end_indices) == 0 or len(train_candidates) == 0:
         return train_candidates
 
-    # Collect all embargoed indices into a set for O(1) lookup
-    embargoed: set[int] = set()
-    for end_i in test_end_indices:
-        embargo_start = end_i + 1
-        embargo_end = min(end_i + embargo_size, n_total - 1)
-        for idx in range(embargo_start, embargo_end + 1):
-            embargoed.add(idx)
+    # Vectorized embargo zone construction
+    test_end_arr = np.asarray(test_end_indices, dtype=np.intp)
+    embargo_starts = test_end_arr + 1
+    embargo_ends = np.minimum(test_end_arr + embargo_size, n_total - 1)
+    valid_windows = embargo_starts <= embargo_ends
 
-    if not embargoed:
+    if not np.any(valid_windows):
         return train_candidates
 
-    # Boolean mask: True = keep (not in embargo zone)
-    keep = np.array(
-        [int(idx) not in embargoed for idx in train_candidates],
-        dtype=np.bool_,
+    embargoed_idx = np.unique(
+        np.concatenate(
+            [
+                np.arange(start, end + 1, dtype=np.intp)
+                for start, end in zip(
+                    embargo_starts[valid_windows],
+                    embargo_ends[valid_windows],
+                    strict=True,
+                )
+            ]
+        )
     )
+    keep = np.isin(train_candidates, embargoed_idx, invert=True)
     return train_candidates[keep]
