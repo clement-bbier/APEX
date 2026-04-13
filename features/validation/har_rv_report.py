@@ -54,14 +54,14 @@ class HARRVValidationReport:
             "|---------|--------:|----:|------:|--------:|:-----------:|",
         ]
         for r in self.ic_results:
-            sig = "yes" if r.is_significant else "no"
+            if r.is_significant is None:
+                sig = "n/a"
+            else:
+                sig = "yes" if r.is_significant else "no"
+            name = r.feature_name if r.feature_name is not None else "har_rv"
+            horizon = r.horizon_bars if r.horizon_bars is not None else 1
             lines.append(
-                f"| {r.feature_name or 'har_rv'} "
-                f"| {r.horizon_bars or 1} "
-                f"| {r.ic:+.4f} "
-                f"| {r.ic_ir:.3f} "
-                f"| {r.p_value:.4f} "
-                f"| {sig} |"
+                f"| {name} | {horizon} | {r.ic:+.4f} | {r.ic_ir:.3f} | {r.p_value:.4f} | {sig} |"
             )
         lines.append("")
         return "\n".join(lines)
@@ -69,7 +69,12 @@ class HARRVValidationReport:
     def summary(self) -> dict[str, object]:
         """Return aggregate metrics for quick inspection."""
         if not self.ic_results:
-            return {"n_results": 0, "mean_ic": 0.0, "mean_ic_ir": 0.0}
+            return {
+                "n_results": 0,
+                "mean_ic": 0.0,
+                "mean_ic_ir": 0.0,
+                "any_significant": False,
+            }
         ics = [r.ic for r in self.ic_results]
         ic_irs = [r.ic_ir for r in self.ic_results]
         return {

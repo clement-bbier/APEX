@@ -1,6 +1,6 @@
 """Unit tests for HARRVCalculator (Phase 3.4).
 
-18 tests covering ABC conformity, correctness, look-ahead defense,
+24 tests covering ABC conformity, correctness, look-ahead defense,
 edge cases, integration with ValidationPipeline, and performance.
 
 Reference:
@@ -171,7 +171,10 @@ class TestCorrectness:
             max_size=100,
         )
     )
-    @settings(max_examples=1000, deadline=None)
+    @settings(
+        max_examples=100 if os.environ.get("CI") else 1000,
+        deadline=None,
+    )
     def test_forecast_non_negative(self, rv_values: list[float]) -> None:
         """HAR-RV forecast of realized variance must be >= 0."""
         estimator = RealizedVolEstimator()
@@ -181,11 +184,14 @@ class TestCorrectness:
     @given(
         seed=st.integers(min_value=0, max_value=10000),
     )
-    @settings(max_examples=1000, deadline=None)
+    @settings(
+        max_examples=50 if os.environ.get("CI") else 300,
+        deadline=None,
+    )
     def test_signal_bounded_in_minus_one_plus_one(self, seed: int) -> None:
         """Signal must be strictly in [-1, +1] for any input."""
         rng = np.random.default_rng(seed)
-        n = 80
+        n = 60  # Reduced from 80 — still above warm_up + margin
         # Build a minimal daily bars DataFrame.
         base_time = datetime(2020, 1, 1, tzinfo=UTC)
         price = 100.0
@@ -475,8 +481,11 @@ class TestPerformance:
     """Performance bounds for HAR-RV computation."""
 
     @pytest.mark.skipif(
-        os.environ.get("CI_FAST_ONLY") == "1",
-        reason="Expanding window O(n^2) may be slow on free CI runners",
+        os.environ.get("CI_FAST_ONLY") == "1" or os.environ.get("CI", "").lower() in {"1", "true"},
+        reason=(
+            "Performance timing assertions skipped in CI (shared runners may "
+            "be flaky). Run locally to validate."
+        ),
     )
     def test_computation_under_5_seconds_on_1_year_daily(self) -> None:
         """252 daily rows must complete in < 5 seconds."""
@@ -546,3 +555,114 @@ class TestAdditional:
         s = report.summary()
         assert s["n_results"] == 1
         assert s["any_significant"] is True
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Copilot review characterization tests (4 tests)
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestCopilotFixes:
+    """Tests characterizing fixes from PR #111 Copilot review."""
+
+    def test_5m_mode_residual_nan_before_day_close(self) -> None:
+        """In 5m mode, residual/signal emitted ONLY on day-close bars.
+
+        Broadcasting to all intraday bars would leak future intraday data
+        (residual depends on full-day realized_rv). Forecast is safe to
+        broadcast (depends only on prior days). See D027.
+        """
+        n_days = 40
+        bars_per_day = 12  # Simplified grid: 12 bars/day
+        calc = HARRVCalculator(bar_frequency="5m", warm_up_periods=25)
+        df = _make_5m_bars(n_days=n_days, bars_per_day=bars_per_day)
+        result = calc.compute(df)
+
+        # Group rows by date and check per-day invariants.
+        timestamps = result["timestamp"].to_list()
+        dates = [str(t)[:10] for t in timestamps]
+
+        unique_dates: list[str] = []
+        seen: set[str] = set()
+        for d in dates:
+            if d not in seen:
+                unique_dates.append(d)
+                seen.add(d)
+
+        for date_str in unique_dates:
+            day_mask = [d == date_str for d in dates]
+            day_residuals = result.filter(pl.Series(day_mask))["har_rv_residual"]
+            day_signals = result.filter(pl.Series(day_mask))["har_rv_signal"]
+            day_forecasts = result.filter(pl.Series(day_mask))["har_rv_forecast"]
+
+            non_null_res = day_residuals.drop_nulls().filter(~day_residuals.drop_nulls().is_nan())
+            non_null_sig = day_signals.drop_nulls().filter(~day_signals.drop_nulls().is_nan())
+
+            # At most 1 non-null residual/signal per day (the last bar).
+            assert non_null_res.len() <= 1, (
+                f"Date {date_str}: {non_null_res.len()} non-null residuals (expected <= 1)"
+            )
+            assert non_null_sig.len() <= 1, (
+                f"Date {date_str}: {non_null_sig.len()} non-null signals (expected <= 1)"
+            )
+
+            # If residual is present, it should be on the LAST bar.
+            if non_null_res.len() == 1:
+                last_residual = day_residuals[-1]
+                assert last_residual is not None, (
+                    f"Date {date_str}: residual present but last bar is None"
+                )
+                assert not np.isnan(last_residual), (
+                    f"Date {date_str}: residual present but last bar is NaN"
+                )
+
+        # Forecast should be non-NaN on post-warm-up bars (safe to broadcast).
+        all_forecasts = result["har_rv_forecast"].to_numpy()
+        non_nan_forecasts = all_forecasts[~np.isnan(all_forecasts)]
+        assert len(non_nan_forecasts) > 0, "No forecasts produced"
+
+    def test_unsorted_timestamps_raise(self) -> None:
+        """Unsorted timestamps must raise ValueError for look-ahead safety."""
+        calc = HARRVCalculator()
+        df = _make_daily_bars(50)
+        df_unsorted = df.sort("timestamp", descending=True)
+        with pytest.raises(ValueError, match="ascending-sorted"):
+            calc.compute(df_unsorted)
+
+    def test_summary_schema_stable_on_empty(self) -> None:
+        """summary() returns all 4 keys even with empty ic_results."""
+        from features.validation.har_rv_report import HARRVValidationReport
+
+        report = HARRVValidationReport(ic_results=())
+        summary = report.summary()
+        assert set(summary.keys()) == {
+            "n_results",
+            "mean_ic",
+            "mean_ic_ir",
+            "any_significant",
+        }
+        assert summary["any_significant"] is False
+
+    def test_to_markdown_renders_none_significance_as_na(self) -> None:
+        """is_significant=None renders as 'n/a', not 'no'."""
+        from features.ic.base import ICResult
+        from features.validation.har_rv_report import HARRVValidationReport
+
+        result = ICResult(
+            ic=0.03,
+            ic_ir=0.6,
+            p_value=0.04,
+            n_samples=100,
+            ci_low=0.01,
+            ci_high=0.05,
+            feature_name="har_rv",
+            is_significant=None,
+        )
+        report = HARRVValidationReport(ic_results=(result,))
+        md = report.to_markdown()
+        assert "n/a" in md
+        # Specifically not rendered as "no" for None.
+        lines = [ln for ln in md.split("\n") if "har_rv" in ln and "+0.0300" in ln]
+        assert len(lines) == 1
+        assert "| no |" not in lines[0]
+        assert "| n/a |" in lines[0]

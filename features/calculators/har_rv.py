@@ -47,12 +47,15 @@ class HARRVCalculator(FeatureCalculator):
     volatility into daily, weekly (5-day avg), and monthly (22-day avg)
     components, capturing heterogeneous market participant horizons.
 
-    Output columns:
-        har_rv_forecast: Next-period RV forecast (NaN during warm-up).
-        har_rv_residual: realized_rv - har_rv_forecast (NaN during warm-up).
-        har_rv_signal: tanh-normalized residual in [-1, +1]. Positive = vol
-            higher than forecast (potential mean-reversion). Sign convention
-            is NOT a trading direction — that is Signal Engine's concern.
+    Output contract:
+        har_rv_forecast: Available on every row after warm-up (depends only on
+            past days — safe to broadcast to all intraday bars).
+        har_rv_residual / har_rv_signal:
+            - Daily mode: available on every row after warm-up.
+            - 5m mode: available ONLY on the last bar of each complete day,
+              because residual = realized_rv - forecast and realized_rv
+              requires full-day data. Broadcasting to earlier bars would leak
+              future intraday bars into them (D027).
 
     Look-ahead defense:
         Forecasts at time t are fit on data [0, t-1] only (expanding window).
@@ -147,6 +150,14 @@ class HARRVCalculator(FeatureCalculator):
         self.validate_input(df)
         n_rows = len(df)
 
+        # Monotonic timestamp invariant — prerequisite for look-ahead defense.
+        if n_rows > 1 and not df["timestamp"].is_sorted():
+            raise ValueError(
+                "HARRVCalculator.compute() requires ascending-sorted "
+                "'timestamp' to preserve look-ahead safety. "
+                "Call df.sort('timestamp') before."
+            )
+
         if n_rows == 0:
             return df.with_columns(
                 pl.Series("har_rv_forecast", [], dtype=pl.Float64),
@@ -177,12 +188,24 @@ class HARRVCalculator(FeatureCalculator):
         residuals = np.full(n_rows, np.nan)
         signals = np.full(n_rows, np.nan)
 
+        # In 5m mode, residual/signal depend on full-day RV and are only
+        # point-in-time safe at the last bar of each day.  Forecast depends
+        # only on prior days and is safe to broadcast to all bars (D027).
+        day_last_row = np.full(n_days, -1, dtype=np.int64)
+        for row_idx in range(n_rows):
+            day_idx = row_to_day[row_idx]
+            if day_idx >= 0:
+                day_last_row[day_idx] = row_idx
+
+        intraday_last_bar_only = self._bar_frequency == "5m"
+
         for row_idx in range(n_rows):
             day_idx = row_to_day[row_idx]
             if day_idx >= 0:
                 forecasts[row_idx] = day_forecasts[day_idx]
-                residuals[row_idx] = day_residuals[day_idx]
-                signals[row_idx] = day_signals[day_idx]
+                if (not intraday_last_bar_only) or (row_idx == day_last_row[day_idx]):
+                    residuals[row_idx] = day_residuals[day_idx]
+                    signals[row_idx] = day_signals[day_idx]
 
         logger.info(
             "har_rv.compute.complete",
