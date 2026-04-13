@@ -9,12 +9,14 @@ Reference:
 """
 
 from features.calculators.cvd_kyle import CVDKyleCalculator
+from features.calculators.gex import GEXCalculator
 from features.calculators.har_rv import HARRVCalculator
 from features.calculators.ofi import OFICalculator
 from features.calculators.rough_vol import RoughVolCalculator
 
 __all__ = [
     "CVDKyleCalculator",
+    "GEXCalculator",
     "HARRVCalculator",
     "OFICalculator",
     "RoughVolCalculator",
