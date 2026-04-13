@@ -582,3 +582,44 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Phase 3.5 (Rough Vol), 3.6 (OFI), 3.7 (CVD+Kyle), 3.8 (GEX) — all parallelizable after 3.4 merge
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+
+---
+
+## Session 013 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.4 hotfix — PR #111 Copilot review + CI timeouts |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~30 min |
+
+### Decisions Made
+
+1. D027: Intraday aggregate features emit realization columns at period-close only
+
+### What Changed
+
+- MODIFIED: `features/calculators/har_rv.py` — 5m look-ahead fix (D027), timestamp validation, output contract docstring
+- MODIFIED: `features/validation/har_rv_report.py` — stable summary schema, None rendering
+- MODIFIED: `tests/unit/features/calculators/test_har_rv.py` — 4 new tests (24 total), CI Hypothesis tuning
+- MODIFIED: `tests/unit/features/ic/test_stats.py` — CI Hypothesis tuning for bootstrap test
+
+### Key Fixes
+
+- **Structural bug #1**: 5m mode broadcast residual/signal to all intraday bars — leaked future data within day. Fixed: emit only on last bar of each day (D027).
+- **Structural bug #2**: No timestamp monotonicity check — unsorted input silently broke look-ahead guarantee. Fixed: ValueError on unsorted.
+- **CI timeouts**: Hypothesis property tests with O(n²) compute() exceeded --timeout=30. Reduced max_examples for CI while keeping full depth locally.
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: clean
+- mypy --strict: 0 errors (378 files)
+- CI=true --timeout=30: 41 passed, 1 skipped
+- test_har_rv.py: 24 tests (23 passed, 1 skipped on CI)
+
+### Next Steps
+
+- Await Copilot re-review on PR #111
+- Phase 3.5-3.8 after merge (D027 is gatekeeper template)

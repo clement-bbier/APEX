@@ -621,3 +621,37 @@ S07 already implements the HAR-RV OLS regression. Reimplementing in features/ wo
 - Parity test verifies calculator output matches direct S07 call
 - Pattern consistent with D013 (adapter/wrapper, not reimplementation)
 - Establishes the template for 3.5-3.8 calculators
+
+---
+
+## D027 — Intraday Aggregate Features Emit at Period-Close Only (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 013 |
+| Decision | Features computed from aggregated-period data must emit realization columns (residual, signal) ONLY on the last bar of the period |
+| Status | ACCEPTED |
+
+### Context
+
+PR #111 Phase 3.4 HAR-RV calculator. In `bar_frequency="5m"` mode, the initial implementation computed daily residuals (based on full-day realized_variance) and broadcast them to every bar of the day. The 9:30 bar received a residual that depended on the 15:55 bar — look-ahead within the day.
+
+Copilot AI review caught this during PR #111. The existing look-ahead test (`test_forecast_at_t_uses_only_data_before_t`) ran in daily mode only and did not catch it.
+
+### Rule (applies to 3.5-3.8 and beyond)
+
+For any feature computed from aggregated intraday data:
+- **Forecast-like columns** (depend on PAST aggregates) → safe to broadcast to all bars of the current period.
+- **Realization columns** (depend on CURRENT-period aggregate) → emit ONLY on the last bar of the period; NaN elsewhere.
+
+### Characterization
+
+Every future calculator with period aggregates must include a test equivalent to `test_5m_mode_residual_nan_before_day_close` that verifies:
+- forecast non-NaN on all post-warm-up bars
+- residual/signal non-NaN on at most 1 bar per period (the last)
+
+### References
+
+- PR #111 Copilot review comment #1
+- PHASE_3_SPEC §5.1 Look-Ahead Bias

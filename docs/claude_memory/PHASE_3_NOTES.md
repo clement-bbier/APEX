@@ -64,4 +64,7 @@
 - D026: Strict wrapper over S07 har_rv_forecast() (same pattern as D013)
 - HARRVCalculator: first concrete FeatureCalculator, template for 3.5-3.8
 - HARRVValidationReport: thin wrapper over ICReport for Phase 3.4 scope
-- 174 tests, 92.57% coverage on features/, 1,433 total tests (0 regressions)
+- 178 tests on features/, 1,442 total tests (0 regressions)
+- D027: Intraday aggregate features emit realization columns at period-close only (3.5-3.8 gatekeeper)
+- 5m mode look-ahead fix: residual/signal only on last bar of each day (forecast safe to broadcast)
+- Timestamp monotonicity validated in compute() — unsorted input raises ValueError
