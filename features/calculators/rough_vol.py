@@ -8,7 +8,9 @@ Output columns:
     rough_hurst: Hurst exponent estimate (NaN during warm-up).
     rough_is_rough: 1.0 if H < 0.3 else 0.0 (Gatheral 2018 regime).
     rough_scalping_score: tanh-normalized scalping edge in [-1, +1].
-    rough_size_adjustment: volatility-adaptive sizing in [0, 1].
+    rough_size_multiplier: Volatility-adaptive sizing multiplier
+        (typically in [0.5, 2.0]). Raw S07 analyzer output — NOT
+        normalized to [0, 1] or [-1, +1]. Multiplicative factor.
     variance_ratio: Lo-MacKinlay VR(q) statistic (1.0 = random walk).
     vr_signal: tanh-normalized direction signal in [-1, +1].
         VR > 1 -> momentum (positive), VR < 1 -> mean-reversion (negative).
@@ -17,10 +19,16 @@ Look-ahead defense:
     Every row t's values are fit on data [0, t-1] only. Expanding
     window refit. O(n^2) by design (same trade-off as HAR-RV, D024).
 
-D027 intraday contract (bar_frequency="5m"):
-    All 6 output columns depend on daily realized variance aggregates.
-    They are emitted ONLY on the last bar of each day. Earlier intraday
-    bars stay NaN to prevent look-ahead within the day.
+D028 intraday contract (bar_frequency="5m"):
+    All 6 output columns are forecast-like: they use daily_rv[0:t]
+    (prior days only, excluding current day t) and are therefore
+    safe to broadcast to all intraday bars of day t. No information
+    from later bars of the same day is used.
+
+    This differs from HAR-RV where residual/signal required full-day
+    RV (day-close-only emission per D027). Rough Vol does NOT compute
+    a per-day residual — all outputs are estimates based purely on
+    prior days' statistics.
 
 Reference:
     Gatheral, J., Jaisson, T. & Rosenbaum, M. (2018). "Volatility is
@@ -51,13 +59,11 @@ class RoughVolCalculator(FeatureCalculator):
     variance_ratio_test() with expanding-window refit to prevent
     look-ahead bias.
 
-    Output contract (D027):
-        All 6 output columns depend on daily realized variance aggregates.
-        In ``bar_frequency="5m"`` mode, they are emitted ONLY on the last
-        bar of each day. Unlike HAR-RV where forecast is safe to broadcast,
-        here ALL columns depend on the current day's realized vol series
-        (Hurst needs the full daily RV up to t, VR needs the full daily
-        log-return series up to t). NaN elsewhere.
+    Output contract (D028):
+        All 6 output columns are forecast-like: they use daily_rv[0:t]
+        (prior days only, excluding current day t) and are therefore
+        safe to broadcast to all intraday bars of day t in 5m mode.
+        No information from later bars of the same day is used.
 
     Look-ahead defense (D024):
         Expanding window — values at day t are computed on data [0, t-1].
@@ -82,7 +88,7 @@ class RoughVolCalculator(FeatureCalculator):
         "rough_hurst",
         "rough_is_rough",
         "rough_scalping_score",
-        "rough_size_adjustment",
+        "rough_size_multiplier",
         "variance_ratio",
         "vr_signal",
     ]
@@ -129,7 +135,7 @@ class RoughVolCalculator(FeatureCalculator):
 
     @property
     def version(self) -> str:
-        return "v1.0"
+        return "1.0.0"
 
     def required_columns(self) -> list[str]:
         return list(self._REQUIRED_COLUMNS)
@@ -173,7 +179,7 @@ class RoughVolCalculator(FeatureCalculator):
         day_hurst = np.full(n_days, np.nan)
         day_is_rough = np.full(n_days, np.nan)
         day_edge_score = np.full(n_days, np.nan)
-        day_size_adj = np.full(n_days, np.nan)
+        day_size_mult = np.full(n_days, np.nan)
         day_vr = np.full(n_days, np.nan)
 
         for t in range(self._warm_up_days, n_days):
@@ -185,7 +191,7 @@ class RoughVolCalculator(FeatureCalculator):
             day_hurst[t] = signal.hurst_exponent
             day_is_rough[t] = 1.0 if signal.is_rough else 0.0
             day_edge_score[t] = signal.scalping_edge_score
-            day_size_adj[t] = max(0.0, min(1.0, signal.size_adjustment))
+            day_size_mult[t] = float(signal.size_adjustment)
 
             # VR from log-return series [0, t) — expanding window.
             lr_window = daily_log_returns[:t].tolist()
@@ -200,31 +206,20 @@ class RoughVolCalculator(FeatureCalculator):
         out_hurst = np.full(n_rows, np.nan)
         out_is_rough = np.full(n_rows, np.nan)
         out_scalping = np.full(n_rows, np.nan)
-        out_size_adj = np.full(n_rows, np.nan)
+        out_size_mult = np.full(n_rows, np.nan)
         out_vr = np.full(n_rows, np.nan)
         out_vr_sig = np.full(n_rows, np.nan)
 
-        # D027: In 5m mode, ALL 6 columns are day-close-only because
-        # they all depend on the daily RV aggregate (unlike HAR-RV where
-        # forecast depends only on prior days).
-        day_last_row = np.full(n_days, -1, dtype=np.int64)
-        for row_idx in range(n_rows):
-            day_idx = row_to_day[row_idx]
-            if day_idx >= 0:
-                day_last_row[day_idx] = row_idx
-
-        intraday_last_bar_only = self._bar_frequency == "5m"
-
+        # D028: All 6 columns are forecast-like (use daily_rv[:t], prior
+        # days only). Safe to broadcast to all intraday bars of day t.
         for row_idx in range(n_rows):
             day_idx = row_to_day[row_idx]
             if day_idx < 0:
                 continue
-            if intraday_last_bar_only and row_idx != day_last_row[day_idx]:
-                continue
             out_hurst[row_idx] = day_hurst[day_idx]
             out_is_rough[row_idx] = day_is_rough[day_idx]
             out_scalping[row_idx] = day_scalping_score[day_idx]
-            out_size_adj[row_idx] = day_size_adj[day_idx]
+            out_size_mult[row_idx] = day_size_mult[day_idx]
             out_vr[row_idx] = day_vr[day_idx]
             out_vr_sig[row_idx] = day_vr_signal[day_idx]
 
@@ -241,7 +236,7 @@ class RoughVolCalculator(FeatureCalculator):
             pl.Series("rough_hurst", out_hurst),
             pl.Series("rough_is_rough", out_is_rough),
             pl.Series("rough_scalping_score", out_scalping),
-            pl.Series("rough_size_adjustment", out_size_adj),
+            pl.Series("rough_size_multiplier", out_size_mult),
             pl.Series("variance_ratio", out_vr),
             pl.Series("vr_signal", out_vr_sig),
         )
@@ -323,7 +318,8 @@ class RoughVolCalculator(FeatureCalculator):
             intraday_returns = np.log(day_closes[1:] / day_closes[:-1])
             rv = float(np.sum(intraday_returns**2))
             daily_rv_list.append(rv)
-            # Daily log-return = log(last_close / first_open) ≈ sum of intraday.
+            # Daily log-return from close-to-close intraday bars:
+            # sum(log(C_t / C_{t-1})) = log(last_close / first_close).
             daily_lr_list.append(float(np.sum(intraday_returns)))
 
         daily_rv = np.array(daily_rv_list, dtype=np.float64)

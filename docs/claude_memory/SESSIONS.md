@@ -669,3 +669,45 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot review on PR #112
 - Phase 3.6 OFI after merge
+
+---
+
+## Session 015 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | PR #112 Copilot review hotfix — PIT semantic + size_multiplier bugs |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~30 min |
+
+### Decisions Made
+
+1. D028: Forecast-like columns (using `series[:t]`) are safe to broadcast in intraday mode. Day-close-only (D027) applies only to realization columns.
+2. All 6 Rough Vol columns reclassified as forecast-like → broadcast to all intraday bars.
+3. `rough_size_adjustment` renamed to `rough_size_multiplier` — raw S07 output, no clamp.
+
+### What Changed
+
+- MODIFIED: `features/calculators/rough_vol.py` — PIT fix (broadcast all 6 cols), size_multiplier rename+unclamp, version 1.0.0, log-return comment
+- MODIFIED: `tests/unit/features/calculators/test_rough_vol.py` — D028 tests replace D027, size_multiplier tests, 25 tests total
+
+### Key Fixes
+
+- **Bug #1 PIT semantic**: Docstring claimed "depends on current day's RV" but code used `daily_rv[:t]` (prior days only). Contradiction resolved: all 6 columns are forecast-like → broadcast.
+- **Bug #2 size_adjustment constant**: `max(0, min(1, size_adjustment))` clamped all S07 multipliers (1.0-1.15) to 1.0 → constant column → IC=0. Fixed: expose raw multiplier.
+- **D028 introduced**: Explicit classification of forecast-like vs realization columns required for all intraday-mode calculators.
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: clean
+- mypy --strict: 0 errors (381 files)
+- rough_vol.py coverage: 93%
+- features/ coverage: 92.55% (> 85% gate)
+- Full test suite: 1,493 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot re-review on PR #112
+- Phase 3.6 OFI after merge

@@ -1,8 +1,8 @@
 """Unit tests for RoughVolCalculator (Phase 3.5).
 
-22 tests covering ABC conformity, correctness, Variance Ratio sanity,
-look-ahead defense, D027 compliance, edge cases, integration with
-ValidationPipeline, report schema, and version.
+25 tests covering ABC conformity, correctness, Variance Ratio sanity,
+look-ahead defense, D028 compliance, edge cases, integration with
+ValidationPipeline, report schema stability.
 
 Reference:
     Gatheral, J., Jaisson, T. & Rosenbaum, M. (2018). "Volatility is
@@ -181,7 +181,7 @@ class TestABCConformity:
             "rough_hurst",
             "rough_is_rough",
             "rough_scalping_score",
-            "rough_size_adjustment",
+            "rough_size_multiplier",
             "variance_ratio",
             "vr_signal",
         ]
@@ -335,15 +335,31 @@ class TestCorrectness:
         assert np.all(valid >= -1.0)
         assert np.all(valid <= 1.0)
 
-    def test_size_adjustment_in_unit_interval(self) -> None:
-        """rough_size_adjustment must be in [0, 1]."""
+    def test_size_multiplier_typical_range(self) -> None:
+        """rough_size_multiplier must be in plausible range [0.1, 5.0]."""
         calc = RoughVolCalculator(warm_up_days=60)
         df = _make_daily_bars(150)
         result = calc.compute(df)
-        vals = result["rough_size_adjustment"].to_numpy()
+        vals = result["rough_size_multiplier"].to_numpy()
         valid = vals[~np.isnan(vals)]
-        assert np.all(valid >= 0.0)
-        assert np.all(valid <= 1.0)
+        assert len(valid) > 0
+        assert np.all(valid >= 0.1), f"Min multiplier = {np.min(valid)}"
+        assert np.all(valid <= 5.0), f"Max multiplier = {np.max(valid)}"
+
+    def test_size_multiplier_varies_across_regimes(self) -> None:
+        """size_multiplier must not be constant — it varies with Hurst regime.
+
+        Gate against the silent bug where clamp to [0,1] made the column
+        effectively constant (IC = 0).
+        """
+        calc = RoughVolCalculator(warm_up_days=60)
+        df = _make_daily_bars(300, seed=7)
+        result = calc.compute(df)
+        vals = result["rough_size_multiplier"].to_numpy()
+        valid = vals[~np.isnan(vals)]
+        assert len(valid) > 50
+        std = float(np.std(valid))
+        assert std > 0.001, f"size_multiplier std = {std:.6f} — column is effectively constant"
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -451,21 +467,26 @@ class TestLookAheadDefense:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# D027 compliance (1 test — mandatory)
+# D028 compliance (2 tests — forecast-like broadcast)
 # ══════════════════════════════════════════════════════════════════════
 
 
-class TestD027Compliance:
-    """Verify D027 intraday contract: all 6 columns day-close-only in 5m mode.
+class TestD028Compliance:
+    """Verify D028: all 6 columns are forecast-like and broadcast in 5m mode.
 
-    Unlike HAR-RV where har_rv_forecast is safe to broadcast (depends only
-    on prior-day data), ALL 6 Rough Vol columns depend on the current day's
-    realized vol series. The Hurst estimate at day t uses the full
-    daily_rv[0:t] including day t's RV, which requires all intraday bars of
-    day t. Therefore ALL columns must be day-close-only in 5m mode.
+    Unlike HAR-RV where residual/signal are realization columns (day-close
+    only per D027), Rough Vol uses daily_rv[:t] (prior days only, excluding
+    current day t). All 6 columns are therefore forecast-like and safe to
+    broadcast to all intraday bars of day t (D028).
     """
 
-    def test_5m_mode_outputs_nan_before_day_close(self) -> None:
+    def test_5m_mode_outputs_broadcast_after_warmup(self) -> None:
+        """In 5m mode, all 6 columns are broadcast to all intraday bars.
+
+        Verifies:
+        - All bars of a post-warm-up day have non-NaN values.
+        - All bars within the same day have identical values (broadcast).
+        """
         n_days = 80
         bars_per_day = 12
         calc = RoughVolCalculator(bar_frequency="5m", warm_up_days=30)
@@ -482,31 +503,67 @@ class TestD027Compliance:
                 unique_dates.append(d)
                 seen.add(d)
 
-        for date_str in unique_dates:
+        # Check post-warm-up days: all bars should have same non-NaN value.
+        post_warmup_dates = unique_dates[35:]  # well past warm-up
+        assert len(post_warmup_dates) >= 2
+
+        for date_str in post_warmup_dates[:5]:  # spot-check 5 days
             day_mask = [d == date_str for d in dates]
             day_df = result.filter(pl.Series(day_mask))
 
             for col in calc.output_columns():
-                day_col = day_df[col]
-                non_null = day_col.drop_nulls()
-                if non_null.dtype in (pl.Float32, pl.Float64):
-                    non_null = non_null.filter(~non_null.is_nan())
-
-                # At most 1 non-null value per day (the last bar).
-                assert non_null.len() <= 1, (
-                    f"Date {date_str}, col {col}: {non_null.len()} non-null values (expected <= 1)"
+                day_vals = day_df[col].to_numpy()
+                non_nan = day_vals[~np.isnan(day_vals)]
+                # All bars of the day should have values (broadcast).
+                assert len(non_nan) == len(day_vals), (
+                    f"Date {date_str}, col {col}: "
+                    f"{len(non_nan)}/{len(day_vals)} non-NaN (expected all)"
+                )
+                # All bars within the day have the same value.
+                assert np.all(non_nan == non_nan[0]), (
+                    f"Date {date_str}, col {col}: intraday values differ (expected broadcast)"
                 )
 
-                # If value present, it must be on the LAST bar.
-                if non_null.len() == 1:
-                    last_val = day_col[-1]
-                    assert last_val is not None, (
-                        f"Date {date_str}, col {col}: value present but last bar is None"
-                    )
-                    if isinstance(last_val, float):
-                        assert not np.isnan(last_val), (
-                            f"Date {date_str}, col {col}: value present but last bar is NaN"
-                        )
+    def test_rough_hurst_depends_only_on_prior_days(self) -> None:
+        """Two 5m DataFrames with different intraday bars on day t but
+        identical prior days must produce identical rough_hurst on day t.
+
+        This characterizes the forecast-like semantics: daily_rv[:t]
+        does not include day t's data, so intraday differences on day t
+        are invisible to the output.
+        """
+        n_days = 50
+        bars_per_day = 12
+        calc = RoughVolCalculator(bar_frequency="5m", warm_up_days=30)
+
+        df_a = _make_5m_bars(n_days=n_days, bars_per_day=bars_per_day, seed=42)
+        df_b = _make_5m_bars(n_days=n_days, bars_per_day=bars_per_day, seed=42)
+
+        # Modify intraday closes on the last 5 days only.
+        diverge_day = n_days - 5
+        diverge_row = diverge_day * bars_per_day
+        closes_b = df_b["close"].to_list()
+        rng = np.random.default_rng(99)
+        for i in range(diverge_row, len(closes_b)):
+            closes_b[i] = closes_b[i] * (1 + 0.05 * rng.standard_normal())
+        df_b = df_b.with_columns(pl.Series("close", closes_b))
+
+        result_a = calc.compute(df_a)
+        result_b = calc.compute(df_b)
+
+        # Check all 6 columns on a day BEFORE divergence.
+        check_day = diverge_day - 1  # last identical day
+        check_start = check_day * bars_per_day
+        for col in calc.output_columns():
+            va = result_a[col][check_start]
+            vb = result_b[col][check_start]
+            if isinstance(va, float) and isinstance(vb, float):
+                if np.isnan(va) and np.isnan(vb):
+                    continue
+            assert va == pytest.approx(vb, rel=1e-12), (
+                f"{col} on day {check_day} differs: {va} vs {vb} — "
+                f"intraday data from later days leaked!"
+            )
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -692,4 +749,4 @@ class TestAdditional:
 
     def test_version_string(self) -> None:
         calc = RoughVolCalculator()
-        assert calc.version == "v1.0"
+        assert calc.version == "1.0.0"

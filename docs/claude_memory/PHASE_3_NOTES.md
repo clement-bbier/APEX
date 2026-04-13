@@ -72,3 +72,7 @@
 - D027 applied to all 6 rough vol columns (all are realization, unlike HAR-RV forecast)
 - VR sanity verified: VR≈1 on random walk, VR>1 on AR(1) momentum series
 - 207 tests on features/, 1,491 total tests (0 regressions)
+- D028: Forecast-like columns (series[:t]) safe to broadcast in 5m mode; realization columns (series[:t+1]) day-close only (D027)
+- 3.5 hotfix: all 6 rough vol columns reclassified forecast-like → broadcast. rough_size_adjustment renamed rough_size_multiplier (raw S07 output)
+- For 3.6-3.8: each calculator must explicitly classify output columns (forecast-like vs realization) in docstring
+- 209 tests on features/, 1,493 total tests (0 regressions after hotfix)

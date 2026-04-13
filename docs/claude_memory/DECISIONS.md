@@ -655,3 +655,41 @@ Every future calculator with period aggregates must include a test equivalent to
 
 - PR #111 Copilot review comment #1
 - PHASE_3_SPEC §5.1 Look-Ahead Bias
+
+---
+
+## D028 — Forecast-like Columns Safe to Broadcast in Intraday Mode (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 015 |
+| Decision | Output columns computed from daily_series[:t] (strict past, excluding current day t) are forecast-like and safe to broadcast to all intraday bars of day t. Day-close-only emission (D027) applies ONLY to columns computed from daily_series[:t+1] or full-day aggregates including day t. |
+| Status | ACCEPTED |
+
+### Context
+
+PR #112 Phase 3.5 Rough Volatility. Initial implementation claimed "all 6 columns depend on current day's RV" (justifying day-close emission per D027), but the code actually used `daily_rv[:t]` (prior days only). Copilot caught the contradiction between code and docstring.
+
+### Resolution
+
+The code (`daily_rv[:t]`) was correct — all 6 Rough Vol columns are forecast-like estimates that use only prior days' statistics. The docstring and PR description were wrong. Switched to broadcast-to-all-intraday-bars in 5m mode (like HAR-RV's `har_rv_forecast`).
+
+### Rule refinement for 3.6-3.8
+
+When implementing a calculator with intraday (5m) mode, explicitly classify each output column:
+- **Forecast-like** (uses `series[:t]`, strict past) → safe broadcast to all bars
+- **Realization** (uses `series[:t+1]` or current-period aggregate) → day-close-only per D027
+
+Document the classification in the class docstring. Verify with a "different-intraday-same-past" test that forecast-like columns are invariant to current-day intraday data.
+
+### Implication
+
+- **Rough Vol (3.5)**: all 6 columns are forecast-like → broadcast
+- **HAR-RV (3.4)**: forecast is forecast-like (broadcast); residual and signal are realization-like (day-close) because residual requires current day's realized_rv
+
+### References
+
+- D027 (original rule, refined here)
+- PR #112 Copilot review comment #3
+- PHASE_3_SPEC §5.1 Look-Ahead Bias
