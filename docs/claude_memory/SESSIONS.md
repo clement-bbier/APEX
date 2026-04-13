@@ -1095,3 +1095,92 @@ Address 5 Copilot review comments + CI failure (sklearn missing) on PR #119.
 
 - Await Copilot re-review on PR #119
 - Phase 3.11 (DSR/PBO) after merge
+
+---
+
+## Session 025 -- 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.11 -- DSR + PBO + MHT Statistical Validation (#97) |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/dsr-pbo-mht` |
+| PR | Pending |
+
+### Objective
+
+Build the statistical validation layer consuming CPCV outputs (Phase 3.10)
+to quantify overfitting risk. Three pillars: DSR, PBO, MHT corrections.
+
+### Audit Results
+
+Existing code reused (no reimplementation):
+- `backtesting/metrics.py`: `probabilistic_sharpe_ratio()`, `deflated_sharpe_ratio()`,
+  `minimum_track_record_length()`, `probability_of_backtest_overfitting_cpcv()`
+- All 34 existing PSR/DSR/PBO/MinTRL tests in `tests/unit/backtesting/test_psr_dsr.py` untouched
+
+New code created:
+- `features/hypothesis/mht.py` -- Holm-Bonferroni (FWER) + Benjamini-Hochberg (FDR)
+- `features/hypothesis/dsr.py` -- `DeflatedSharpeCalculator` wrapping existing metrics
+- `features/hypothesis/pbo.py` -- `PBOCalculator` rank-based PBO from IS/OOS fold metrics
+- `features/hypothesis/report.py` -- `HypothesisTestingReport` + `build_report()`
+
+### Key Design Decisions
+
+1. Spec file paths followed: `features/hypothesis/` (not `features/validation/`)
+2. ADR-0004 thresholds: DSR > 0.95, PBO < 0.10 (stricter than mission's 0.50)
+3. PBOCalculator takes IS+OOS metric dicts (canonical Bailey et al. approach)
+4. MHT genuinely new -- no Holm/BH existed anywhere in codebase
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors (5 files)
+- 46 new tests passed (coverage 93% on features/hypothesis/)
+- Full suite: 1,736 passed, 27 skipped, 10 errors (pre-existing TimescaleDB), 0 regressions
+- Critical test: 10 strategies (1 alpha + 9 random) -> only alpha survives Holm
+
+### Next Steps
+
+- Commit and open PR
+- Await Copilot review
+- Phase 3.12 (Feature Report) after merge
+
+---
+
+## Session 026 -- 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.11 -- PR #120 Copilot Review Hotfix |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/dsr-pbo-mht` |
+| PR | #120 (updated) |
+
+### Fixes Applied (8 Copilot comments, 7 fixes)
+
+1. **Sharpe rf inconsistency** (silent bug): `compute_from_returns()` called
+   `sharpe_ratio()` with default rf=0.05 but PSR/DSR treat input as excess
+   returns. Fixed: pass rf=0.0. Sharpe values shifted ~0.3 upward.
+2. **Min-TRL sentinel bypass** (silent bug): `max(sr, 1e-10)` clamp prevented
+   sentinel for negative-Sharpe strategies. Removed clamp.
+3. **MHT silent skip** (silent bug): `build_report(mht_correction="holm")`
+   with missing p-values dict silently skipped correction. Now raises ValueError.
+4. **MHT list input crash** (API): `_validate_inputs()` now returns coerced ndarray.
+5. **PBO threshold validation** (API): D030 validation in (0, 1).
+6. **Test no-op** (cleanup): tautological assertion replaced.
+7. **Citation year** (doc): Bailey et al. 2017 -> 2014 in __init__.py.
+
+### Quality Gates
+
+- ruff + mypy: clean
+- 52 tests passed (46 + 6 regression tests)
+- Diagnostic report regenerated with corrected numbers
+- Decision boundaries unchanged: true_alpha PASS, 9 random FAIL
+
+### Next Steps
+
+- Await Copilot re-review on PR #120
+- Phase 3.12 (Feature Report) after merge

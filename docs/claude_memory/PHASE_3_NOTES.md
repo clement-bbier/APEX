@@ -20,7 +20,7 @@
 | 3.8 GEX | IN_PROGRESS | PR #116 open — 31 tests, 98% coverage |
 | 3.9 Multicollinearity | PENDING | |
 | 3.10 CPCV | PENDING | |
-| 3.11 DSR/PBO | PENDING | backtesting/metrics.py has PSR/DSR |
+| 3.11 DSR/PBO | IN_PROGRESS | PR pending -- 46 tests, 93% coverage, MHT new |
 | 3.12 Feature Report | PENDING | |
 | 3.13 S02 Integration | PENDING | Adapter pattern, no S02 modification |
 
@@ -108,3 +108,10 @@
 - 3.8 hotfix: data quality gate (spot_price constant per timestamp), case-insensitive option_type
 - D034: snapshot-level IC measurement for features with multiple rows per timestamp (GEX). Row-level IC produces artificial zero returns. Applies to all future snapshot-granularity features.
 - 300 tests on features/, 33 GEX tests, 1,584+ total tests (0 regressions after hotfix)
+- Phase 3.11: features/hypothesis/ package (NEW) -- MHT, DSR wrapper, PBO calculator, report
+- MHT genuinely new: holm_bonferroni() + benjamini_hochberg() in features/hypothesis/mht.py
+- DeflatedSharpeCalculator wraps existing backtesting.metrics.deflated_sharpe_ratio() (no reimplementation)
+- PBOCalculator: rank-based PBO from IS/OOS fold-level metrics (canonical Bailey et al. 2014 Eq 11-12)
+- ADR-0004 thresholds confirmed: DSR > 0.95, PBO < 0.10 (spec PBOResult.is_overfit uses 0.50 as secondary)
+- Critical test: 10 strategies (1 alpha + 9 random) -> only alpha survives Holm-Bonferroni
+- 46 tests on features/hypothesis/, 93% coverage, 1,736 total tests (0 regressions)
