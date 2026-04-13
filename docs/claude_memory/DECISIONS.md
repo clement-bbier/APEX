@@ -693,3 +693,75 @@ Document the classification in the class docstring. Verify with a "different-int
 - D027 (original rule, refined here)
 - PR #112 Copilot review comment #3
 - PHASE_3_SPEC §5.1 Look-Ahead Bias
+
+---
+
+## D029 — Signal Variance Gate on Output Columns (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 016 |
+| Decision | Every calculator output column must include a test verifying the column varies across inputs |
+| Status | ACCEPTED |
+
+### Context
+
+PR #112 Phase 3.5 Rough Volatility. The `rough_size_adjustment` column was effectively constant (all values clamped to 1.0 due to a misapplied `[0, 1]` bound on a multiplicative factor). No test caught this — bound checks and non-NaN checks all passed. Would have produced IC = 0 on that column in 3.9/3.10 with no diagnostic trace.
+
+### Rule (applies to 3.7, 3.8, and retrofits)
+
+For each output column C of any FeatureCalculator:
+- Add `test_<name>_varies_across_inputs` or equivalent.
+- Generate N >= 100 different synthetic DataFrames.
+- Assert `std(C.mean() for each df) > epsilon` (typical 0.01).
+- Alternative: `std(C) > epsilon` within a single non-trivial input.
+
+### First Application
+
+- `test_ofi_signal_varies_across_inputs` in PR #113 Phase 3.6
+
+### Retrofits Required
+
+- 3.7 CVDKyleCalculator: add variance gate per output column
+- 3.8 GEXCalculator: add variance gate per output column
+- Optional: retrofit HAR-RV (3.4) and Rough Vol (3.5) in a future tidy-up PR
+
+### References
+
+- PR #112 Copilot review, size_adjustment constant bug
+- D028 (forecast vs realization classification)
+
+---
+
+## D030 — S02 OFI Price-Proxy vs Cont 2014 Size-Delta (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 016 |
+| Decision | OFICalculator implements canonical Cont 2014 (Δbid_size − Δask_size) directly, not wrapping S02's price-delta proxy |
+| Status | ACCEPTED |
+
+### Context
+
+S02 `MicrostructureAnalyzer.ofi()` (`services/s02_signal_engine/microstructure.py`) computes OFI as `Σ(ΔBid_price − ΔAsk_price) / total_volume`. This is a price-based proxy for queue-volume changes. The canonical Cont, Kukanov & Stoikov (2014) formula uses order book SIZE deltas: `Σ(Δbid_size − Δask_size)`.
+
+### Why Not Wrap S02
+
+- S02's formula answers a different question (price-level shifts) than Cont 2014 (order book depth changes)
+- Feature validation must use the canonical academic formula to produce comparable IC results
+- Wrapping S02 would produce scientifically incorrect OFI for the validation harness
+- D026 (wrapper strict) is honored in spirit — we would wrap if the formulas matched
+
+### Implication
+
+- S02 is NOT modified (anti-scope-creep)
+- If S02's OFI needs upgrading to Cont 2014 formula, that is a separate issue (out of Phase 3 scope)
+- Lee-Ready classifier exists only inline in VPIN — not reusable standalone. Trade-based fallback uses signed volume directly
+
+### References
+
+- D026 (wrapper strict — honored where applicable)
+- Cont, Kukanov & Stoikov (2014) JFE 104(2)
+- S02 `services/s02_signal_engine/microstructure.py` lines 61-81

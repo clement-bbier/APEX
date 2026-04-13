@@ -711,3 +711,49 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot re-review on PR #112
 - Phase 3.6 OFI after merge
+
+---
+
+## Session 016 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.6 — OFI Validation (Cont, Kukanov & Stoikov 2014) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~45 min |
+
+### Decisions Made
+
+1. S02 `MicrostructureAnalyzer.ofi()` uses bid/ask price-delta proxy — NOT the canonical Cont 2014 size-delta formula. OFICalculator implements the canonical formula directly (not a wrapper of S02). S02 is NOT modified.
+2. D028 applied: all 4 OFI columns are realization-like at tick t (use ticks [t-w+1, t] inclusive). D027 day-close-only does NOT apply — OFI operates natively at tick level.
+3. D029 introduced: signal variance gate — every calculator output column must include a test verifying the column varies across inputs. Prevents silent constant column → IC=0.
+4. Lee-Ready classifier exists only inline in VPIN calculator — not standalone. Trade-based fallback uses signed volume directly.
+
+### What Changed
+
+- CREATED: `features/calculators/ofi.py` (~240 LOC) — OFICalculator with book-based + trade-based fallback
+- CREATED: `features/validation/ofi_report.py` (~90 LOC) — Schema-compatible with HAR-RV/Rough Vol reports
+- CREATED: `tests/unit/features/calculators/test_ofi.py` (~530 LOC) — 23 tests
+- MODIFIED: `features/calculators/__init__.py` — Added OFICalculator to exports
+
+### Key Design Choices
+
+- **Book-based OFI**: Δbid_size − Δask_size (Cont 2014), rolling mean over 10/50/100 ticks
+- **Trade-based fallback**: +quantity (BUY) / −quantity (SELL) when L2 columns absent
+- **Signal**: tanh(weighted_combination / (k * rolling_std)) with k=3, weights=(0.5, 0.3, 0.2)
+- **Decay pattern test**: verifies std(ofi_10) > std(ofi_100) on burst data — short-term OFI captures bursts better
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: clean
+- mypy --strict: 0 errors
+- ofi.py coverage: 93%
+- features/ coverage: 92.22% (> 85% gate)
+- Full unit tests: 1,491 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot review on PR #113
+- Phase 3.7 CVD + Kyle after merge
