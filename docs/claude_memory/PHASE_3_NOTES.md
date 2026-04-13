@@ -14,7 +14,7 @@
 | 3.2 Feature Store | COMPLETE | PR #109 merged |
 | 3.3 IC Measurement | COMPLETE | PR #110 merged |
 | 3.4 HAR-RV | IN_PROGRESS | PR #111 open — 20 tests, 91% coverage |
-| 3.5 Rough Vol | PENDING | S07 estimate_hurst_from_vol() ready |
+| 3.5 Rough Vol | IN_PROGRESS | PR #112 open — 23 tests, 94% coverage |
 | 3.6 OFI | PENDING | S02 ofi() ready |
 | 3.7 CVD + Kyle | PENDING | S02 cvd(), kyle_lambda() ready |
 | 3.8 GEX | PENDING | Risk: options data availability |
@@ -29,7 +29,7 @@
 | Feature | IC (BTC) | IC (ETH) | IC (SPY) | IC (QQQ) | IC_IR | Decision |
 |---|---|---|---|---|---|---|
 | HAR-RV | synth | synth | synth | synth | synth | Synthetic validated — real data pending Phase 5 |
-| Rough Vol | — | — | — | — | — | — |
+| Rough Vol | synth | synth | synth | synth | synth | Synthetic validated — real data pending Phase 5 |
 | OFI | — | — | — | — | — | — |
 | CVD | — | — | — | — | — | — |
 | Kyle Lambda | — | — | — | — | — | — |
@@ -68,3 +68,11 @@
 - D027: Intraday aggregate features emit realization columns at period-close only (3.5-3.8 gatekeeper)
 - 5m mode look-ahead fix: residual/signal only on last bar of each day (forecast safe to broadcast)
 - Timestamp monotonicity validated in compute() — unsorted input raises ValueError
+- RoughVolCalculator: wraps S07 estimate_hurst_from_vol + variance_ratio_test (D026 wrapper)
+- D027 applied to all 6 rough vol columns (all are realization, unlike HAR-RV forecast)
+- VR sanity verified: VR≈1 on random walk, VR>1 on AR(1) momentum series
+- 207 tests on features/, 1,491 total tests (0 regressions)
+- D028: Forecast-like columns (series[:t]) safe to broadcast in 5m mode; realization columns (series[:t+1]) day-close only (D027)
+- 3.5 hotfix: all 6 rough vol columns reclassified forecast-like → broadcast. rough_size_adjustment renamed rough_size_multiplier (raw S07 output)
+- For 3.6-3.8: each calculator must explicitly classify output columns (forecast-like vs realization) in docstring
+- 209 tests on features/, 1,493 total tests (0 regressions after hotfix)

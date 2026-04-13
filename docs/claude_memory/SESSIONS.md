@@ -623,3 +623,91 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot re-review on PR #111
 - Phase 3.5-3.8 after merge (D027 is gatekeeper template)
+
+---
+
+## Session 014 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.5 — Rough Volatility Validation (Gatheral 2018) (#91) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1 hour |
+
+### Decisions Made
+
+1. No new decisions required — D024-D027 cover all design choices
+2. `vr_lag=5` follows Lo-MacKinlay (1988) standard weekly lag convention
+3. All 6 output columns classified as realization (day-close-only in 5m mode), unlike HAR-RV where forecast was safe broadcast
+
+### What Changed
+
+- NEW: `features/calculators/rough_vol.py` — RoughVolCalculator (~400 LOC)
+- NEW: `features/validation/rough_vol_report.py` — RoughVolValidationReport (~95 LOC)
+- MODIFIED: `features/calculators/__init__.py` — added RoughVolCalculator export
+- NEW: `tests/unit/features/calculators/test_rough_vol.py` — 23 tests (~690 LOC)
+
+### Pattern Reuse from HAR-RV
+
+- Expanding-window loop (D024): identical structure, 2 S07 calls per iteration
+- tanh normalization (D025): scalping_score centers on rolling mean, vr_signal on VR=1
+- Strict S07 wrapper (D026): wraps estimate_hurst_from_vol + variance_ratio_test
+- D027 day-close emission: all 6 columns (vs HAR-RV where forecast was safe)
+- Test structure: same categories, adapted for 6 output columns
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: clean
+- mypy --strict: 0 errors (381 files)
+- rough_vol.py coverage: 94%
+- features/ coverage: 92.62% (> 85% gate)
+- Full test suite: 1,491 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot review on PR #112
+- Phase 3.6 OFI after merge
+
+---
+
+## Session 015 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | PR #112 Copilot review hotfix — PIT semantic + size_multiplier bugs |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~30 min |
+
+### Decisions Made
+
+1. D028: Forecast-like columns (using `series[:t]`) are safe to broadcast in intraday mode. Day-close-only (D027) applies only to realization columns.
+2. All 6 Rough Vol columns reclassified as forecast-like → broadcast to all intraday bars.
+3. `rough_size_adjustment` renamed to `rough_size_multiplier` — raw S07 output, no clamp.
+
+### What Changed
+
+- MODIFIED: `features/calculators/rough_vol.py` — PIT fix (broadcast all 6 cols), size_multiplier rename+unclamp, version 1.0.0, log-return comment
+- MODIFIED: `tests/unit/features/calculators/test_rough_vol.py` — D028 tests replace D027, size_multiplier tests, 25 tests total
+
+### Key Fixes
+
+- **Bug #1 PIT semantic**: Docstring claimed "depends on current day's RV" but code used `daily_rv[:t]` (prior days only). Contradiction resolved: all 6 columns are forecast-like → broadcast.
+- **Bug #2 size_adjustment constant**: `max(0, min(1, size_adjustment))` clamped all S07 multipliers (1.0-1.15) to 1.0 → constant column → IC=0. Fixed: expose raw multiplier.
+- **D028 introduced**: Explicit classification of forecast-like vs realization columns required for all intraday-mode calculators.
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: clean
+- mypy --strict: 0 errors (381 files)
+- rough_vol.py coverage: 93%
+- features/ coverage: 92.55% (> 85% gate)
+- Full test suite: 1,493 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot re-review on PR #112
+- Phase 3.6 OFI after merge
