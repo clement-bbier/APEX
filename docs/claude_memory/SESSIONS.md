@@ -1184,3 +1184,48 @@ New code created:
 
 - Await Copilot re-review on PR #120
 - Phase 3.12 (Feature Report) after merge
+
+---
+
+## Session 027 — 2026-04-14
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-14 |
+| Mission | Phase 3.12 — Feature Selection Report (closes #98) |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/feature-selection-report` |
+| PR | TBD |
+
+### What Was Done
+
+Phase 3.12: final feature selection report aggregating IC (3.3), multicollinearity (3.9),
+and hypothesis testing (3.11) evidence into keep/reject decisions per candidate feature.
+
+New module `features/selection/`:
+- `SelectionDecision` frozen dataclass: full audit trail per feature (IC, VIF, DSR, PBO, reject reasons)
+- `FeatureSelectionReportGenerator`: configurable decision gates (ADR-0004 defaults), cherry-picking protection
+- `FeatureSelectionReport`: deterministic Markdown + JSON output
+
+Decision gates (from ADR-0004): IC >= 0.02, IC_IR >= 0.50, VIF <= 5.0, DSR >= 0.95, PSR >= 0.90, p_holm <= 0.05, PBO < 0.10.
+
+Cherry-picking protection enforced: features missing from multicoll or hypothesis reports appear
+with explicit reject reasons (`vif_not_computed`, `dsr_not_computed`), never silent passes.
+
+### Synthetic Report Results (8 features)
+
+- **3 KEEP**: gex_signal, har_rv_signal, ofi_signal
+- **5 REJECT**: cvd_signal (cluster_dropped), rough_hurst (DSR<0.95), rough_vol_signal (DSR<0.95),
+  combined_signal (IC+DSR+PSR+p_holm), liquidity_signal (IC+DSR+PSR+p_holm)
+- PBO of final set: 0.05 (strong edge per ADR-0004)
+
+### Quality Gates
+
+- ruff + mypy strict: 0 errors
+- 53 new tests passed (95% coverage on features/selection/)
+- Full suite: 1,689 passed, 27 skipped, 10 errors (pre-existing TimescaleDB), 0 regressions
+
+### Next Steps
+
+- Open PR, await Copilot review
+- Phase 3.13 (S02 Adapter) after merge

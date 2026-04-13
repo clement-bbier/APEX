@@ -21,7 +21,7 @@
 | 3.9 Multicollinearity | PENDING | |
 | 3.10 CPCV | PENDING | |
 | 3.11 DSR/PBO | IN_PROGRESS | PR pending -- 46 tests, 93% coverage, MHT new |
-| 3.12 Feature Report | PENDING | |
+| 3.12 Feature Report | IN_PROGRESS | PR pending — 53 tests, 95% coverage |
 | 3.13 S02 Integration | PENDING | Adapter pattern, no S02 modification |
 
 ## IC Results (to be filled during validation)
@@ -115,3 +115,9 @@
 - ADR-0004 thresholds confirmed: DSR > 0.95, PBO < 0.10 (spec PBOResult.is_overfit uses 0.50 as secondary)
 - Critical test: 10 strategies (1 alpha + 9 random) -> only alpha survives Holm-Bonferroni
 - 46 tests on features/hypothesis/, 93% coverage, 1,736 total tests (0 regressions)
+- Phase 3.12: features/selection/ package (NEW) -- FeatureSelectionReport, SelectionDecision
+- FeatureSelectionReportGenerator: configurable gates from ADR-0004 (IC>=0.02, IC_IR>=0.50, VIF<=5.0, DSR>=0.95, PSR>=0.90, p_holm<=0.05, PBO<0.10)
+- Cherry-picking protection: missing multicoll/hypothesis evidence = explicit reject, not silent pass
+- Synthetic 8-feature report: 3 KEEP (gex_signal, har_rv_signal, ofi_signal), 5 REJECT
+- PBO of final set: 0.05 (strong evidence per ADR-0004)
+- 53 tests on features/selection/, 95% coverage, 1,789 total tests (0 regressions)

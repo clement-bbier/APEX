@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
-**Last updated**: 2026-04-13
-**Updated by**: Session 025
+**Last updated**: 2026-04-14
+**Updated by**: Session 027
 
 ---
 
@@ -9,9 +9,9 @@
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 3 — Feature Validation Harness (3.11 PR PENDING) |
+| Active Phase | Phase 3 — Feature Validation Harness (3.12 PR PENDING) |
 | Previous Phase | Phase 2 — Universal Data Infrastructure (DONE) |
-| Total tests | 1,736+ (1,669 unit + 55 integration + skips) |
+| Total tests | 1,789+ (1,722 unit + 55 integration + skips) |
 | Production LOC | ~35,770 |
 | Test LOC | ~22,700 |
 | mypy strict | 0 errors |
