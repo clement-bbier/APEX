@@ -876,3 +876,43 @@ Phase 3.8 GEXCalculator needs dealer-adjusted gamma exposure per Barbon-Buraschi
 - D030 (OFI precedent), D032 (CVD/Kyle precedent)
 - Barbon & Buraschi (2020) "Gamma Fragility"
 - S02 `services/s02_signal_engine/crowd_behavior.py` lines 43-79
+
+---
+
+## D034 — Snapshot-Level IC Measurement for Snapshot-Granularity Features (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 021 |
+| Decision | For features with multiple rows per timestamp, IC must be computed at snapshot level (one row per unique timestamp) |
+| Status | ACCEPTED |
+
+### Context
+
+PR #116 Copilot review caught that GEX integration tests computed forward returns by row-shifting `result_df`, which has `n_options_per_snapshot` rows per timestamp. Most adjacent rows shared the same snapshot, producing artificial zero returns (`log(spot/spot) = 0`) and IC sensitive to option chain density. The IC measurement was semantically incorrect.
+
+### Rule
+
+For features whose output columns are broadcast across multiple rows sharing the same timestamp (e.g., GEX across option rows):
+1. Aggregate result DataFrame by timestamp (one row per snapshot)
+2. Take signal value (broadcast = identical within snapshot)
+3. Compute forward returns at snapshot level
+4. Measure IC on snapshot-level pairs
+
+Row-level IC on such features produces artificial zero returns on same-snapshot adjacent rows and IC sensitive to broadcast density.
+
+### Applies To
+
+- GEX (3.8): multiple option rows per timestamp
+- Future snapshot-based features (OI imbalance, IV surface features)
+
+### Does NOT Apply To
+
+- Bar-level features (HAR-RV, Rough Vol): one row per bar
+- Tick-level features (OFI, CVD+Kyle): one row per tick
+
+### References
+
+- PR #116 Copilot review comment #4
+- PHASE_3_SPEC §2.8

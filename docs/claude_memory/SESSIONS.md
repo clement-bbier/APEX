@@ -921,3 +921,38 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot review on PR #116
 - Phase 3.9 Multicollinearity + Orthogonalization after merge
+
+---
+
+## Session 021 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | PR #116 Copilot review hotfix |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~20 min |
+
+### What Changed
+
+- MODIFIED: `features/calculators/gex.py` — spot_price consistency validation (data quality gate), case-insensitive option_type normalization, strike/expiry requirement documented.
+- MODIFIED: `tests/unit/features/calculators/test_gex.py` — snapshot-level IC measurement in integration tests (D034), 2 new tests (33 total).
+
+### Key Findings
+
+- Copilot found 2 real bugs: (1) spot_price inconsistency within timestamp silently produces wrong GEX, (2) integration tests computed forward returns at row level instead of snapshot level (IC was measuring noise).
+- D034 pattern: snapshot-level IC is the correct default for features with multiple rows per timestamp (GEX). Row-level IC only for tick/bar features.
+- First hotfix with a test design bug (not calculator bug).
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors
+- 300 features/ tests passed (33 GEX), 0 regressions
+- features/ coverage: 92.35%
+- Full suite: 1,584 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot re-review on PR #116
+- Phase 3.9 after merge

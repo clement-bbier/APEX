@@ -105,3 +105,6 @@
 - 298 tests on features/, 31 GEX tests, 1,582+ total tests (0 regressions)
 - **Phase 3.4-3.8 calculator wave COMPLETE**: 5/5 calculators validated (HAR-RV, Rough Vol, OFI, CVD+Kyle, GEX)
 - Route open for Phase 3.9 Multicollinearity + Orthogonalization
+- 3.8 hotfix: data quality gate (spot_price constant per timestamp), case-insensitive option_type
+- D034: snapshot-level IC measurement for features with multiple rows per timestamp (GEX). Row-level IC produces artificial zero returns. Applies to all future snapshot-granularity features.
+- 300 tests on features/, 33 GEX tests, 1,584+ total tests (0 regressions after hotfix)
