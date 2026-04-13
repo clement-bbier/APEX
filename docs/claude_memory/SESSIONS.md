@@ -841,3 +841,37 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot review on PR #114
 - Phase 3.8 GEX after merge (risk: options data availability)
+
+---
+
+## Session 019 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | PR #114 Copilot review hotfix — doc/naming nits |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~15 min |
+
+### What Changed
+
+- MODIFIED: `features/calculators/cvd_kyle.py` — "expanding window" → "fixed-length rolling window" in module docstring and `_compute_kyle_lambda` docstring. Explicitly documents difference from HAR-RV/Rough Vol expanding windows.
+- MODIFIED: `tests/unit/features/calculators/test_cvd_kyle.py` — rename `test_cvd_is_monotonic_cumulative` → `test_cvd_diff_equals_signed_volume` (body was already correct).
+
+### Key Findings
+
+- Copilot found 0 bugs (math, look-ahead, semantics). First sub-phase with no real bug.
+- 3 perf suggestions deferred to Phase 5 per ADR-0002 (correctness-first). Tracking issue #115 created.
+- Kyle lambda clamp rate investigation: 50-73% on random-walk data (expected, no structural relationship), 0% on illiquid data (structural impact). Not a bug — property of data.
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors (387 files)
+- 267 features/ tests passed, 0 regressions
+- features/ coverage: 92.28%
+
+### Next Steps
+
+- Await Copilot re-review on PR #114
+- Phase 3.8 GEX after merge

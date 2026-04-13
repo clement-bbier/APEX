@@ -93,3 +93,6 @@
 - Kyle lambda clamped ≥ 0 (negative = economically unphysical), logged via structlog warning
 - CVD divergence = tanh(-corr(price_changes, cvd_changes)) — negative correlation = divergence = positive signal
 - 267 tests on features/, 31 CVD/Kyle tests, 1,546+ total tests (0 regressions)
+- 3.7 hotfix: doc "expanding" → "rolling window" for Kyle lambda, test rename. Zero real bugs found by Copilot.
+- 3 perf suggestions deferred to Phase 5 (ADR-0002 correctness-first). Tracking issue #115.
+- Kyle lambda clamp rate: 50-73% on random walk (expected), 0% on illiquid data (correct). Not a bug.
