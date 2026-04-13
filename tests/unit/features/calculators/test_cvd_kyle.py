@@ -200,7 +200,7 @@ class TestCorrectness:
         # After warm-up, should have values.
         assert not np.isnan(kyle_arr[kw])
 
-    def test_cvd_is_monotonic_cumulative(self) -> None:
+    def test_cvd_diff_equals_signed_volume(self) -> None:
         """CVD is cumulative: diff(cvd) = signed_volume per tick."""
         calc = CVDKyleCalculator(kyle_window=10, kyle_zscore_lookback=20)
         df = _make_ticks(100, seed=42)

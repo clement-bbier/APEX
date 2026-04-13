@@ -8,11 +8,13 @@ Note on S02 MicrostructureAnalyzer.cvd() and kyle_lambda():
     bounded in [-1, 1]. This calculator needs the *raw* cumulative sum
     of signed volume (unbounded, monotonically evolving). S02's
     kyle_lambda() uses Cov(delta_P, Q)/Var(Q) without intercept and
-    without expanding-window protection against look-ahead. Since feature
+    without strict-past protection against look-ahead. Since feature
     validation requires (a) raw CVD, (b) OLS with intercept, and (c)
-    strict past expanding window, this calculator implements both
-    directly rather than wrapping S02. S02 is NOT modified
-    (anti-scope-creep). Decision documented as D032.
+    a strict past fixed-length rolling window of kyle_window ticks
+    (rolling, NOT expanding -- different statistical properties),
+    this calculator implements both directly rather than wrapping S02.
+    S02 is NOT modified (anti-scope-creep). Decision documented as
+    D032.
 
 Output columns (6):
     cvd: Cumulative signed volume from t=0. Realization at tick t.
@@ -329,10 +331,16 @@ class CVDKyleCalculator(FeatureCalculator):
         delta_p: npt.NDArray[np.float64],
         signed_vol: npt.NDArray[np.float64],
     ) -> npt.NDArray[np.float64]:
-        """Compute Kyle's lambda via rolling-window OLS.
+        """Compute Kyle's lambda via fixed-length rolling-window OLS.
+
+        Uses a strict past rolling window of kyle_window ticks
+        [t-kyle_window, t-1], EXCLUSIVE of tick t. This differs from
+        HAR-RV/Rough Vol which use expanding windows (fit on [0, t-1]).
+        The rolling convention captures local liquidity regime;
+        expanding would average across regime shifts.
 
         For each tick t, fits: delta_P = lambda * signed_vol + alpha
-        on ticks [t-kyle_window, t-1] (strict past, excluding t).
+        on the kyle_window ticks immediately preceding t.
 
         Lambda is clamped to >= 0: negative lambda is economically
         unphysical (means "buy pressure lowers price"). When clamping
