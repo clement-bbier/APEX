@@ -836,3 +836,83 @@ Phase 3.7 CVDKyleCalculator needs (a) raw cumulative CVD, (b) Kyle lambda via OL
 - D030 (OFI precedent: implement directly when S02 formula differs)
 - Kyle (1985) Econometrica 53(6)
 - S02 `services/s02_signal_engine/microstructure.py` lines 83-126
+
+---
+
+## D033 — GEX Implemented Directly (Not Wrapping S02) (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 020 |
+| Decision | GEXCalculator implements GEX directly, not wrapping S02 CrowdBehaviorAnalyzer.update_gex() |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3.8 GEXCalculator needs dealer-adjusted gamma exposure per Barbon-Buraschi (2020): calls contribute negatively, puts positively, with S² dollar scaling and strict-past z-score. S02 provides `update_gex()` but with fundamentally different semantics:
+
+- S02 sign convention: calls = +1, puts = -1 (**opposite** of Barbon-Buraschi)
+- S02 formula: `gamma * OI * 100` (no S² scaling for dollar GEX)
+- S02 uses `float`, no strict-past protection, no rolling z-score
+
+### Why Not Wrap S02
+
+- Sign convention is **inverted** — wrapping would require negating the result and re-signing every option, defeating the wrapper purpose
+- Formula lacks S² factor for proper dollar GEX — wrapping would require multiplying by S² post-hoc
+- No rolling z-score or regime classification in S02
+- Same pattern as D030 (OFI) and D032 (CVD/Kyle): implement directly when S02 formula differs
+
+### Justification
+
+- S02 is NOT modified (anti-scope-creep)
+- D026 (wrapper strict) honored in spirit — would wrap if sign convention and formula matched
+- Barbon-Buraschi sign convention characterized by 2 dedicated tests
+- GEX formula: `Σ(sign_i * OI_i * gamma_i * S² * multiplier)` where sign = -1 calls, +1 puts
+
+### References
+
+- D026 (strict wrapper — honored where applicable)
+- D030 (OFI precedent), D032 (CVD/Kyle precedent)
+- Barbon & Buraschi (2020) "Gamma Fragility"
+- S02 `services/s02_signal_engine/crowd_behavior.py` lines 43-79
+
+---
+
+## D034 — Snapshot-Level IC Measurement for Snapshot-Granularity Features (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 021 |
+| Decision | For features with multiple rows per timestamp, IC must be computed at snapshot level (one row per unique timestamp) |
+| Status | ACCEPTED |
+
+### Context
+
+PR #116 Copilot review caught that GEX integration tests computed forward returns by row-shifting `result_df`, which has `n_options_per_snapshot` rows per timestamp. Most adjacent rows shared the same snapshot, producing artificial zero returns (`log(spot/spot) = 0`) and IC sensitive to option chain density. The IC measurement was semantically incorrect.
+
+### Rule
+
+For features whose output columns are broadcast across multiple rows sharing the same timestamp (e.g., GEX across option rows):
+1. Aggregate result DataFrame by timestamp (one row per snapshot)
+2. Take signal value (broadcast = identical within snapshot)
+3. Compute forward returns at snapshot level
+4. Measure IC on snapshot-level pairs
+
+Row-level IC on such features produces artificial zero returns on same-snapshot adjacent rows and IC sensitive to broadcast density.
+
+### Applies To
+
+- GEX (3.8): multiple option rows per timestamp
+- Future snapshot-based features (OI imbalance, IV surface features)
+
+### Does NOT Apply To
+
+- Bar-level features (HAR-RV, Rough Vol): one row per bar
+- Tick-level features (OFI, CVD+Kyle): one row per tick
+
+### References
+
+- PR #116 Copilot review comment #4
+- PHASE_3_SPEC §2.8
