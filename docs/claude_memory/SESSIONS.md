@@ -483,3 +483,53 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Phase 3.3 (IC Measurement) can start after merge
 - Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate
+
+---
+
+## Session 011 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.3 — Information Coefficient Measurement (#89) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1.5 hours |
+
+### Decisions Made
+
+1. Stationary bootstrap reimplemented in `features/ic/stats.py` (not reused from `backtesting/metrics.py`) — existing impl is Sharpe-specific, a generic mean-bootstrap for IC is cleaner (D020)
+2. Extended `ICResult` with 9 optional fields (`default=None`) rather than creating a new dataclass — backward-compatible with Phase 3.1 code (D021)
+3. Minimum 20 valid samples for IC measurement — below this, returns `ic=0.0, is_significant=False` (D022)
+4. Degenerate IC series (std=0, perfect predictor) handled as maximally significant: `ic_ir=1e6, t_stat=1e6, p_value=0.0` (D023)
+
+### Files Created
+
+- `features/ic/stats.py` — `safe_spearman`, `newey_west_se`, `ic_t_statistic`, `ic_bootstrap_ci`
+- `features/ic/forward_returns.py` — `compute_forward_returns` (look-ahead-safe log-returns)
+- `features/ic/measurer.py` — `SpearmanICMeasurer` (rolling IC, turnover-adj IC, IC decay)
+- `features/ic/report.py` — `ICReport` (JSON + Markdown rendering)
+- `tests/unit/features/ic/test_stats.py` — 14 tests (3 Hypothesis 1000-example)
+- `tests/unit/features/ic/test_forward_returns.py` — 5 tests
+- `tests/unit/features/ic/test_measurer.py` — 11 tests
+- `tests/unit/features/ic/test_report.py` — 5 tests
+- `tests/unit/features/validation/test_ic_stage.py` — 3 tests
+
+### Files Modified
+
+- `features/ic/base.py` — ICResult extended with 9 optional Phase 3.3 fields
+- `features/ic/__init__.py` — updated exports
+- `features/validation/stages.py` — ICStage concrete implementation (replaces stub)
+- `tests/unit/features/validation/test_pipeline.py` — updated for ICStage(measurer) constructor
+
+### Quality Gates
+
+- ruff check: clean (0 errors)
+- ruff format: clean
+- mypy --strict: 0 errors (373 files)
+- pytest tests/unit/: 1,413 passed, 0 regressions
+- Coverage features/: 93.10% (gate 85%)
+
+### Next Steps
+
+- Phase 3.4 (HAR-RV Calculator) — first concrete FeatureCalculator
+- Follow-up issue #102: fix full_report() Sharpe then enforce backtest-gate

@@ -459,3 +459,99 @@ Feature Store needs a read cache to avoid repeated TimescaleDB queries for the s
 - Including `as_of` in cache key prevents PIT cache poisoning (different as_of = different cache entry)
 - TTL keeps memory bounded without explicit eviction
 - Manual invalidation deferred to Phase 9+ (observability)
+
+---
+
+## D020 — IC Bootstrap Reimplemented (Not Reused from metrics.py) (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 011 |
+| Decision | Reimplement stationary bootstrap in features/ic/stats.py instead of reusing backtesting/metrics.py |
+| Status | ACCEPTED |
+
+### Context
+
+`backtesting/metrics.py` has `_stationary_bootstrap_sharpe_ci()` (Politis & Romano 1994), but it is tightly coupled to Sharpe ratio computation (takes returns, risk_free_rate, annual_factor). IC measurement needs a generic mean-bootstrap on IC series.
+
+### Alternatives Considered
+
+1. **Reuse and wrap**: Extract the block-sampling logic from metrics.py into a shared helper. Invasive refactor for minimal gain.
+2. **Reimplement (chosen)**: ~30 lines of Politis-Romano block sampling, purpose-built for IC mean CI.
+
+### Justification
+
+- The Politis-Romano algorithm is simple (~30 LOC) — the coupling cost of wrapping exceeds reimplementation cost
+- IC bootstrap needs `np.mean()` as the statistic; Sharpe bootstrap uses a complex risk-adjusted ratio
+- No shared interface that cleanly abstracts both use cases without over-engineering
+
+---
+
+## D021 — Extend ICResult with Optional Fields (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 011 |
+| Decision | Extend ICResult dataclass with optional fields (default=None) rather than creating ICResultFull |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3.1 defined ICResult with 6 fields. Phase 3.3 needs 9 additional fields (ic_std, ic_t_stat, ic_hit_rate, turnover_adj_ic, ic_decay, is_significant, feature_name, horizon_bars, newey_west_lags).
+
+### Alternatives Considered
+
+1. **New ICResultFull dataclass**: Clean separation but requires parallel type handling everywhere.
+2. **Extend with optional fields (chosen)**: Backward-compatible, single type throughout.
+
+### Justification
+
+- All existing code constructing ICResult with 6 positional args continues to work unchanged
+- mypy catches any field access on optional fields that aren't None-checked
+- Single type simplifies pipeline, report, and serialization code
+
+---
+
+## D022 — Minimum 20 Samples for IC Measurement (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 011 |
+| Decision | Require ≥ 20 valid (non-NaN) observations for IC measurement; return zero ICResult below threshold |
+| Status | ACCEPTED |
+
+### Context
+
+Spearman rank correlation on very small samples (< 20) produces noisy, unreliable IC estimates. Need a floor.
+
+### Justification
+
+- 20 is a common minimum for rank correlation in financial literature
+- Below 20, the p-value from spearmanr is unreliable and bootstrap CI is meaningless
+- Returns `ic=0.0, is_significant=False, p_value=1.0` — conservative, logged as warning
+- `safe_spearman` separately enforces ≥ 10 valid pairs per block
+
+---
+
+## D023 — Degenerate IC Series Handling (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 011 |
+| Decision | When all per-block IC values are identical (std=0), treat as maximally significant if IC ≠ 0 |
+| Status | ACCEPTED |
+
+### Context
+
+A perfect predictor (feature == forward_return) produces IC=1.0 on every block. std(IC)=0, so IC_IR=mean/std is undefined (0/0), and Newey-West SE=0 makes t-stat=0/0.
+
+### Justification
+
+- A perfectly consistent IC is the BEST possible result, not an error
+- Set ic_ir=1e6, t_stat=1e6, p_value=0.0 — effectively infinite significance
+- This correctly passes ADR-0004 thresholds (|IC|>=0.02 AND IC_IR>=0.50)
+- The degenerate case only arises with synthetic/test data; real features will have IC variance

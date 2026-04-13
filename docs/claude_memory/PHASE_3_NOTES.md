@@ -11,8 +11,8 @@
 | Sub-Phase | Status | Notes |
 |---|---|---|
 | 3.1 Pipeline Foundation | COMPLETE | PR #108 merged |
-| 3.2 Feature Store | IN_PROGRESS | PR open, awaiting review |
-| 3.3 IC Measurement | PENDING | |
+| 3.2 Feature Store | COMPLETE | PR #109 merged |
+| 3.3 IC Measurement | IN_PROGRESS | PR #110 open |
 | 3.4 HAR-RV | PENDING | S07 har_rv_forecast() ready |
 | 3.5 Rough Vol | PENDING | S07 estimate_hurst_from_vol() ready |
 | 3.6 OFI | PENDING | S02 ofi() ready |
@@ -46,9 +46,16 @@
 - TripleBarrierLabeler exposed via adapter pattern (D013) — does not inherit from core class
 - ValidationPipeline uses composable ValidationStage ABCs (D014) — 6 stubs in 3.1
 - SampleWeighter.uniqueness_weights uses O(n²) concurrency counting — acceptable for offline
-- 108 tests, 95.02% coverage on features/, 1,367 total tests (0 regressions)
+- 154 tests, 93.10% coverage on features/, 1,413 total tests (0 regressions)
 - D017: FeatureStore ABC extended with asset_id (no concrete impl existed in 3.1)
 - D018: Content-addressable versioning: `{calculator}-{hash8}` from SHA-256 of canonical JSON
 - D019: Redis TTL cache (300s), as_of in cache key prevents PIT poisoning
 - TimescaleFeatureStore: COPY protocol for bulk insert, point-in-time via computed_at <= as_of
 - FeaturePipeline.run() wired: takes pre-fetched bars, computes, persists per-calculator
+- D020: IC bootstrap reimplemented (not reused from metrics.py — Sharpe-coupled)
+- D021: ICResult extended with 9 optional fields (backward-compatible)
+- D022: Minimum 20 samples for IC measurement
+- D023: Degenerate IC series (std=0) treated as maximally significant
+- SpearmanICMeasurer: Newey-West HAC t-stat, rolling IC, turnover-adj IC, IC decay
+- ICStage wired as first non-stub ValidationPipeline stage (ADR-0004 gates: |IC|>=0.02, IC_IR>=0.50)
+- ICReport: JSON + Markdown with KEEP/WEAK/REJECT decisions
