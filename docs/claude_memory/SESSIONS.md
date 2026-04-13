@@ -797,3 +797,47 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot re-review on PR #113
 - Phase 3.7 CVD + Kyle after merge
+
+---
+
+## Session 018 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.7 — CVD + Kyle Lambda Validation (#93) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1 hour |
+
+### Decisions Made
+
+1. D032: S02 cvd() and kyle_lambda() not wrapped — S02's cvd() is normalized ratio, we need raw cumulative; S02's kyle_lambda() uses Cov/Var without intercept or expanding window. Implemented directly (same pattern as D030/OFI).
+
+### What Changed
+
+- CREATED: `features/calculators/cvd_kyle.py` (478 LOC) — CVDKyleCalculator with 6 output columns
+- CREATED: `features/validation/cvd_kyle_report.py` (93 LOC) — ICResult wrapper
+- CREATED: `tests/unit/features/calculators/test_cvd_kyle.py` (745 LOC) — 31 tests
+- MODIFIED: `features/calculators/__init__.py` — register CVDKyleCalculator
+
+### Key Implementation Details
+
+- Kyle lambda: rolling-window OLS (delta_P = lambda * signed_vol + alpha) on [t-kw, t-1] exclusive of current tick (forecast-like)
+- Lambda clamped ≥ 0 with structlog warning when negative OLS result (economic constraint)
+- CVD divergence: tanh(-corr(price_changes, cvd_changes)) — negative correlation = divergence = positive signal
+- D028 classification: cvd/cvd_divergence realization-like, kyle_lambda and derivatives forecast-like
+- D029 variance gates: 3 separate tests, one per signal column
+- D030 proactive: 4 ValueError constraints in constructor
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors (387 files)
+- cvd_kyle.py coverage: 94%
+- features/ coverage: 92.28% (> 85% gate)
+- 267 features/ tests passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot review on PR #114
+- Phase 3.8 GEX after merge (risk: options data availability)

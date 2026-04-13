@@ -16,7 +16,7 @@
 | 3.4 HAR-RV | IN_PROGRESS | PR #111 open — 20 tests, 91% coverage |
 | 3.5 Rough Vol | IN_PROGRESS | PR #112 open — 23 tests, 94% coverage |
 | 3.6 OFI | IN_PROGRESS | PR #113 open — 23 tests, 93% coverage |
-| 3.7 CVD + Kyle | PENDING | S02 cvd(), kyle_lambda() ready |
+| 3.7 CVD + Kyle | IN_PROGRESS | PR #114 open — 31 tests, 94% coverage |
 | 3.8 GEX | PENDING | Risk: options data availability |
 | 3.9 Multicollinearity | PENDING | |
 | 3.10 CPCV | PENDING | |
@@ -84,3 +84,12 @@
 - 3.6 hotfix: dynamic column names from self._windows (D031), remove dead max_window param, fix comment
 - D031: configurable params must honor configurability everywhere. HAR-RV/Rough Vol audited: NOT affected
 - 236 tests on features/, 27 OFI tests (0 regressions after hotfix)
+- CVDKyleCalculator: implements CVD + Kyle lambda directly (D032), NOT wrapping S02 (formulas differ)
+- S02 cvd() = normalized ratio Σ(buy-sell)/total_vol; we need raw cumulative sum
+- S02 kyle_lambda() = Cov(ΔP,Q)/Var(Q) no intercept; we need OLS with intercept on strict past window
+- D028 applied: cvd/cvd_divergence realization at tick t; kyle_lambda and derivatives forecast-like
+- D029 variance gates × 3: cvd_divergence, liquidity_signal, combined_signal (each signal can degenerate independently)
+- D030 proactive: 4 ValueError constraints (cvd_window, kyle_window, kyle_zscore_lookback, combined_weights)
+- Kyle lambda clamped ≥ 0 (negative = economically unphysical), logged via structlog warning
+- CVD divergence = tanh(-corr(price_changes, cvd_changes)) — negative correlation = divergence = positive signal
+- 267 tests on features/, 31 CVD/Kyle tests, 1,546+ total tests (0 regressions)
