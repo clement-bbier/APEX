@@ -798,3 +798,41 @@ For every FeatureCalculator constructor parameter:
 
 - PR #113 Copilot review comment #1
 - D026 (strict wrapper)
+
+---
+
+## D032 — CVD/Kyle Lambda Implemented Directly (Not Wrapping S02) (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 018 |
+| Decision | CVDKyleCalculator implements CVD and Kyle lambda directly, not wrapping S02 microstructure.py |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3.7 CVDKyleCalculator needs (a) raw cumulative CVD, (b) Kyle lambda via OLS with intercept on a strict-past rolling window. S02 provides both functions but with different semantics:
+
+- S02 `cvd()` returns a normalized ratio `Σ(buy-sell)/total_vol` ∈ [-1,1] — not the raw cumulative sum needed for divergence tracking.
+- S02 `kyle_lambda()` uses `Cov(ΔP,Q)/Var(Q)` without intercept and without rolling/expanding window protection — no look-ahead defense.
+
+### Why Not Wrap S02
+
+- S02's formulas answer different questions than what feature validation requires
+- Wrapping would require either modifying S02 (anti-scope-creep) or applying ad-hoc corrections that negate the wrapper benefit
+- Same pattern as D030 (OFI) where S02's price-delta proxy differs from Cont 2014 canonical formula
+
+### Justification
+
+- S02 is NOT modified (anti-scope-creep, same as D030)
+- D026 (wrapper strict) honored in spirit — we would wrap if formulas matched
+- OLS with intercept captures baseline price drift, producing a cleaner lambda estimate
+- Rolling window with strict past exclusion enforces D024 look-ahead safety
+
+### References
+
+- D026 (strict wrapper — honored where applicable)
+- D030 (OFI precedent: implement directly when S02 formula differs)
+- Kyle (1985) Econometrica 53(6)
+- S02 `services/s02_signal_engine/microstructure.py` lines 83-126
