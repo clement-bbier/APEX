@@ -11,6 +11,7 @@ import polars as pl
 import pytest
 
 from features.base import FeatureCalculator
+from features.ic.measurer import SpearmanICMeasurer
 from features.validation.pipeline import ValidationPipeline
 from features.validation.stages import (
     CPCVStage,
@@ -21,6 +22,8 @@ from features.validation.stages import (
     PipelineStage,
     StabilityStage,
 )
+
+_IC_MEASURER = SpearmanICMeasurer(bootstrap_n=50)
 
 # ── Dummy calculator for testing ─────────────────────────────────────
 
@@ -49,7 +52,7 @@ class TestValidationPipelineStubs:
     def all_stages_pipeline(self) -> ValidationPipeline:
         return ValidationPipeline(
             stages=[
-                ICStage(),
+                ICStage(_IC_MEASURER),
                 StabilityStage(),
                 MulticollinearityStage(),
                 MDAStage(),
@@ -85,7 +88,6 @@ class TestValidationPipelineStubs:
         report = all_stages_pipeline.run(calc)
         for result in report.stage_results:
             assert result.skipped is not None
-            assert "wired in sub-phase" in result.skipped
 
     def test_report_feature_name(self, all_stages_pipeline: ValidationPipeline) -> None:
         calc = _StubCalculator()
@@ -111,6 +113,6 @@ class TestValidationPipelineStubs:
         assert report.passed is True
 
     def test_stages_property_returns_copy(self) -> None:
-        pipeline = ValidationPipeline(stages=[ICStage()])
+        pipeline = ValidationPipeline(stages=[ICStage(_IC_MEASURER)])
         pipeline.stages.append(StabilityStage())
         assert len(pipeline.stages) == 1

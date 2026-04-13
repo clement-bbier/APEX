@@ -47,7 +47,7 @@ at time *t* and the forward return over a specified horizon.
 | Correlation method | Spearman rank (non-parametric, robust to outliers) |
 | Forward horizons | 1-bar, 5-bar, 20-bar |
 | Acceptance threshold | \|IC\| >= 0.02 (minimum), \|IC\| >= 0.05 (strong) |
-| IC Information Ratio | IC_IR = mean(IC) / std(IC) > 0.50 |
+| IC Information Ratio | IC_IR = mean(IC) / std(IC) >= 0.50 |
 | Asset universes | BTC, ETH, SPY, QQQ (minimum 4) |
 
 The IC is the simplest and most robust measure of a feature's predictive
