@@ -12,9 +12,8 @@ def main() -> None:
     except (json.JSONDecodeError, EOFError):
         return
 
-    file_path = (
-        data.get("tool_response", {}).get("filePath", "")
-        or data.get("tool_input", {}).get("file_path", "")
+    file_path = data.get("tool_response", {}).get("filePath", "") or data.get("tool_input", {}).get(
+        "file_path", ""
     )
     if not file_path or not file_path.endswith(".py"):
         return
@@ -24,26 +23,39 @@ def main() -> None:
     if not os.path.isfile(full):
         return
 
-    messages = []
-    try:
-        r1 = subprocess.run(
-            ["ruff", "check", full],
-            capture_output=True, text=True, timeout=10,
-        )
-        if r1.returncode != 0 and r1.stdout.strip():
-            messages.append(f"ruff check:\n{r1.stdout.strip()}")
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+    messages: list[str] = []
 
+    # ruff check
     try:
-        r2 = subprocess.run(
-            ["ruff", "format", "--check", full],
-            capture_output=True, text=True, timeout=10,
+        r1 = subprocess.run(  # noqa: S603
+            [sys.executable, "-m", "ruff", "check", full],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
-        if r2.returncode != 0 and r2.stdout.strip():
-            messages.append(f"ruff format:\n{r2.stdout.strip()}")
-    except (FileNotFoundError, subprocess.TimeoutExpired):
-        pass
+        output = (r1.stdout.strip() + "\n" + r1.stderr.strip()).strip()
+        if r1.returncode != 0 and output:
+            messages.append(f"ruff check:\n{output}")
+    except FileNotFoundError:
+        messages.append("ruff check: ruff not found on PATH")
+    except subprocess.TimeoutExpired:
+        messages.append("ruff check: timed out after 10s")
+
+    # ruff format
+    try:
+        r2 = subprocess.run(  # noqa: S603
+            [sys.executable, "-m", "ruff", "format", "--check", full],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        output = (r2.stdout.strip() + "\n" + r2.stderr.strip()).strip()
+        if r2.returncode != 0 and output:
+            messages.append(f"ruff format:\n{output}")
+    except FileNotFoundError:
+        messages.append("ruff format: ruff not found on PATH")
+    except subprocess.TimeoutExpired:
+        messages.append("ruff format: timed out after 10s")
 
     if messages:
         result = {

@@ -32,7 +32,7 @@ This routes Opus to planning (strategic decisions, architecture) and Sonnet to e
 
 | Hook | Trigger | Purpose |
 |------|---------|---------|
-| PreToolUse (protection) | write\|edit\|create | Blocks modification of S01-S10, ADRs, PHASE_SPEC, .env, pyproject.toml, CI workflows |
-| PostToolUse (ruff) | write\|edit on .py | Runs `ruff check` + `ruff format --check` on every Python file edit |
-| PostToolUse (pytest) | write\|edit on calculators/ | Runs targeted `pytest` on matching test file |
+| PreToolUse (protection) | Write\|Edit\|MultiEdit | Blocks modification of S01-S10, ADRs, PHASE_SPEC, .env, pyproject.toml, CI workflows |
+| PostToolUse (ruff) | Write\|Edit\|MultiEdit | Runs `ruff check` + `ruff format --check` on every Python file edit |
+| PostToolUse (pytest) | Write\|Edit\|MultiEdit | Runs targeted `pytest` on matching test file |
 | UserPromptSubmit | every prompt | Injects git state (branch, last commit, uncommitted count, recent files) |

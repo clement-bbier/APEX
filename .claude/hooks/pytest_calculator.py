@@ -17,9 +17,8 @@ def main() -> None:
     except (json.JSONDecodeError, EOFError):
         return
 
-    file_path = (
-        data.get("tool_response", {}).get("filePath", "")
-        or data.get("tool_input", {}).get("file_path", "")
+    file_path = data.get("tool_response", {}).get("filePath", "") or data.get("tool_input", {}).get(
+        "file_path", ""
     )
     if not file_path:
         return
@@ -32,17 +31,22 @@ def main() -> None:
 
     basename = os.path.splitext(os.path.basename(file_path))[0]
     proj = os.environ.get("CLAUDE_PROJECT_DIR", ".")
-    test_file = os.path.join(proj, "tests", "unit", "features", "calculators", f"test_{basename}.py")
+    test_file = os.path.join(
+        proj, "tests", "unit", "features", "calculators", f"test_{basename}.py"
+    )
 
     if not os.path.isfile(test_file):
         return
 
     try:
         env = {**os.environ, "CI": "true"}
-        r = subprocess.run(
-            ["pytest", test_file, "--timeout=30", "-x", "--tb=short", "-q"],
-            capture_output=True, text=True, timeout=60,
-            env=env, cwd=proj,
+        r = subprocess.run(  # noqa: S603
+            [sys.executable, "-m", "pytest", test_file, "--timeout=30", "-x", "--tb=short", "-q"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=env,
+            cwd=proj,
         )
         # Show last 15 lines of output
         output_lines = (r.stdout + r.stderr).strip().splitlines()
