@@ -14,18 +14,34 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
+from typing import Protocol, runtime_checkable
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 import structlog
 
-from features.ic.base import ICMetric
+from features.ic.base import ICMetric, ICResult
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 # ADR-0004 acceptance thresholds.
 _IC_THRESHOLD: float = 0.02
 _IC_IR_THRESHOLD: float = 0.50
+
+
+@runtime_checkable
+class RichICMeasurer(Protocol):
+    """Measurer that exposes horizon-aware metrics (Newey-West, decay, turnover-adj)."""
+
+    def measure_rich(
+        self,
+        *,
+        feature: npt.NDArray[np.float64],
+        forward_returns: npt.NDArray[np.float64],
+        feature_name: str,
+        horizon_bars: int,
+    ) -> ICResult: ...
 
 
 class PipelineStage(Enum):
@@ -111,7 +127,7 @@ class ICStage(ValidationStage):
 
     Computes Spearman rank IC between a feature and forward returns,
     then gates on ADR-0004 thresholds: ``|IC| >= 0.02`` and
-    ``IC_IR > 0.50``.
+    ``IC_IR >= 0.50``.
 
     The feature vector and forward returns must be provided via
     ``context.metadata``:
@@ -149,20 +165,41 @@ class ICStage(ValidationStage):
 
         feat_arr = np.asarray(feature_values, dtype=np.float64)
         fwd_arr = np.asarray(forward_returns, dtype=np.float64)
+
+        # Robust horizon_bars parsing — invalid values fall back to 1.
         raw_horizon = context.metadata.get("horizon_bars", 1)
-        horizon: int = int(raw_horizon) if isinstance(raw_horizon, (int, float, str)) else 1
+        horizon = 1
+        if isinstance(raw_horizon, (int, float, str)):
+            try:
+                horizon = int(raw_horizon)
+            except (TypeError, ValueError):
+                logger.warning(
+                    "validation_stage.ic.invalid_horizon_bars",
+                    feature=context.feature_name,
+                    raw_horizon=raw_horizon,
+                    fallback_horizon=1,
+                )
+                horizon = 1
+        if horizon < 1:
+            logger.warning(
+                "validation_stage.ic.non_positive_horizon_bars",
+                feature=context.feature_name,
+                raw_horizon=raw_horizon,
+                coerced_horizon=1,
+            )
+            horizon = 1
 
-        result = self._measurer.measure(feat_arr, fwd_arr)
-
-        # For richer metrics, re-measure with horizon awareness if the
-        # measurer is a SpearmanICMeasurer (duck-typing via hasattr).
-        if hasattr(self._measurer, "measure_rich"):
+        # Use measure_rich (horizon-aware, HAC-corrected) when the
+        # measurer supports it; otherwise fall back to the ABC measure().
+        if isinstance(self._measurer, RichICMeasurer):
             result = self._measurer.measure_rich(
                 feature=feat_arr,
                 forward_returns=fwd_arr,
                 feature_name=context.feature_name,
                 horizon_bars=horizon,
             )
+        else:
+            result = self._measurer.measure(feat_arr, fwd_arr)
 
         passed = abs(result.ic) >= _IC_THRESHOLD and result.ic_ir >= _IC_IR_THRESHOLD
 

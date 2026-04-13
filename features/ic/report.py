@@ -5,7 +5,7 @@ Markdown table and a machine-readable JSON document.  Decision
 thresholds follow ADR-0004:
 
 - ``|IC| >= 0.02`` (noise floor)
-- ``IC_IR > 0.50`` (stability)
+- ``IC_IR >= 0.50`` (stability)
 
 Reference:
     ADR-0004 (``docs/adr/ADR-0004-feature-validation-methodology.md``).

@@ -201,3 +201,21 @@ class TestICBootstrapCI:
         mean = float(np.mean(series))
         assert ci_low <= mean + 1e-10
         assert ci_high >= mean - 1e-10
+
+    def test_raises_on_invalid_n_boot(self) -> None:
+        """n_boot=0 or negative -> ValueError."""
+        series = np.array([0.1, 0.2, 0.3])
+        with pytest.raises(ValueError, match="n_boot must be >= 1"):
+            ic_bootstrap_ci(series, n_boot=0)
+        with pytest.raises(ValueError, match="n_boot must be >= 1"):
+            ic_bootstrap_ci(series, n_boot=-1)
+
+    def test_raises_on_invalid_confidence(self) -> None:
+        """confidence outside (0, 1) -> ValueError."""
+        series = np.array([0.1, 0.2, 0.3])
+        with pytest.raises(ValueError, match="confidence must be in"):
+            ic_bootstrap_ci(series, confidence=0.0)
+        with pytest.raises(ValueError, match="confidence must be in"):
+            ic_bootstrap_ci(series, confidence=1.0)
+        with pytest.raises(ValueError, match="confidence must be in"):
+            ic_bootstrap_ci(series, confidence=-0.5)

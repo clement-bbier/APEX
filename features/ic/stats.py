@@ -177,6 +177,11 @@ def ic_bootstrap_ci(
         Politis, D. N. & Romano, J. P. (1994). "The Stationary
         Bootstrap." *JASA*, 89(428), 1303-1313.
     """
+    if n_boot < 1:
+        raise ValueError(f"n_boot must be >= 1, got {n_boot}")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError(f"confidence must be in (0, 1), got {confidence}")
+
     n = ic_series.size
     if n < 2:
         return 0.0, 0.0

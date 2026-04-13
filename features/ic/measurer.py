@@ -18,6 +18,8 @@ References:
 
 from __future__ import annotations
 
+import dataclasses
+
 import numpy as np
 import numpy.typing as npt
 import polars as pl
@@ -226,6 +228,8 @@ class SpearmanICMeasurer(ICMetric):
         results: list[ICResult] = []
         for name in feature_names:
             feat_arr = np.asarray(features[name].to_numpy(), dtype=np.float64)
+            # Compute decay once per feature (independent of horizon).
+            decay = self._ic_decay(feat_arr, forward_returns_by_horizon)
             for h, fwd in sorted(forward_returns_by_horizon.items()):
                 result = self.measure_rich(
                     feature=feat_arr,
@@ -233,25 +237,7 @@ class SpearmanICMeasurer(ICMetric):
                     feature_name=name,
                     horizon_bars=h,
                 )
-                # Attach IC decay across all horizons.
-                decay = self._ic_decay(feat_arr, forward_returns_by_horizon)
-                result = ICResult(
-                    ic=result.ic,
-                    ic_ir=result.ic_ir,
-                    p_value=result.p_value,
-                    n_samples=result.n_samples,
-                    ci_low=result.ci_low,
-                    ci_high=result.ci_high,
-                    feature_name=result.feature_name,
-                    ic_std=result.ic_std,
-                    ic_t_stat=result.ic_t_stat,
-                    ic_hit_rate=result.ic_hit_rate,
-                    turnover_adj_ic=result.turnover_adj_ic,
-                    ic_decay=decay,
-                    is_significant=result.is_significant,
-                    horizon_bars=result.horizon_bars,
-                    newey_west_lags=result.newey_west_lags,
-                )
+                result = dataclasses.replace(result, ic_decay=decay)
                 results.append(result)
         return results
 
@@ -294,15 +280,16 @@ class SpearmanICMeasurer(ICMetric):
         forward_returns: npt.NDArray[np.float64],
         horizon_bars: int,
     ) -> npt.NDArray[np.float64]:
-        """Split data into non-overlapping blocks and compute IC per block.
+        """Compute per-period IC via stepped rolling windows.
 
-        Block size = ``max(horizon_bars, 1)`` to reduce
-        autocorrelation from overlapping returns.  Each block must
-        have at least ``_MIN_VALID_PAIRS // 2`` observations (but
-        never fewer than 5).
+        Uses a rolling window of size ``max(rolling_window, horizon *
+        10)`` advanced by ``step = max(horizon_bars, 1)`` positions.
+        Windows **may overlap** when ``window > step``; the residual
+        autocorrelation this introduces is handled by the Newey-West
+        HAC correction applied downstream in :meth:`measure_rich`.
 
-        Falls back to a rolling approach with step = horizon_bars
-        when blocks are too small relative to window.
+        Falls back to equal-sized non-overlapping blocks when the
+        stepped approach yields fewer than 3 IC observations.
         """
         n = feature.size
         block_size = max(horizon_bars, 1)
@@ -365,19 +352,24 @@ class SpearmanICMeasurer(ICMetric):
         feature: npt.NDArray[np.float64],
         returns_by_horizon: dict[int, npt.NDArray[np.float64]],
     ) -> tuple[float, ...]:
-        """IC at each horizon in ``self._horizons``.
+        """IC at each configured horizon in ``self._horizons``.
 
-        Only computes for horizons present in *returns_by_horizon*.
+        Horizons missing from *returns_by_horizon* or with fewer than
+        ``_MIN_SAMPLES`` valid pairs are reported as ``0.0`` to keep
+        the decay tuple shape stable and in configured order.
         """
         decay: list[float] = []
-        for h in sorted(returns_by_horizon.keys()):
-            fwd = returns_by_horizon[h]
+        for h in self._horizons:
+            fwd = returns_by_horizon.get(h)
+            if fwd is None:
+                decay.append(0.0)
+                continue
             mask = np.isfinite(feature) & np.isfinite(fwd)
             if mask.sum() < _MIN_SAMPLES:
                 decay.append(0.0)
-            else:
-                ic_val, _ = safe_spearman(feature[mask], fwd[mask])
-                decay.append(ic_val)
+                continue
+            ic_val, _ = safe_spearman(feature[mask], fwd[mask])
+            decay.append(ic_val)
         return tuple(decay)
 
     @staticmethod

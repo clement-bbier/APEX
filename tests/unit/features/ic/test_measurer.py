@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import polars as pl
 import pytest
 
 from features.ic.base import ICMetric, ICResult
@@ -137,3 +138,88 @@ class TestSpearmanICMeasurer:
         fwd = rng.normal(0, 1, size=100)
         result = measurer.measure(feat, fwd)
         assert isinstance(result, ICResult)
+
+    def test_measure_all_computes_decay_once_per_feature(self) -> None:
+        """_ic_decay is called once per feature, not once per horizon."""
+        rng = np.random.default_rng(42)
+        n = 500
+        feat = rng.normal(0, 1, size=n)
+
+        m = SpearmanICMeasurer(
+            rolling_window=50,
+            horizons=(1, 5, 10, 20),
+            bootstrap_n=50,
+        )
+
+        # Spy on _ic_decay to count calls.
+        call_count: list[int] = [0]
+        original_ic_decay = m._ic_decay  # type: ignore[attr-defined]
+
+        def spy_ic_decay(
+            feature: np.ndarray,  # type: ignore[type-arg]
+            returns_by_horizon: dict[int, np.ndarray],  # type: ignore[type-arg]
+        ) -> tuple[float, ...]:
+            call_count[0] += 1
+            return original_ic_decay(feature, returns_by_horizon)
+
+        m._ic_decay = spy_ic_decay  # type: ignore[attr-defined]
+
+        features_df = pl.DataFrame({"feat_a": feat})
+        fwd_by_h: dict[int, np.ndarray] = {}  # type: ignore[type-arg]
+        for h in (1, 5, 10, 20):
+            fwd_by_h[h] = rng.normal(0, 1, size=n)
+
+        m.measure_all(features_df, fwd_by_h, ["feat_a"])
+        assert call_count[0] == 1, f"_ic_decay called {call_count[0]} times, expected 1"
+
+    def test_ic_decay_respects_configured_horizons_order(self) -> None:
+        """Decay tuple follows self._horizons order, not dict key order."""
+        rng = np.random.default_rng(42)
+        n = 500
+        feat = rng.normal(0, 1, size=n)
+
+        m = SpearmanICMeasurer(
+            rolling_window=50,
+            horizons=(1, 5, 10, 20),
+            bootstrap_n=50,
+        )
+
+        # Build returns dict in scrambled order.
+        fwd_by_h: dict[int, np.ndarray] = {}  # type: ignore[type-arg]
+        for h in (20, 5, 10, 1):
+            fwd_by_h[h] = rng.normal(0, 1, size=n)
+
+        decay = m._ic_decay(feat, fwd_by_h)
+        assert len(decay) == 4
+        # Verify order matches configured horizons by checking against
+        # individual horizon IC values.
+        for i, h in enumerate((1, 5, 10, 20)):
+            from features.ic.stats import safe_spearman
+
+            mask = np.isfinite(feat) & np.isfinite(fwd_by_h[h])
+            expected_ic, _ = safe_spearman(feat[mask], fwd_by_h[h][mask])
+            assert decay[i] == pytest.approx(expected_ic, abs=1e-10)
+
+    def test_ic_decay_missing_horizon_returns_zero(self) -> None:
+        """Configured horizon not in dict -> 0.0 at that position."""
+        rng = np.random.default_rng(42)
+        n = 500
+        feat = rng.normal(0, 1, size=n)
+
+        m = SpearmanICMeasurer(
+            rolling_window=50,
+            horizons=(1, 5, 10, 20),
+            bootstrap_n=50,
+        )
+
+        # Only provide horizons 1 and 10 — missing 5 and 20.
+        fwd_by_h: dict[int, np.ndarray] = {  # type: ignore[type-arg]
+            1: rng.normal(0, 1, size=n),
+            10: rng.normal(0, 1, size=n),
+        }
+
+        decay = m._ic_decay(feat, fwd_by_h)
+        assert len(decay) == 4
+        # Positions 1 (horizon=5) and 3 (horizon=20) should be 0.0.
+        assert decay[1] == 0.0
+        assert decay[3] == 0.0
