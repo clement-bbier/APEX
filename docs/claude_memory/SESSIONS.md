@@ -711,3 +711,89 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot re-review on PR #112
 - Phase 3.6 OFI after merge
+
+---
+
+## Session 016 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.6 — OFI Validation (Cont, Kukanov & Stoikov 2014) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~45 min |
+
+### Decisions Made
+
+1. S02 `MicrostructureAnalyzer.ofi()` uses bid/ask price-delta proxy — NOT the canonical Cont 2014 size-delta formula. OFICalculator implements the canonical formula directly (not a wrapper of S02). S02 is NOT modified.
+2. D028 applied: all 4 OFI columns are realization-like at tick t (use ticks [t-w+1, t] inclusive). D027 day-close-only does NOT apply — OFI operates natively at tick level.
+3. D029 introduced: signal variance gate — every calculator output column must include a test verifying the column varies across inputs. Prevents silent constant column → IC=0.
+4. Lee-Ready classifier exists only inline in VPIN calculator — not standalone. Trade-based fallback uses signed volume directly.
+
+### What Changed
+
+- CREATED: `features/calculators/ofi.py` (~240 LOC) — OFICalculator with book-based + trade-based fallback
+- CREATED: `features/validation/ofi_report.py` (~90 LOC) — Schema-compatible with HAR-RV/Rough Vol reports
+- CREATED: `tests/unit/features/calculators/test_ofi.py` (~530 LOC) — 23 tests
+- MODIFIED: `features/calculators/__init__.py` — Added OFICalculator to exports
+
+### Key Design Choices
+
+- **Book-based OFI**: Δbid_size − Δask_size (Cont 2014), rolling mean over 10/50/100 ticks
+- **Trade-based fallback**: +quantity (BUY) / −quantity (SELL) when L2 columns absent
+- **Signal**: tanh(weighted_combination / (k * rolling_std)) with k=3, weights=(0.5, 0.3, 0.2)
+- **Decay pattern test**: verifies std(ofi_10) > std(ofi_100) on burst data — short-term OFI captures bursts better
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: clean
+- mypy --strict: 0 errors
+- ofi.py coverage: 93%
+- features/ coverage: 92.22% (> 85% gate)
+- Full unit tests: 1,491 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot review on PR #113
+- Phase 3.7 CVD + Kyle after merge
+
+---
+
+## Session 017 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | PR #113 Copilot review hotfix — API landmine + hygiene |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~20 min |
+
+### Decisions Made
+
+1. D031: Configurable constructor parameters must honor configurability everywhere. Generate output names dynamically, never hardcode.
+2. HAR-RV and Rough Vol audited: NOT affected (column names invariant of constructor params).
+
+### What Changed
+
+- MODIFIED: `features/calculators/ofi.py` — dynamic column names from `self._windows`, remove `_OUTPUT_COLUMNS` ClassVar, add constructor validation (empty windows, weights sum), remove unused `max_window` param, fix "Rolling sums" comment
+- MODIFIED: `tests/unit/features/calculators/test_ofi.py` — 4 new tests (27 total), renamed `test_output_columns_are_four_expected` to `test_output_columns_default_config_are_four_expected`
+
+### Key Fixes
+
+- **Bug #1 API landmine**: `windows` configurable but output columns hardcoded to ofi_10/50/100. Custom windows would silently produce mislabeled columns. Fixed: dynamic generation.
+- **Bug #2 dead parameter**: `_compute_signal(max_window)` never used `max_window`. Removed.
+- **Bug #3 misleading comment**: "Rolling sums" → "Rolling means" to match implementation.
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors
+- ofi.py coverage: 94%
+- features/ coverage: 92.38% (> 85% gate)
+- 236 features/ tests passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot re-review on PR #113
+- Phase 3.7 CVD + Kyle after merge

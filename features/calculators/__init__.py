@@ -9,6 +9,7 @@ Reference:
 """
 
 from features.calculators.har_rv import HARRVCalculator
+from features.calculators.ofi import OFICalculator
 from features.calculators.rough_vol import RoughVolCalculator
 
-__all__ = ["HARRVCalculator", "RoughVolCalculator"]
+__all__ = ["HARRVCalculator", "OFICalculator", "RoughVolCalculator"]

@@ -15,7 +15,7 @@
 | 3.3 IC Measurement | COMPLETE | PR #110 merged |
 | 3.4 HAR-RV | IN_PROGRESS | PR #111 open — 20 tests, 91% coverage |
 | 3.5 Rough Vol | IN_PROGRESS | PR #112 open — 23 tests, 94% coverage |
-| 3.6 OFI | PENDING | S02 ofi() ready |
+| 3.6 OFI | IN_PROGRESS | PR #113 open — 23 tests, 93% coverage |
 | 3.7 CVD + Kyle | PENDING | S02 cvd(), kyle_lambda() ready |
 | 3.8 GEX | PENDING | Risk: options data availability |
 | 3.9 Multicollinearity | PENDING | |
@@ -76,3 +76,11 @@
 - 3.5 hotfix: all 6 rough vol columns reclassified forecast-like → broadcast. rough_size_adjustment renamed rough_size_multiplier (raw S07 output)
 - For 3.6-3.8: each calculator must explicitly classify output columns (forecast-like vs realization) in docstring
 - 209 tests on features/, 1,493 total tests (0 regressions after hotfix)
+- OFICalculator: implements canonical Cont 2014 (Δbid_size − Δask_size), NOT S02 price-delta proxy (D030)
+- D028 applied: all 4 OFI columns realization-like at tick t ([t-w+1, t] inclusive). D027 N/A for tick-level features
+- D029: signal variance gate — test_ofi_signal_varies_across_inputs (100 DataFrames, std > 0.01)
+- Book-based mode auto-detected via bid_size/ask_size columns; trade-based fallback uses signed volume
+- 232 tests on features/, 1,491 total tests (0 regressions)
+- 3.6 hotfix: dynamic column names from self._windows (D031), remove dead max_window param, fix comment
+- D031: configurable params must honor configurability everywhere. HAR-RV/Rough Vol audited: NOT affected
+- 236 tests on features/, 27 OFI tests (0 regressions after hotfix)
