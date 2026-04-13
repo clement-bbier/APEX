@@ -103,12 +103,18 @@ class GEXCalculator(FeatureCalculator):
     _REQUIRED_COLUMNS: ClassVar[list[str]] = [
         "timestamp",
         "spot_price",
-        "strike",
-        "expiry",
+        "strike",  # Not used in GEX formula but required for audit trail
+        "expiry",  # and forward-compatibility (0DTE filtering, strike-buckets).
         "option_type",
         "open_interest",
         "gamma",
     ]
+    # Note: strike and expiry are not currently used in the GEX formula
+    # (GEX = sign * OI * gamma * S^2 * multiplier), but they are required
+    # inputs for auditability (reconstruct per-option contributions) and
+    # forward-compatibility with future features like 0DTE filtering or
+    # strike-distance bucketing. Keeping them required now avoids a
+    # breaking schema change later.
 
     _OUTPUT_COLUMNS: ClassVar[list[str]] = [
         "gex_raw",
@@ -204,11 +210,42 @@ class GEXCalculator(FeatureCalculator):
                 "Call df.sort('timestamp') before."
             )
 
-        # Validate option_type values.
+        # Normalize option_type to lowercase (case-insensitive acceptance).
+        df = df.with_columns(
+            pl.col("option_type").cast(pl.Utf8).str.strip_chars().str.to_lowercase()
+        )
+
+        # Validate option_type values (post-normalization).
         unique_types = df.select(pl.col("option_type").unique()).to_series().to_list()
         invalid = set(unique_types) - {"call", "put"}
         if invalid:
-            raise ValueError(f"option_type must be 'call' or 'put', got invalid values: {invalid}")
+            raise ValueError(
+                f"option_type must be 'call' or 'put' (case-insensitive), "
+                f"got invalid values: {invalid}"
+            )
+
+        # Data quality invariant: spot_price must be constant within a timestamp.
+        # Multiple options at the same timestamp reference the same underlying,
+        # so their spot must be identical. Variance within a timestamp indicates
+        # upstream data quality issues (stale quotes, unsynced snapshots).
+        spot_consistency = df.group_by("timestamp").agg(
+            pl.col("spot_price").n_unique().alias("_spot_uniques")
+        )
+        max_uniques = spot_consistency.select(pl.col("_spot_uniques").max()).item()
+        if isinstance(max_uniques, int) and max_uniques > 1:
+            bad_timestamps = (
+                spot_consistency.filter(pl.col("_spot_uniques") > 1)
+                .select("timestamp")
+                .limit(3)
+                .to_series()
+                .to_list()
+            )
+            raise ValueError(
+                f"spot_price must be constant within each timestamp, "
+                f"found {max_uniques} distinct spots. "
+                f"Sample offending timestamps: {bad_timestamps}. "
+                f"Upstream data quality issue — synchronize option chain snapshots."
+            )
 
         # Step 1: Per-option contribution (dealer-adjusted sign).
         # sign = -1 for calls, +1 for puts (Barbon-Buraschi 2020).

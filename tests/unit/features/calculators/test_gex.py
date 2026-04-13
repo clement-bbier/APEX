@@ -1,6 +1,6 @@
 """Unit tests for GEXCalculator (Phase 3.8).
 
-31 tests covering ABC conformity, constructor validation (D030),
+33 tests covering ABC conformity, constructor validation (D030),
 input validation, correctness, sign convention sanity, magnitude
 sanity, look-ahead defense, D028 compliance, D029 variance gates,
 edge cases, integration with ValidationPipeline, report schema,
@@ -204,7 +204,7 @@ class TestConstructorValidation:
 
 
 # ══════════════════════════════════════════════════════════════════════
-# Input validation (2 tests)
+# Input validation (4 tests)
 # ══════════════════════════════════════════════════════════════════════
 
 
@@ -227,6 +227,41 @@ class TestInputValidation:
         )
         with pytest.raises(ValueError, match="option_type must be"):
             calc.compute(df)
+
+    def test_inconsistent_spot_within_timestamp_raises(self) -> None:
+        """spot_price must be constant within a timestamp — data quality gate."""
+        calc = GEXCalculator()
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2024, 1, 1, tzinfo=UTC)] * 2,
+                "spot_price": [400.0, 400.5],  # inconsistent!
+                "strike": [400.0, 400.0],
+                "expiry": [datetime(2024, 2, 1, tzinfo=UTC)] * 2,
+                "option_type": ["call", "put"],
+                "open_interest": [1000.0, 1000.0],
+                "gamma": [0.02, 0.02],
+            }
+        )
+        with pytest.raises(ValueError, match="spot_price must be constant"):
+            calc.compute(df)
+
+    def test_option_type_case_insensitive(self) -> None:
+        """option_type accepts CALL/Call/call and PUT/Put/put."""
+        calc = GEXCalculator(zscore_lookback=20)
+        df = pl.DataFrame(
+            {
+                "timestamp": [datetime(2020, 1, 1, tzinfo=UTC)] * 4,
+                "spot_price": [400.0] * 4,
+                "strike": [395.0, 400.0, 405.0, 410.0],
+                "expiry": [datetime(2020, 2, 1, tzinfo=UTC)] * 4,
+                "option_type": ["CALL", "Call", "PUT", "Put"],
+                "open_interest": [1000.0] * 4,
+                "gamma": [0.02] * 4,
+            }
+        )
+        result = calc.compute(df)
+        # Should not raise, should produce non-NaN gex_raw.
+        assert not np.isnan(result["gex_raw"][0])
 
     def test_missing_required_column_raises(self) -> None:
         """DataFrame without 'gamma' must raise ValueError."""
@@ -678,7 +713,12 @@ class TestIntegration:
     """End-to-end tests through the ValidationPipeline."""
 
     def test_gex_through_validation_pipeline(self) -> None:
-        """Run GEXCalculator through ICStage end-to-end."""
+        """Run GEXCalculator through ICStage end-to-end.
+
+        Forward returns are computed at snapshot level (one per unique
+        timestamp) — not row-level, since GEX has multiple option rows
+        per timestamp (D034 pattern).
+        """
         from features.ic.measurer import SpearmanICMeasurer
         from features.validation.stages import ICStage, StageContext
 
@@ -686,16 +726,23 @@ class TestIntegration:
         df = _make_option_chain(100, n_options_per_snapshot=20, seed=42)
         result_df = calc.compute(df)
 
-        # Use gex_signal as the feature, dummy forward returns.
-        signals = result_df["gex_signal"].to_numpy()
-        spot = result_df["spot_price"].to_numpy().astype(np.float64)
+        # Aggregate to snapshot level for IC measurement.
+        snapshot_df = (
+            result_df.group_by("timestamp", maintain_order=True)
+            .agg(
+                pl.col("spot_price").first(),
+                pl.col("gex_signal").first(),
+            )
+            .sort("timestamp")
+        )
+        snapshot_spot = snapshot_df["spot_price"].to_numpy().astype(np.float64)
+        snapshot_signal = snapshot_df["gex_signal"].to_numpy().astype(np.float64)
 
-        # Create forward returns per row (log return of next row's spot).
-        fwd_returns = np.full(len(spot), np.nan)
-        fwd_returns[:-1] = np.log(spot[1:] / spot[:-1])
+        fwd_returns = np.full(len(snapshot_spot), np.nan)
+        fwd_returns[:-1] = np.log(snapshot_spot[1:] / snapshot_spot[:-1])
 
-        mask = np.isfinite(signals) & np.isfinite(fwd_returns)
-        feat_clean = signals[mask]
+        mask = np.isfinite(snapshot_signal) & np.isfinite(fwd_returns)
+        feat_clean = snapshot_signal[mask]
         fwd_clean = fwd_returns[mask]
 
         measurer = SpearmanICMeasurer(rolling_window=50, bootstrap_n=100)
@@ -718,28 +765,40 @@ class TestIntegration:
         self,
     ) -> None:
         """Build synthetic data where gex_signal predicts forward
-        returns. Verify measured IC > 0.1.
+        returns at snapshot level. Verify measured IC > 0.1.
+
+        Forward returns are computed per unique timestamp (D034),
+        not per option row.
         """
         calc = GEXCalculator(zscore_lookback=20)
         df = _make_option_chain(100, n_options_per_snapshot=20, seed=42)
         result_df = calc.compute(df)
 
-        signals = result_df["gex_signal"].to_numpy()
-        spot = result_df["spot_price"].to_numpy().astype(np.float64)
+        # Aggregate to snapshot level.
+        snapshot_df = (
+            result_df.group_by("timestamp", maintain_order=True)
+            .agg(
+                pl.col("spot_price").first(),
+                pl.col("gex_signal").first(),
+            )
+            .sort("timestamp")
+        )
+        snapshot_spot = snapshot_df["spot_price"].to_numpy().astype(np.float64)
+        snapshot_signal = snapshot_df["gex_signal"].to_numpy().astype(np.float64)
 
-        fwd_raw = np.full(len(spot), np.nan)
-        fwd_raw[:-1] = np.log(spot[1:] / spot[:-1])
+        fwd_raw = np.full(len(snapshot_spot), np.nan)
+        fwd_raw[:-1] = np.log(snapshot_spot[1:] / snapshot_spot[:-1])
 
         rng = np.random.default_rng(42)
-        mask = np.isfinite(signals) & np.isfinite(fwd_raw)
+        mask = np.isfinite(snapshot_signal) & np.isfinite(fwd_raw)
 
-        # Inject predictive relationship.
+        # Inject predictive relationship at snapshot level.
         fwd_synthetic = np.copy(fwd_raw)
         alpha = 0.3
         noise = rng.standard_normal(int(mask.sum())) * 0.01
-        fwd_synthetic[mask] = alpha * signals[mask] + noise
+        fwd_synthetic[mask] = alpha * snapshot_signal[mask] + noise
 
-        feat_clean = signals[mask]
+        feat_clean = snapshot_signal[mask]
         fwd_clean = fwd_synthetic[mask]
 
         from features.ic.measurer import SpearmanICMeasurer
