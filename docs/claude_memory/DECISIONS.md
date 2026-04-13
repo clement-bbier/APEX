@@ -555,3 +555,103 @@ A perfect predictor (feature == forward_return) produces IC=1.0 on every block. 
 - Set ic_ir=1e6, t_stat=1e6, p_value=0.0 — effectively infinite significance
 - This correctly passes ADR-0004 thresholds (|IC|>=0.02 AND IC_IR>=0.50)
 - The degenerate case only arises with synthetic/test data; real features will have IC variance
+
+---
+
+## D024 — Expanding-Window Refit for HAR-RV (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 012 |
+| Decision | Use expanding-window refit (fit on [0, t-1] to forecast t) rather than global fit or rolling window |
+| Status | ACCEPTED |
+
+### Context
+
+The HAR-RV model fits OLS coefficients β_D, β_W, β_M. A single global fit on the entire series then "forecasting" past points leaks future information through the coefficients — this is the primary look-ahead trap (PHASE_3_SPEC §5.1).
+
+### Justification
+
+- Expanding window guarantees forecasts at time t never see data at or after t
+- O(n²) cost is acceptable for offline feature computation (252 daily rows in ~1-2s)
+- Future optimization path: incremental OLS / Kalman filter (out of scope 3.4)
+- Characterized by 2 dedicated look-ahead tests (identical-past-different-future)
+
+---
+
+## D025 — tanh Normalization with k=3.0 (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 012 |
+| Decision | Normalize HAR-RV residual to signal via tanh(residual / (k * rolling_std)) with k=3.0 |
+| Status | ACCEPTED |
+
+### Context
+
+The HAR-RV residual (realized - forecast) has unbounded range. The signal must be in [-1, +1] for downstream consumption. Three options: z-score clipped, min-max on rolling window, tanh scaling.
+
+### Justification
+
+- tanh is smooth, strictly bounded in (-1, +1), and does not saturate abruptly
+- k=3.0 maps ±1σ residuals to ≈±0.32 and ±3σ to ≈±0.71 — good spread, not saturated
+- rolling_std (window=60, expanding until 60 available) adapts to local volatility regime
+- Validated by test: mean |signal| < 0.7 on well-behaved synthetic data
+
+---
+
+## D026 — Strict Wrapper over S07 har_rv_forecast (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 012 |
+| Decision | HARRVCalculator wraps S07 RealizedVolEstimator.har_rv_forecast() — no reimplementation of OLS |
+| Status | ACCEPTED |
+
+### Context
+
+S07 already implements the HAR-RV OLS regression. Reimplementing in features/ would create divergence risk (same as TripleBarrierLabeler adapter decision D013).
+
+### Justification
+
+- Single source of truth for HAR-RV math remains in S07
+- Parity test verifies calculator output matches direct S07 call
+- Pattern consistent with D013 (adapter/wrapper, not reimplementation)
+- Establishes the template for 3.5-3.8 calculators
+
+---
+
+## D027 — Intraday Aggregate Features Emit at Period-Close Only (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 013 |
+| Decision | Features computed from aggregated-period data must emit realization columns (residual, signal) ONLY on the last bar of the period |
+| Status | ACCEPTED |
+
+### Context
+
+PR #111 Phase 3.4 HAR-RV calculator. In `bar_frequency="5m"` mode, the initial implementation computed daily residuals (based on full-day realized_variance) and broadcast them to every bar of the day. The 9:30 bar received a residual that depended on the 15:55 bar — look-ahead within the day.
+
+Copilot AI review caught this during PR #111. The existing look-ahead test (`test_forecast_at_t_uses_only_data_before_t`) ran in daily mode only and did not catch it.
+
+### Rule (applies to 3.5-3.8 and beyond)
+
+For any feature computed from aggregated intraday data:
+- **Forecast-like columns** (depend on PAST aggregates) → safe to broadcast to all bars of the current period.
+- **Realization columns** (depend on CURRENT-period aggregate) → emit ONLY on the last bar of the period; NaN elsewhere.
+
+### Characterization
+
+Every future calculator with period aggregates must include a test equivalent to `test_5m_mode_residual_nan_before_day_close` that verifies:
+- forecast non-NaN on all post-warm-up bars
+- residual/signal non-NaN on at most 1 bar per period (the last)
+
+### References
+
+- PR #111 Copilot review comment #1
+- PHASE_3_SPEC §5.1 Look-Ahead Bias

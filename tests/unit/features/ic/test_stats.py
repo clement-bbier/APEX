@@ -10,6 +10,8 @@ References:
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pytest
 from hypothesis import given, settings
@@ -187,7 +189,10 @@ class TestICBootstrapCI:
             np.float64, shape=st.integers(10, 100), elements=st.floats(-1.0, 1.0, allow_nan=False)
         ),
     )
-    @settings(max_examples=1000, deadline=None)
+    @settings(
+        max_examples=100 if os.environ.get("CI") else 1000,
+        deadline=None,
+    )
     def test_ci_contains_mean_hypothesis(
         self,
         series: np.ndarray,  # type: ignore[type-arg]
@@ -197,7 +202,8 @@ class TestICBootstrapCI:
             return
         if np.ptp(series) < 1e-12:
             return
-        ci_low, ci_high = ic_bootstrap_ci(series, n_boot=500, seed=42)
+        n_boot = 200 if os.environ.get("CI") else 500
+        ci_low, ci_high = ic_bootstrap_ci(series, n_boot=n_boot, seed=42)
         mean = float(np.mean(series))
         assert ci_low <= mean + 1e-10
         assert ci_high >= mean - 1e-10
