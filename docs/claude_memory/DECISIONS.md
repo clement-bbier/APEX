@@ -324,3 +324,55 @@ PHASE_3_NOTES.md, and various docs. No single entry point existed.
 - Explicit "Workflow for new Claude Code session" checklist (step 4)
 - "Where to find things" navigation table
 - Reduces onboarding time from ~30 min to ~15 min
+
+---
+
+## D013 — TripleBarrierLabeler Adapter Pattern (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 008 |
+| Decision | Expose TripleBarrierLabeler via Polars adapter, not via inheritance |
+| Status | ACCEPTED |
+
+### Context
+
+Phase 3.1 needs a pipeline-friendly interface for Triple Barrier labeling.
+`core/math/labeling.py::TripleBarrierLabeler` already implements the math.
+
+### Alternatives Considered
+
+1. **Inherit from TripleBarrierLabeler**: Extend with Polars methods. Risk: couples
+   features/ to core/math internal API; breaking changes propagate.
+2. **Adapter (chosen)**: `TripleBarrierLabelerAdapter` wraps the core labeler,
+   converting Polars DataFrames to/from the native interface.
+
+### Justification
+
+- Adapter isolates features/ from core/math implementation details
+- Core labeler can evolve independently (Liskov Substitution preserved)
+- Zero duplication of labeling math
+
+---
+
+## D014 — ValidationPipeline Composable Stage Pattern (2026-04-13)
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Session | 008 |
+| Decision | ADR-0004 pipeline as composable ValidationStage ABCs injected into ValidationPipeline |
+| Status | ACCEPTED |
+
+### Context
+
+ADR-0004 defines 6 sequential validation steps. Phase 3.1 provides the skeleton;
+concrete stages arrive in sub-phases 3.3, 3.9, 3.10, 3.11.
+
+### Justification
+
+- Each stage is independently testable and replaceable (OCP)
+- Stages can be added/removed without modifying ValidationPipeline (Strategy pattern)
+- Stub stages log and return `skipped` — observable in tests
+- Pipeline propagates StageContext for inter-stage communication
