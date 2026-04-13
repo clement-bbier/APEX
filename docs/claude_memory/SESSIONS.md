@@ -956,3 +956,53 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot re-review on PR #116
 - Phase 3.9 after merge
+
+---
+
+## Session 022 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Phase | 3.9 — Multicollinearity & Orthogonalization |
+| Branch | `phase-3/multicollinearity-analysis` |
+| PR | TBD |
+| Issue | #95 |
+
+### Objective
+
+Implement cross-calculator multicollinearity analysis for 8 signal columns from Phase 3.4-3.8 calculators. NOT a new calculator — an analysis tool producing correlation matrix, VIF scores, hierarchical clustering, and orthogonalization strategies.
+
+### Files Created
+
+- `features/multicollinearity.py` (~290 LOC) — `MulticollinearityAnalyzer`, `MulticollinearityReport`
+- `features/orthogonalizer.py` (~180 LOC) — `FeatureOrthogonalizer` (3 methods: drop_lowest_ic, residualize, pca)
+- `tests/unit/features/test_multicollinearity.py` (~330 LOC, 33 tests)
+- `tests/unit/features/test_orthogonalizer.py` (~200 LOC, 16 tests)
+- `reports/phase_3_9/multicollinearity_report.md` — Synthetic data report (seed=42, N=1000)
+
+### Key Findings (Synthetic Data)
+
+- Top collinear pairs: (har_rv_signal, vr_signal, ρ=0.848), (ofi_signal, cvd_divergence, ρ=0.807)
+- Recommended drops: vr_signal (IC=0.06), cvd_divergence (IC=0.04) — lowest IC in each pair
+- Independent signals: liquidity_signal, combined_signal, gex_signal, gex_raw (VIF ≈ 1.0)
+- Condition number: 3.53
+
+### Decisions
+
+- No D035 needed: PHASE_3_SPEC §3.9 explicitly defines method priority (drop_lowest_ic > residualize > pca) based on IC comparison, not manual priority ordering.
+- Used scipy hierarchical clustering (complete linkage, distance = 1 - |corr|, cut at 0.3) per Lopez de Prado (2020) Ch. 6.
+- VIF computed via numpy.linalg.lstsq — no statsmodels dependency introduced.
+- Constant-column edge case: NaN from np.corrcoef handled by replacing off-diagonal NaN with 0.0.
+
+### Quality Gates
+
+- ruff check + format: clean
+- mypy --strict: 0 errors (2 files)
+- 49 new tests passed (33 multicollinearity + 16 orthogonalizer)
+- Full suite: 1,634 passed, 27 skipped, 0 regressions (10 integration errors = pre-existing Docker requirement)
+
+### Next Steps
+
+- Push branch, open PR for Copilot review
+- Phase 3.10 (CPCV) after merge
