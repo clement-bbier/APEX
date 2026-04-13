@@ -261,6 +261,74 @@ class TestCollinearPairDetection:
 
 
 # =========================================================================
+# D030-class: clustering cutoff honors max_correlation
+# =========================================================================
+
+
+class TestClusteringCutoffHonored:
+    """D030: configurable parameters must propagate downstream."""
+
+    def test_clustering_cutoff_honors_max_correlation(self) -> None:
+        """With max_correlation=0.95, a pair with rho=0.85 must NOT cluster.
+
+        Same input with max_correlation=0.70 DOES cluster them.
+        """
+        rng = np.random.default_rng(42)
+        n = 500
+        base = rng.standard_normal(n)
+        sig_correlated = 0.85 * base + np.sqrt(1 - 0.85**2) * rng.standard_normal(n)
+        df = pl.DataFrame(
+            {
+                "a": base,
+                "b": sig_correlated,
+                "c": rng.standard_normal(n),
+            }
+        )
+        ic = [_make_ic("a", 0.08), _make_ic("b", 0.06), _make_ic("c", 0.05)]
+
+        # Loose threshold: rho=0.85 IS above 0.70 -> cluster -> drop
+        loose = MulticollinearityAnalyzer(max_correlation=0.70, max_vif=5.0)
+        report_loose = loose.analyze(df, ic, ["a", "b", "c"])
+        assert "b" in report_loose.recommended_drops
+
+        # Strict threshold: rho=0.85 is BELOW 0.95 -> no cluster -> no drop
+        strict = MulticollinearityAnalyzer(max_correlation=0.95, max_vif=5.0)
+        report_strict = strict.analyze(df, ic, ["a", "b", "c"])
+        assert "b" not in report_strict.recommended_drops
+        assert report_strict.recommended_drops == []
+
+
+# =========================================================================
+# D030-class: max_vif drives status flags
+# =========================================================================
+
+
+class TestMaxVIFPropagation:
+    """D030: max_vif threshold propagates to high_vif_signals and report."""
+
+    def test_max_vif_drives_high_vif_signals(self) -> None:
+        """Two signals with rho~0.91 -> VIF~6. HIGH under max_vif=5, OK under 10."""
+        rng = np.random.default_rng(42)
+        n = 500
+        base = rng.standard_normal(n)
+        correlated = 0.91 * base + np.sqrt(1 - 0.91**2) * rng.standard_normal(n)
+        df = pl.DataFrame({"a": base, "b": correlated, "c": rng.standard_normal(n)})
+        ic = [_make_ic("a", 0.08), _make_ic("b", 0.06), _make_ic("c", 0.05)]
+
+        # max_vif=5 -> signals with VIF >= 5 flagged HIGH
+        strict = MulticollinearityAnalyzer(max_correlation=0.99, max_vif=5.0)
+        report_strict = strict.analyze(df, ic, ["a", "b", "c"])
+        high_names = {s[0] for s in report_strict.high_vif_signals}
+        assert high_names & {"a", "b"}, "Expected a or b to have VIF >= 5"
+        assert "HIGH" in report_strict.to_markdown()
+
+        # max_vif=10 -> nothing flagged
+        loose = MulticollinearityAnalyzer(max_correlation=0.99, max_vif=10.0)
+        report_loose = loose.analyze(df, ic, ["a", "b", "c"])
+        assert report_loose.high_vif_signals == []
+
+
+# =========================================================================
 # Column resolution
 # =========================================================================
 
@@ -305,22 +373,41 @@ class TestInsufficientData:
             }
         )
         analyzer = MulticollinearityAnalyzer()
-        with pytest.raises(ValueError, match="non-NaN rows"):
+        with pytest.raises(ValueError, match="finite rows"):
             analyzer.analyze(df, [_make_ic("a", 0.1), _make_ic("b", 0.08)], ["a", "b"])
 
     def test_nan_rows_reduce_count(self) -> None:
-        """Enough total rows but too many NaNs."""
+        """Enough total rows but too many Nones."""
         rng = np.random.default_rng(42)
         n = 200
         a_vals = rng.standard_normal(n).tolist()
         b_vals = rng.standard_normal(n).tolist()
-        # Set most values to NaN so fewer than 100 survive
+        # Set most values to None so fewer than 100 survive
         for i in range(n - 50):
             a_vals[i] = None  # type: ignore[call-overload]
         df = pl.DataFrame({"a": a_vals, "b": b_vals})
         analyzer = MulticollinearityAnalyzer()
-        with pytest.raises(ValueError, match="non-NaN rows"):
+        with pytest.raises(ValueError, match="finite rows"):
             analyzer.analyze(df, [_make_ic("a", 0.1), _make_ic("b", 0.08)], ["a", "b"])
+
+    def test_nan_rows_are_dropped(self) -> None:
+        """np.nan (not just None) must be dropped — calculators emit np.nan for warm-up."""
+        rng = np.random.default_rng(42)
+        n = 200
+        # Build with explicit np.nan in first 50 rows (simulates warm-up)
+        col_a = np.concatenate([np.full(50, np.nan), rng.standard_normal(n - 50)])
+        col_b = np.concatenate([np.full(50, np.nan), rng.standard_normal(n - 50)])
+        col_c = rng.standard_normal(n)
+        df = pl.DataFrame({"a": col_a, "b": col_b, "c": col_c})
+        ic = [_make_ic("a", 0.10), _make_ic("b", 0.05), _make_ic("c", 0.08)]
+
+        analyzer = MulticollinearityAnalyzer()
+        report = analyzer.analyze(df, ic, ["a", "b", "c"])
+        # n_rows should be n-50 = 150, NOT n=200
+        assert report.n_rows_used == 150, (
+            f"Expected 150 finite rows after dropping 50 NaN, got {report.n_rows_used}. "
+            f"drop_nulls() alone does not drop np.nan."
+        )
 
 
 # =========================================================================
@@ -387,7 +474,7 @@ class TestIntegrationEightSignals:
         """Build synthetic 8-signal DataFrame mimicking Phase 3 outputs.
 
         Known structure:
-        - har_rv_signal and rough_vol_signal: correlated (rho~0.85)
+        - har_rv_signal and vr_signal: correlated (rho~0.85)
         - ofi_signal and cvd_divergence: correlated (rho~0.80)
         - liquidity_signal, combined_signal, gex_signal, gex_raw: independent
         """

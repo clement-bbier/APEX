@@ -25,6 +25,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import numpy.typing as npt
 import polars as pl
 from scipy.cluster.hierarchy import fcluster, linkage
 from scipy.spatial.distance import squareform
@@ -53,10 +54,13 @@ class MulticollinearityReport:
     """Symmetric Pearson correlation matrix (signal x signal)."""
 
     vif_scores: dict[str, float]
-    """VIF per signal.  VIF > 5 = problematic, VIF > 10 = severe."""
+    """VIF per signal."""
 
     high_correlation_pairs: list[tuple[str, str, float]]
     """|corr| > threshold.  Sorted descending by |corr|."""
+
+    high_vif_signals: list[tuple[str, float]]
+    """Signals with VIF >= max_vif threshold."""
 
     cluster_assignments: dict[str, int]
     """Signal -> cluster ID from hierarchical clustering."""
@@ -68,10 +72,13 @@ class MulticollinearityReport:
     """Condition number of the feature matrix (lower = better)."""
 
     n_rows_used: int
-    """Number of non-NaN rows used for computation."""
+    """Number of finite rows used for computation."""
 
     signal_columns: list[str]
     """Ordered list of signal column names analysed."""
+
+    max_vif: float
+    """VIF threshold used for HIGH/OK status flags."""
 
     def to_markdown(self) -> str:
         """Render the report as reproducible Markdown."""
@@ -99,17 +106,12 @@ class MulticollinearityReport:
         lines.append("")
 
         # -- VIF per signal ---------------------------------------------
-        lines.append("## VIF per signal\n")
+        lines.append(f"## VIF per signal (threshold={self.max_vif})\n")
         lines.append("| Signal | VIF | Status |")
         lines.append("|---|---|---|")
         for sig in cols:
             vif = self.vif_scores[sig]
-            if vif > 10.0:
-                status = "SEVERE"
-            elif vif > 5.0:
-                status = "HIGH"
-            else:
-                status = "OK"
+            status = "HIGH" if vif >= self.max_vif else "OK"
             lines.append(f"| {sig} | {vif:.4f} | {status} |")
         lines.append("")
 
@@ -226,12 +228,20 @@ class MulticollinearityAnalyzer:
                 f"Need >= 2 signal columns for multicollinearity analysis, got {len(cols)}: {cols}"
             )
 
-        # Drop rows with any NaN across selected columns ---------------
-        clean = feature_matrix.select(cols).drop_nulls()
+        # Drop rows with any null / NaN / infinite value across selected
+        # columns so downstream NumPy statistics receive only finite data.
+        # Note: Polars drop_nulls() only removes None, NOT np.nan.
+        # Phase 3 calculators emit warm-up gaps as np.nan, so we must
+        # also filter for is_finite().
+        clean = (
+            feature_matrix.select(cols)
+            .drop_nulls()
+            .filter(pl.all_horizontal(pl.col(c).is_finite() for c in cols))
+        )
         n_rows = clean.height
         if n_rows < _MIN_ROWS:
             raise ValueError(
-                f"Only {n_rows} non-NaN rows (minimum {_MIN_ROWS}). "
+                f"Only {n_rows} finite rows (minimum {_MIN_ROWS}). "
                 f"Cannot compute reliable correlations."
             )
 
@@ -240,6 +250,7 @@ class MulticollinearityAnalyzer:
 
         corr_matrix = self._pearson_correlation(arr, cols)
         vif_scores = self._compute_vif(arr, cols)
+        high_vif = [(col, vif) for col, vif in vif_scores.items() if vif >= self._max_vif]
         pairs = self._detect_pairs(corr_matrix, cols)
         clusters = self._cluster_signals(corr_matrix, cols)
         drops = self._recommend_drops(clusters, ic_results, cols)
@@ -249,11 +260,13 @@ class MulticollinearityAnalyzer:
             correlation_matrix=corr_matrix,
             vif_scores=vif_scores,
             high_correlation_pairs=pairs,
+            high_vif_signals=high_vif,
             cluster_assignments=clusters,
             recommended_drops=drops,
             condition_number=cond,
             n_rows_used=n_rows,
             signal_columns=cols,
+            max_vif=self._max_vif,
         )
 
     # ------------------------------------------------------------------
@@ -279,7 +292,7 @@ class MulticollinearityAnalyzer:
 
     @staticmethod
     def _pearson_correlation(
-        arr: np.ndarray,  # type: ignore[type-arg]
+        arr: npt.NDArray[np.float64],
         cols: list[str],
     ) -> dict[str, dict[str, float]]:
         """Compute Pearson correlation matrix.
@@ -303,7 +316,7 @@ class MulticollinearityAnalyzer:
 
     @staticmethod
     def _compute_vif(
-        arr: np.ndarray,  # type: ignore[type-arg]
+        arr: npt.NDArray[np.float64],
         cols: list[str],
     ) -> dict[str, float]:
         """VIF_i = 1 / (1 - R^2_i), R^2 from OLS of col_i on remaining.
@@ -348,15 +361,17 @@ class MulticollinearityAnalyzer:
         pairs.sort(key=lambda t: abs(t[2]), reverse=True)
         return pairs
 
-    @staticmethod
     def _cluster_signals(
+        self,
         corr_matrix: dict[str, dict[str, float]],
         cols: list[str],
     ) -> dict[str, int]:
         """Hierarchical clustering on correlation distance.
 
-        Distance = 1 - |corr|.  Clusters are cut at distance 0.3
-        (i.e. signals with |corr| >= 0.7 end up in the same cluster).
+        Distance = 1 - |corr|.  Distance cutoff derived from
+        ``max_correlation``: ``cutoff = 1.0 - max_correlation``.
+        Default ``max_correlation=0.70`` → cutoff=0.30 (groups signals
+        with |corr| >= 0.70).
 
         Reference: Lopez de Prado (2020) Ch. 6.
         """
@@ -370,8 +385,8 @@ class MulticollinearityAnalyzer:
 
         condensed = squareform(dist_matrix, checks=False)
         link = linkage(condensed, method="complete")
-        # Cut at distance 0.3 => |corr| >= 0.7 forms a cluster
-        labels = fcluster(link, t=0.3, criterion="distance")
+        cutoff = 1.0 - self._max_correlation
+        labels = fcluster(link, t=cutoff, criterion="distance")
 
         return {cols[i]: int(labels[i]) for i in range(n)}
 

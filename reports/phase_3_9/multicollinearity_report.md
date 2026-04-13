@@ -1,4 +1,4 @@
-# Phase 3.9 — Multicollinearity Analysis Report
+# Phase 3.9 â€” Multicollinearity Analysis Report
 
 ## Input scope
 
@@ -19,7 +19,7 @@
 | gex_signal | 0.0213 | 0.0406 | -0.0558 | -0.0510 | 0.0063 | -0.0222 | 1.0000 | -0.0234 |
 | gex_raw | -0.0056 | -0.0030 | 0.0141 | 0.0449 | -0.0275 | 0.0221 | -0.0234 | 1.0000 |
 
-## VIF per signal
+## VIF per signal (threshold=5.0)
 
 | Signal | VIF | Status |
 |---|---|---|
