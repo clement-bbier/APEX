@@ -1146,3 +1146,41 @@ New code created:
 - Commit and open PR
 - Await Copilot review
 - Phase 3.12 (Feature Report) after merge
+
+---
+
+## Session 026 -- 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.11 -- PR #120 Copilot Review Hotfix |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `phase-3/dsr-pbo-mht` |
+| PR | #120 (updated) |
+
+### Fixes Applied (8 Copilot comments, 7 fixes)
+
+1. **Sharpe rf inconsistency** (silent bug): `compute_from_returns()` called
+   `sharpe_ratio()` with default rf=0.05 but PSR/DSR treat input as excess
+   returns. Fixed: pass rf=0.0. Sharpe values shifted ~0.3 upward.
+2. **Min-TRL sentinel bypass** (silent bug): `max(sr, 1e-10)` clamp prevented
+   sentinel for negative-Sharpe strategies. Removed clamp.
+3. **MHT silent skip** (silent bug): `build_report(mht_correction="holm")`
+   with missing p-values dict silently skipped correction. Now raises ValueError.
+4. **MHT list input crash** (API): `_validate_inputs()` now returns coerced ndarray.
+5. **PBO threshold validation** (API): D030 validation in (0, 1).
+6. **Test no-op** (cleanup): tautological assertion replaced.
+7. **Citation year** (doc): Bailey et al. 2017 -> 2014 in __init__.py.
+
+### Quality Gates
+
+- ruff + mypy: clean
+- 52 tests passed (46 + 6 regression tests)
+- Diagnostic report regenerated with corrected numbers
+- Decision boundaries unchanged: true_alpha PASS, 9 random FAIL
+
+### Next Steps
+
+- Await Copilot re-review on PR #120
+- Phase 3.12 (Feature Report) after merge
