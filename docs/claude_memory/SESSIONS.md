@@ -623,3 +623,49 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 - Await Copilot re-review on PR #111
 - Phase 3.5-3.8 after merge (D027 is gatekeeper template)
+
+---
+
+## Session 014 — 2026-04-13
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-13 |
+| Mission | Phase 3.5 — Rough Volatility Validation (Gatheral 2018) (#91) |
+| Agent Model | Claude Opus 4.6 |
+| Duration | ~1 hour |
+
+### Decisions Made
+
+1. No new decisions required — D024-D027 cover all design choices
+2. `vr_lag=5` follows Lo-MacKinlay (1988) standard weekly lag convention
+3. All 6 output columns classified as realization (day-close-only in 5m mode), unlike HAR-RV where forecast was safe broadcast
+
+### What Changed
+
+- NEW: `features/calculators/rough_vol.py` — RoughVolCalculator (~400 LOC)
+- NEW: `features/validation/rough_vol_report.py` — RoughVolValidationReport (~95 LOC)
+- MODIFIED: `features/calculators/__init__.py` — added RoughVolCalculator export
+- NEW: `tests/unit/features/calculators/test_rough_vol.py` — 23 tests (~690 LOC)
+
+### Pattern Reuse from HAR-RV
+
+- Expanding-window loop (D024): identical structure, 2 S07 calls per iteration
+- tanh normalization (D025): scalping_score centers on rolling mean, vr_signal on VR=1
+- Strict S07 wrapper (D026): wraps estimate_hurst_from_vol + variance_ratio_test
+- D027 day-close emission: all 6 columns (vs HAR-RV where forecast was safe)
+- Test structure: same categories, adapted for 6 output columns
+
+### Quality Gates
+
+- ruff check: clean
+- ruff format: clean
+- mypy --strict: 0 errors (381 files)
+- rough_vol.py coverage: 94%
+- features/ coverage: 92.62% (> 85% gate)
+- Full test suite: 1,491 passed, 0 regressions
+
+### Next Steps
+
+- Await Copilot review on PR #112
+- Phase 3.6 OFI after merge
