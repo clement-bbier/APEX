@@ -83,8 +83,14 @@ computed for the report so reviewers can see the cost sensitivity.
 make lint
 pytest tests/unit/features/meta_labeler/test_pnl_simulation.py -q
 pytest tests/unit/features/meta_labeler/test_validation_gates.py -q
-APEX_REPORT_NOW=2026-04-14T00:00:00Z APEX_REPORT_WALLCLOCK_MODE=fixed \
-  python scripts/generate_phase_4_5_report.py --output reports/phase_4_5
+# Report generator: env-var driven, no CLI flags. Output dir is fixed
+# (reports/phase_4_5/). APEX_REPORT_NOW must include a tz offset; the
+# wallclock mode must be one of {record, zero, omit}. Set APEX_FULL_VALIDATION=1
+# for the heavier 3x3x2 grid.
+APEX_SEED=42 \
+  APEX_REPORT_NOW=2026-04-14T00:00:00+00:00 \
+  APEX_REPORT_WALLCLOCK_MODE=omit \
+  python scripts/generate_phase_4_5_report.py
 ```
 
 ### References

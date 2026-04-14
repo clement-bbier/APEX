@@ -1,10 +1,12 @@
-# Phase 4.5 — Pre-Implementation Audit
+# Phase 4.5 — Implementation Audit
 
 **Issue**: #129
 **Branch**: `phase/4.5-statistical-validation`
 **Author**: Clément Barbier (with Claude Code)
 **Date**: 2026-04-15
-**Status**: PRE-IMPLEMENTATION — no code written yet
+**Status**: POST-IMPLEMENTATION — written before code, retained as the
+design contract that the shipped code (`features/meta_labeler/{pnl_simulation,validation}.py`,
+`scripts/generate_phase_4_5_report.py`, plus tests) implements.
 **Predecessors**: Phase 4.3 (PR #140, `d5dc3a0`), Phase 4.4 (PR #141,
 `e477c96`), mid-phase leakage audit (PR #142, `acbbe07`).
 

@@ -36,9 +36,7 @@ def _make_bars(n: int = 200, seed: int = 7) -> pl.DataFrame:
     close = 100.0 * np.exp(np.cumsum(log_ret))
     return pl.DataFrame(
         {
-            "timestamp": pl.Series(
-                "timestamp", timestamps, dtype=pl.Datetime("us", "UTC")
-            ),
+            "timestamp": pl.Series("timestamp", timestamps, dtype=pl.Datetime("us", "UTC")),
             "close": pl.Series("close", close.astype(np.float64), dtype=pl.Float64),
         }
     )
@@ -114,9 +112,7 @@ def test_zero_cost_gross_equals_net_log_return_times_bet() -> None:
         bet = 2 * p - 1
         expected.append(np.log(bars_close[i1] / bars_close[i0]) * bet)
     np.testing.assert_allclose(result.per_fold[0].gross_returns, expected)
-    np.testing.assert_allclose(
-        result.per_fold[0].net_returns, result.per_fold[0].gross_returns
-    )
+    np.testing.assert_allclose(result.per_fold[0].net_returns, result.per_fold[0].gross_returns)
 
 
 def test_realistic_cost_deduction_scales_with_absolute_bet() -> None:
@@ -147,12 +143,8 @@ def test_stress_scenario_costs_three_times_realistic() -> None:
         "t1_per_fold": (t1,),
         "proba_per_fold": (proba,),
     }
-    realistic = simulate_meta_labeler_pnl(
-        bars=bars, scenario=CostScenario.REALISTIC, **base_kwargs
-    )
-    stress = simulate_meta_labeler_pnl(
-        bars=bars, scenario=CostScenario.STRESS, **base_kwargs
-    )
+    realistic = simulate_meta_labeler_pnl(bars=bars, scenario=CostScenario.REALISTIC, **base_kwargs)
+    stress = simulate_meta_labeler_pnl(bars=bars, scenario=CostScenario.STRESS, **base_kwargs)
     diff_realistic = realistic.per_fold[0].gross_returns - realistic.per_fold[0].net_returns
     diff_stress = stress.per_fold[0].gross_returns - stress.per_fold[0].net_returns
     np.testing.assert_allclose(diff_stress, 3.0 * diff_realistic)
@@ -176,9 +168,7 @@ def test_result_contains_scenario_and_concatenated_returns() -> None:
     assert result.all_net_returns.shape == (5,)
     np.testing.assert_array_equal(
         result.all_net_returns,
-        np.concatenate(
-            [result.per_fold[0].net_returns, result.per_fold[1].net_returns]
-        ),
+        np.concatenate([result.per_fold[0].net_returns, result.per_fold[1].net_returns]),
     )
     assert isinstance(result.per_fold[0], FoldPnL)
     assert result.per_fold[0].fold_index == 0
@@ -234,9 +224,7 @@ def test_pnl_unchanged_when_prices_after_max_t1_permuted() -> None:
         proba_per_fold=(proba,),
         scenario=CostScenario.REALISTIC,
     )
-    np.testing.assert_array_equal(
-        after.per_fold[0].net_returns, base.per_fold[0].net_returns
-    )
+    np.testing.assert_array_equal(after.per_fold[0].net_returns, base.per_fold[0].net_returns)
 
 
 def test_pnl_unchanged_when_prices_outside_t0_t1_set_permuted() -> None:
@@ -261,9 +249,7 @@ def test_pnl_unchanged_when_prices_outside_t0_t1_set_permuted() -> None:
     used_idx = set()
     for ts in np.concatenate([t0, t1]):
         used_idx.add(int(np.searchsorted(bars_ts, ts)))
-    free_idx = np.array(
-        [i for i in range(bars.height) if i not in used_idx], dtype=np.int64
-    )
+    free_idx = np.array([i for i in range(bars.height) if i not in used_idx], dtype=np.int64)
 
     rng = np.random.default_rng(123)
     perm_free = rng.permutation(free_idx)
@@ -279,9 +265,7 @@ def test_pnl_unchanged_when_prices_outside_t0_t1_set_permuted() -> None:
         proba_per_fold=(proba,),
         scenario=CostScenario.ZERO,
     )
-    np.testing.assert_array_equal(
-        after.per_fold[0].net_returns, base.per_fold[0].net_returns
-    )
+    np.testing.assert_array_equal(after.per_fold[0].net_returns, base.per_fold[0].net_returns)
 
 
 # --------------------------------------------------------------------
@@ -293,9 +277,7 @@ def test_missing_timestamp_raises_value_error() -> None:
     bars = _make_bars()
     bars_ts = bars["timestamp"].to_numpy().astype("datetime64[us]")
     # Synthesize a timestamp not present in the bar grid.
-    fake_t0 = np.array(
-        [bars_ts[10] + np.timedelta64(13, "m")], dtype="datetime64[us]"
-    )
+    fake_t0 = np.array([bars_ts[10] + np.timedelta64(13, "m")], dtype="datetime64[us]")
     fake_t1 = np.array([bars_ts[15]], dtype="datetime64[us]")
     proba = np.array([0.5], dtype=np.float64)
     with pytest.raises(ValueError, match="exact-matching bar"):
@@ -312,9 +294,7 @@ def test_t1_after_last_bar_raises() -> None:
     bars_ts = bars["timestamp"].to_numpy().astype("datetime64[us]")
     # t1 is one hour past the last bar.
     t0 = np.array([bars_ts[40]], dtype="datetime64[us]")
-    t1 = np.array(
-        [bars_ts[-1] + np.timedelta64(1, "h")], dtype="datetime64[us]"
-    )
+    t1 = np.array([bars_ts[-1] + np.timedelta64(1, "h")], dtype="datetime64[us]")
     proba = np.array([0.5], dtype=np.float64)
     with pytest.raises(ValueError, match="exceeds last bar timestamp"):
         simulate_meta_labeler_pnl(
@@ -399,9 +379,7 @@ def test_non_monotonic_bars_raise() -> None:
     timestamps[5], timestamps[6] = timestamps[6], timestamps[5]
     bad = pl.DataFrame(
         {
-            "timestamp": pl.Series(
-                "timestamp", timestamps, dtype=pl.Datetime("us", "UTC")
-            ),
+            "timestamp": pl.Series("timestamp", timestamps, dtype=pl.Datetime("us", "UTC")),
             "close": pl.Series("close", closes, dtype=pl.Float64),
         }
     )
@@ -423,9 +401,7 @@ def test_non_positive_close_raises() -> None:
     timestamps = bars["timestamp"].to_numpy().astype("datetime64[us]")
     bad = pl.DataFrame(
         {
-            "timestamp": pl.Series(
-                "timestamp", timestamps, dtype=pl.Datetime("us", "UTC")
-            ),
+            "timestamp": pl.Series("timestamp", timestamps, dtype=pl.Datetime("us", "UTC")),
             "close": pl.Series("close", closes, dtype=pl.Float64),
         }
     )
@@ -457,9 +433,7 @@ def test_missing_columns_raise() -> None:
 def test_empty_bars_raise() -> None:
     empty = pl.DataFrame(
         {
-            "timestamp": pl.Series(
-                "timestamp", [], dtype=pl.Datetime("us", "UTC")
-            ),
+            "timestamp": pl.Series("timestamp", [], dtype=pl.Datetime("us", "UTC")),
             "close": pl.Series("close", [], dtype=pl.Float64),
         }
     )

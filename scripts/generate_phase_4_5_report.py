@@ -105,13 +105,10 @@ def _resolve_generated_at() -> str:
             parsed = datetime.fromisoformat(override)
         except ValueError as exc:
             raise ValueError(
-                f"APEX_REPORT_NOW={override!r} is not ISO 8601; "
-                "refusing to generate report"
+                f"APEX_REPORT_NOW={override!r} is not ISO 8601; refusing to generate report"
             ) from exc
         if parsed.tzinfo is None:
-            raise ValueError(
-                "APEX_REPORT_NOW must include a timezone offset (e.g. '...+00:00')"
-            )
+            raise ValueError("APEX_REPORT_NOW must include a timezone offset (e.g. '...+00:00')")
         return parsed.isoformat()
     return datetime.now(tz=UTC).isoformat()
 
@@ -125,9 +122,7 @@ def _resolve_wallclock(measured: float) -> float | None:
         return 0.0
     if mode == "omit":
         return None
-    raise ValueError(
-        f"APEX_REPORT_WALLCLOCK_MODE={mode!r} not in {{'record', 'zero', 'omit'}}"
-    )
+    raise ValueError(f"APEX_REPORT_WALLCLOCK_MODE={mode!r} not in {{'record', 'zero', 'omit'}}")
 
 
 def _synthetic_features_and_labels(
@@ -156,9 +151,7 @@ def _synthetic_features_and_labels(
         [np.datetime64("2025-01-01") + np.timedelta64(i, "h") for i in range(n)],
         dtype="datetime64[us]",
     )
-    t1: npt.NDArray[np.datetime64] = (t0 + np.timedelta64(5, "h")).astype(
-        "datetime64[us]"
-    )
+    t1: npt.NDArray[np.datetime64] = (t0 + np.timedelta64(5, "h")).astype("datetime64[us]")
     fs = MetaLabelerFeatureSet(X=x, feature_names=FEATURE_NAMES, t0=t0, t1=t1)
     w = np.ones(n, dtype=np.float64)
     return fs, y, w, x[:, 2].astype(np.float64)
@@ -190,9 +183,7 @@ def _synthetic_bars(
     start = np.min(t0)
     end = np.max(t1)
     # One bar per hour over [start, end] inclusive.
-    span_hours = int(
-        (end - start).astype("timedelta64[h]").astype(np.int64)
-    ) + 1
+    span_hours = int((end - start).astype("timedelta64[h]").astype(np.int64)) + 1
     timestamps = np.array(
         [start + np.timedelta64(i, "h") for i in range(span_hours)],
         dtype="datetime64[us]",
@@ -215,9 +206,7 @@ def _synthetic_bars(
 
     return pl.DataFrame(
         {
-            "timestamp": pl.Series(
-                "timestamp", timestamps, dtype=pl.Datetime("us", "UTC")
-            ),
+            "timestamp": pl.Series("timestamp", timestamps, dtype=pl.Datetime("us", "UTC")),
             "close": pl.Series("close", close.astype(np.float64), dtype=pl.Float64),
         }
     )
@@ -233,12 +222,8 @@ def _config(full: bool) -> dict[str, Any]:
                 max_depth=(5, 10, None),
                 min_samples_leaf=(5, 20),
             ),
-            "outer": CombinatoriallyPurgedKFold(
-                n_splits=6, n_test_splits=2, embargo_pct=0.02
-            ),
-            "inner": CombinatoriallyPurgedKFold(
-                n_splits=4, n_test_splits=1, embargo_pct=0.0
-            ),
+            "outer": CombinatoriallyPurgedKFold(n_splits=6, n_test_splits=2, embargo_pct=0.02),
+            "inner": CombinatoriallyPurgedKFold(n_splits=4, n_test_splits=1, embargo_pct=0.0),
             "label": "full (APEX_FULL_VALIDATION=1)",
         }
     return {
@@ -248,21 +233,15 @@ def _config(full: bool) -> dict[str, Any]:
             max_depth=(3, 5),
             min_samples_leaf=(5, 10),
         ),
-        "outer": CombinatoriallyPurgedKFold(
-            n_splits=4, n_test_splits=2, embargo_pct=0.0
-        ),
-        "inner": CombinatoriallyPurgedKFold(
-            n_splits=3, n_test_splits=1, embargo_pct=0.0
-        ),
+        "outer": CombinatoriallyPurgedKFold(n_splits=4, n_test_splits=2, embargo_pct=0.0),
+        "inner": CombinatoriallyPurgedKFold(n_splits=3, n_test_splits=1, embargo_pct=0.0),
         "label": "fast (CI default)",
     }
 
 
 def _gate_row(g: GateResult) -> str:
     verdict = "✅ pass" if g.passed else "❌ fail"
-    return (
-        f"| `{g.name}` | {g.value:.4f} | {g.threshold:.4f} | {verdict} |"
-    )
+    return f"| `{g.name}` | {g.value:.4f} | {g.threshold:.4f} | {verdict} |"
 
 
 def _gate_to_json(g: GateResult) -> dict[str, Any]:
@@ -346,10 +325,7 @@ def _emit_markdown(
     verdict = "✅ **ALL PASS**" if report.all_passed else "❌ **FAIL**"
     lines.append(f"- Aggregate verdict: {verdict}")
     if report.failing_gate_names:
-        lines.append(
-            "- Failing gates: "
-            + ", ".join(f"`{n}`" for n in report.failing_gate_names)
-        )
+        lines.append("- Failing gates: " + ", ".join(f"`{n}`" for n in report.failing_gate_names))
     lines.append("")
     lines.append("## ADR-0005 D5 deployment gates")
     lines.append("")
@@ -467,14 +443,10 @@ def main() -> None:
         payload["wall_clock_seconds"] = wallclock
 
     json_path = REPORT_DIR / "validation_report.json"
-    json_path.write_text(
-        json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8"
-    )
+    json_path.write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
 
     md_path = REPORT_DIR / "validation_report.md"
-    md_path.write_text(
-        _emit_markdown(payload, report, cfg, seed, wallclock), encoding="utf-8"
-    )
+    md_path.write_text(_emit_markdown(payload, report, cfg, seed, wallclock), encoding="utf-8")
 
     _log.info(
         "phase_4_5.report_written",

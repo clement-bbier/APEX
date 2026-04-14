@@ -247,9 +247,7 @@ def simulate_meta_labeler_pnl(
         )
         net_parts.append(net.astype(np.float64))
 
-    all_net = (
-        np.concatenate(net_parts) if net_parts else np.empty(0, dtype=np.float64)
-    )
+    all_net = np.concatenate(net_parts) if net_parts else np.empty(0, dtype=np.float64)
     return PnLSimulationResult(
         scenario=scenario,
         per_fold=tuple(per_fold),
@@ -269,12 +267,20 @@ def _validate_inputs(
     proba_per_fold: tuple[npt.NDArray[np.float64], ...],
 ) -> None:
     if "timestamp" not in bars.columns or "close" not in bars.columns:
-        raise ValueError(
-            "bars must contain columns 'timestamp' and 'close'; "
-            f"got {bars.columns}"
-        )
+        raise ValueError(f"bars must contain columns 'timestamp' and 'close'; got {bars.columns}")
     if bars.height == 0:
         raise ValueError("bars is empty")
+
+    # Phase 4 timestamp contract: bars.timestamp MUST be Datetime[us, UTC].
+    # Mirrors features.meta_labeler.feature_builder._validate_utc_column so
+    # tz-naive or non-UTC frames fail loud here instead of silently coercing.
+    expected_ts_dtype = pl.Datetime("us", "UTC")
+    actual_ts_dtype = bars.schema["timestamp"]
+    if actual_ts_dtype != expected_ts_dtype:
+        raise ValueError(
+            f"bars.timestamp must be {expected_ts_dtype} per ADR-0005 / "
+            f"Phase 4 contract; got {actual_ts_dtype}"
+        )
 
     ts = bars["timestamp"].to_numpy().astype("datetime64[us]")
     if len(ts) > 1 and not np.all(ts[1:] > ts[:-1]):
@@ -302,8 +308,7 @@ def _validate_inputs(
             continue
         if not np.all(t1 >= t0):
             raise ValueError(
-                f"fold {fold_idx}: every t1_i must be >= t0_i (Triple "
-                "Barrier guarantee)"
+                f"fold {fold_idx}: every t1_i must be >= t0_i (Triple Barrier guarantee)"
             )
         if not np.isfinite(p).all():
             raise ValueError(f"fold {fold_idx}: proba contains non-finite values")

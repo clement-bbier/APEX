@@ -176,6 +176,18 @@ class MetaLabelerValidator:
         cost_scenario: CostScenario = CostScenario.REALISTIC,
         seed: int = 42,
     ) -> None:
+        # ADR-0005 D8: only the realistic-cost scenario feeds the G3 DSR
+        # deployment gate. Zero / stress are computed by the report
+        # generator for sensitivity analysis but MUST NOT enter the
+        # validator. Reject other scenarios here so a mis-configured
+        # caller cannot accidentally pass G3 on a frictionless P&L.
+        if cost_scenario is not CostScenario.REALISTIC:
+            raise ValueError(
+                "MetaLabelerValidator only accepts CostScenario.REALISTIC "
+                "for the G3 DSR gate per ADR-0005 D8; got "
+                f"{cost_scenario!r}. Run the zero / stress scenarios via "
+                "simulate_meta_labeler_pnl directly for sensitivity reporting."
+            )
         self._cpcv = cpcv
         self._scenario = cost_scenario
         self._seed = int(seed)
@@ -377,9 +389,9 @@ class MetaLabelerValidator:
                 is_metrics[tid].append(float(mean_inner))
                 oos_metrics[tid].append(float(oos))
 
-        pbo_result = PBOCalculator(
-            adr0004_threshold=_G4_PBO_THRESHOLD
-        ).compute(is_metrics=is_metrics, oos_metrics=oos_metrics)
+        pbo_result = PBOCalculator(adr0004_threshold=_G4_PBO_THRESHOLD).compute(
+            is_metrics=is_metrics, oos_metrics=oos_metrics
+        )
 
         # Suppress the unused-first_hp lint: we keep it bound for
         # debuggability; downstream branches do not consume it.
@@ -482,9 +494,7 @@ class MetaLabelerValidator:
         best_hp_per_fold = tuning_result.best_hyperparameters_per_fold
         n_folds = len(best_hp_per_fold)
         observed = 0
-        for outer_idx, (train_idx, test_idx) in enumerate(
-            self._cpcv.split(x, t1, t0)
-        ):
+        for outer_idx, (train_idx, test_idx) in enumerate(self._cpcv.split(x, t1, t0)):
             if outer_idx >= n_folds:  # pragma: no cover - shape guarded below
                 raise ValueError(
                     "outer CPCV produced more folds than tuning_result has "
@@ -557,17 +567,13 @@ class MetaLabelerValidator:
                 "G7 baseline missing: training_result.logreg_auc_per_fold "
                 "is empty. ADR-0005 D5 G7 forbids silent pass."
             )
-        if len(training_result.rf_auc_per_fold) != len(
-            training_result.logreg_auc_per_fold
-        ):
+        if len(training_result.rf_auc_per_fold) != len(training_result.logreg_auc_per_fold):
             raise ValueError(
                 "rf_auc_per_fold and logreg_auc_per_fold must have the same "
                 f"length; got {len(training_result.rf_auc_per_fold)} vs "
                 f"{len(training_result.logreg_auc_per_fold)}."
             )
-        if len(training_result.rf_brier_per_fold) != len(
-            training_result.rf_auc_per_fold
-        ):
+        if len(training_result.rf_brier_per_fold) != len(training_result.rf_auc_per_fold):
             raise ValueError(
                 "rf_brier_per_fold and rf_auc_per_fold must have the same "
                 f"length; got {len(training_result.rf_brier_per_fold)} vs "
@@ -577,8 +583,7 @@ class MetaLabelerValidator:
             raise ValueError("tuning_result.best_hyperparameters_per_fold is empty")
         if features.X.shape[0] != y.shape[0]:
             raise ValueError(
-                f"features.X has {features.X.shape[0]} rows but y has "
-                f"{y.shape[0]} entries"
+                f"features.X has {features.X.shape[0]} rows but y has {y.shape[0]} entries"
             )
         if features.X.shape[0] != sample_weights.shape[0]:
             raise ValueError(
@@ -599,11 +604,7 @@ def _trial_id(hp: dict[str, Any]) -> str:
     ``min_samples_leaf`` - matching :class:`TuningSearchSpace.grid`.
     Used as the trial-key in the PBO IS / OOS dicts.
     """
-    return (
-        f"n={hp.get('n_estimators')}_"
-        f"d={hp.get('max_depth')}_"
-        f"min={hp.get('min_samples_leaf')}"
-    )
+    return f"n={hp.get('n_estimators')}_d={hp.get('max_depth')}_min={hp.get('min_samples_leaf')}"
 
 
 def _build_rf(hp: dict[str, Any], *, seed: int) -> RandomForestClassifier:

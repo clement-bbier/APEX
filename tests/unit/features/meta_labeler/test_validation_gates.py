@@ -121,7 +121,7 @@ def _synthetic_dataset(
     fs = MetaLabelerFeatureSet(X=x, feature_names=FEATURE_NAMES, t0=t0, t1=t1)
     w = np.ones(n, dtype=np.float64)
 
-    span = int(((t1.max() - t0.min())).astype("timedelta64[h]").astype(np.int64)) + 1
+    span = int((t1.max() - t0.min()).astype("timedelta64[h]").astype(np.int64)) + 1
     timestamps = np.array(
         [t0.min() + np.timedelta64(i, "h") for i in range(span)],
         dtype="datetime64[us]",
@@ -135,9 +135,7 @@ def _synthetic_dataset(
     close = 100.0 * np.exp(np.cumsum(log_returns))
     bars = pl.DataFrame(
         {
-            "timestamp": pl.Series(
-                "timestamp", timestamps, dtype=pl.Datetime("us", "UTC")
-            ),
+            "timestamp": pl.Series("timestamp", timestamps, dtype=pl.Datetime("us", "UTC")),
             "close": pl.Series("close", close.astype(np.float64), dtype=pl.Float64),
         }
     )
@@ -217,9 +215,7 @@ def test_g4_fail_when_trial_ledger_is_empty() -> None:
 
 def test_g4_fail_when_only_one_distinct_trial_id() -> None:
     hp = {"n_estimators": 30, "max_depth": 3, "min_samples_leaf": 5}
-    trials = tuple(
-        (dict(hp), 0.55 + 0.01 * o, 0.55 + 0.01 * o) for o in range(4)
-    )
+    trials = tuple((dict(hp), 0.55 + 0.01 * o, 0.55 + 0.01 * o) for o in range(4))
     tuning = TuningResult(
         best_hyperparameters_per_fold=tuple(dict(hp) for _ in range(4)),
         best_oos_auc_per_fold=tuple(0.55 + 0.01 * o for o in range(4)),
@@ -327,6 +323,16 @@ def test_validator_default_scenario_is_realistic(
     assert v._scenario == CostScenario.REALISTIC
 
 
+@pytest.mark.parametrize("bad_scenario", [CostScenario.ZERO, CostScenario.STRESS])
+def test_validator_rejects_non_realistic_scenario(
+    cpcv: CombinatoriallyPurgedKFold,
+    bad_scenario: CostScenario,
+) -> None:
+    """ADR-0005 D8: only REALISTIC may feed the G3 DSR gate."""
+    with pytest.raises(ValueError, match=r"only accepts CostScenario\.REALISTIC"):
+        MetaLabelerValidator(cpcv=cpcv, cost_scenario=bad_scenario)
+
+
 def test_validate_rejects_empty_rf_auc_per_fold(
     cpcv: CombinatoriallyPurgedKFold,
 ) -> None:
@@ -414,16 +420,12 @@ def test_end_to_end_validation_returns_report_with_seven_gates(
             min_samples_leaf=(5, 10),
         ),
         outer_cpcv=cpcv,
-        inner_cpcv=CombinatoriallyPurgedKFold(
-            n_splits=3, n_test_splits=1, embargo_pct=0.0
-        ),
+        inner_cpcv=CombinatoriallyPurgedKFold(n_splits=3, n_test_splits=1, embargo_pct=0.0),
         seed=42,
     )
     tuning_result = tuner.tune(fs, y, w)
 
-    validator = MetaLabelerValidator(
-        cpcv=cpcv, cost_scenario=CostScenario.REALISTIC, seed=42
-    )
+    validator = MetaLabelerValidator(cpcv=cpcv, cost_scenario=CostScenario.REALISTIC, seed=42)
     report = validator.validate(training_result, tuning_result, fs, y, w, bars)
 
     assert isinstance(report, MetaLabelerValidationReport)
@@ -458,9 +460,7 @@ def test_end_to_end_failing_gates_listed_in_canonical_order(
     tampered = dataclasses.replace(
         training_result,
         rf_auc_per_fold=tuple([0.51] * len(training_result.rf_auc_per_fold)),
-        logreg_auc_per_fold=tuple(
-            [0.50] * len(training_result.logreg_auc_per_fold)
-        ),
+        logreg_auc_per_fold=tuple([0.50] * len(training_result.logreg_auc_per_fold)),
         rf_brier_per_fold=tuple([0.30] * len(training_result.rf_brier_per_fold)),
     )
 
@@ -471,9 +471,7 @@ def test_end_to_end_failing_gates_listed_in_canonical_order(
             min_samples_leaf=(5, 10),
         ),
         outer_cpcv=cpcv,
-        inner_cpcv=CombinatoriallyPurgedKFold(
-            n_splits=3, n_test_splits=1, embargo_pct=0.0
-        ),
+        inner_cpcv=CombinatoriallyPurgedKFold(n_splits=3, n_test_splits=1, embargo_pct=0.0),
         seed=42,
     )
     tuning_result = tuner.tune(fs, y, w)
