@@ -71,6 +71,7 @@ module = [
     "yfinance.*",
     "apex_mc.*",
     "scipy.*",
+    "sklearn.*",
     "defusedxml.*",
     "asyncpg.*",
     "bs4.*",

@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-14
-**Updated by**: Session 031 (Phase 4.2 Sample Weights)
+**Updated by**: Session 032 (Phase 4.3 Baseline Meta-Labeler)
 
 ---
 
@@ -14,47 +14,54 @@ the full inventory. 3 features activated for downstream use:
 not wired (issue #123 for streaming).
 
 Phase 4 design-gate merged. Phase 4.1 Triple Barrier Labeling (`#125`)
-merged via PR #138 on `main`.
+merged via PR #138 on `main`. Phase 4.2 Sample Weights (`#126`) merged
+via PR #139 on `main`.
 
-Phase 4.2 Sample Weights (`#126`) in progress on branch
-`phase/4.2-sample-weights`. Canonical bar-indexed uniqueness ×
-return-attribution weights per ADR-0005 D2 / LdP §§4.4-4.5:
-`features/labeling/sample_weights.py` with 4 public helpers
-(`compute_concurrency`, `uniqueness_weights`,
-`return_attribution_weights`, `combined_weights`). 52 new unit tests,
-94% coverage. Coexists with the Phase 3.1 prototype
-`features/weights.py::SampleWeighter` (untouched, 21 tests still
-green); migration of `features/pipeline.py` deferred to the Phase 4
-closure report (#133) as technical debt.
+Phase 4.3 Baseline Meta-Labeler (`#127`) in progress on branch
+`phase/4.3-baseline-meta-labeler`. Implements ADR-0005 D3:
+`RandomForestClassifier` primary + mandatory `LogisticRegression`
+baseline, trained with outer CPCV (`n_splits=6, n_test_splits=2,
+embargo_pct=0.02` → 15 folds). Module tree `features/meta_labeler/`:
+`metrics.py` (`fold_auc`, `fold_brier`, `calibration_bins`),
+`feature_builder.py` (8-feature matrix — gex/har/ofi signals + regime
+vol/trend codes + realized_vol_28d + cyclical hour/weekday — with
+strict anti-leakage via `searchsorted(side='left') - 1`),
+`baseline.py` (`BaselineMetaLabeler` trainer + frozen
+`BaselineTrainingResult`). 66 new unit tests, 94% coverage on the new
+package. Diagnostic report at `reports/phase_4_3/baseline_report.{md,
+json}`: smoke gate PASS (mean RF AUC 0.7630 ≥ 0.55 on synthetic alpha,
+APEX_SEED=42, n=1200). G7 gate (RF−LogReg ≥ +0.03) deferred to 4.5
+per spec; synthetic alpha is linear so LogReg edges RF by 2.3 pp —
+expected.
 
-Remaining Phase 4 work: #127 (Baseline Meta-Labeler), #128 (Nested
-Tuning), #129 (Statistical Validation), #130 (Persistence + Model
-Card), #131 (Fusion Engine IC-weighted), #132 (E2E Pipeline Test),
-#133 (Closure Report), plus #134 (mid-phase leakage audit) and #135
-(closure tracking).
+Remaining Phase 4 work: #128 (Nested Tuning), #129 (Statistical
+Validation), #130 (Persistence + Model Card), #131 (Fusion Engine
+IC-weighted), #132 (E2E Pipeline Test), #133 (Closure Report), plus
+#134 (mid-phase leakage audit) and #135 (closure tracking).
 
 Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 (streaming calculators, Phase 5).
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 4.2 (Sample Weights — #126 PR pending); 4.1 merged (PR #138) |
+| Active Phase | Phase 4.3 (Baseline Meta-Labeler — #127 PR pending); 4.1/4.2 merged (PRs #138/#139) |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
 | Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests |
-| Production LOC | ~35,770 (+ ~8,271 `features/`) |
-| Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/`) |
+| Production LOC | ~35,770 (+ ~8,271 `features/` + ~970 `features/meta_labeler/`) |
+| Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/` + ~820 `tests/unit/features/meta_labeler/`) |
 | mypy strict | 0 errors |
 | Services scaffolded | 10/10 (S01-S10) |
 | S01 fully implemented | Yes (78 files, 9,583 LOC) |
 | ADRs accepted | 10 (+ ADR-0004 Feature Validation Methodology) |
-| features/ coverage | ~93% (491 tests incl. Phase 3.13 adapter at 100%) |
+| features/ coverage | ~93% (557 tests incl. meta-labeler at 94%) |
 
 ## On the horizon
 
-Phase 4.3 Baseline Meta-Labeler (issue #127) once PR for #126 merges.
-Builds on the `t0/t1` schema from Phase 4.1 + the sample weights from
-Phase 4.2 to train a `RandomForestClassifier` (ADR-0005 D3) with
-CPCV-based validation.
+Phase 4.4 Nested Tuning (issue #128) once PR for #127 merges. Wraps
+the 4.3 outer CPCV in an inner `GridSearchCV` (or equivalent) for
+honest-nested hyperparameter selection on RF depth / estimators /
+min_samples_leaf, without touching the outer OOS slices used for
+4.5's DSR/PBO statistical validation.
 
 ## Audit Status
 

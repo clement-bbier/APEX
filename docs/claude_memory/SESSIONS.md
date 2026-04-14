@@ -1526,3 +1526,83 @@ schema).
   integration / backtest-gate).
 - On merge: pull `main`, branch `phase/4.3-baseline-meta-labeler`,
   open issue #127 (Baseline Meta-Labeler).
+
+## Session 032 — 2026-04-14
+
+### Focus
+
+Phase 4.3 — Baseline Meta-Labeler (issue #127). ADR-0005 D3 primary
+`RandomForestClassifier` + mandatory `LogisticRegression` baseline,
+outer CPCV(6, 2, 0.02) = 15 folds, 8-feature matrix per ADR-0005 D6.
+
+### Branch
+
+`phase/4.3-baseline-meta-labeler` (off `main` after PR #139 for
+Phase 4.2 merged).
+
+### Deliverables
+
+| Artifact | LOC | Notes |
+|---|---|---|
+| `reports/phase_4_3/audit.md` | 302 | Pre-impl audit, verdict CRÉER new sibling `features/meta_labeler/` (no refactor of existing module). Full 8-feature spec + API contract. |
+| `features/meta_labeler/metrics.py` | 165 | `fold_auc` / `fold_brier` / `calibration_bins` thin wrappers on sklearn with strict probability-range + finite-weight validation. |
+| `features/meta_labeler/feature_builder.py` | 489 | `MetaLabelerFeatureSet` frozen dataclass + `MetaLabelerFeatureBuilder.build()`. Phase 3 signals joined strictly-before-t0 via `searchsorted(side='left') - 1`; regime codes as-of-t0 inclusive via `searchsorted(side='right') - 1`; 28-bar realized vol strictly pre-t0; cyclical hour/weekday sin encoding. |
+| `features/meta_labeler/baseline.py` | 313 | `BaselineMetaLabeler(cpcv, rf_hyperparameters, seed)` + frozen `BaselineTrainingResult`. Reserved HP keys (random_state, class_weight, n_jobs) trainer-controlled. Per-fold OOS AUC (RF+LogReg) + Brier (RF) + aggregate 10-bin calibration on concatenated OOS probs. |
+| `features/meta_labeler/__init__.py` | 38 | Public re-exports. |
+| `tests/unit/features/meta_labeler/test_baseline_metrics.py` | 102 | 12 tests (sklearn parity, sample_weight propagation, fail-loud validation). |
+| `tests/unit/features/meta_labeler/test_feature_builder.py` | 739 | 36 tests incl. anti-leakage property (shuffle bars after `max(t1)` → identical feature matrix) and all validation branches. |
+| `tests/unit/features/meta_labeler/test_baseline_training.py` | 298 | 18 tests incl. determinism with seed, sample_weight spy through `RandomForestClassifier.fit`, CPCV empty-split detection via MagicMock. |
+| `scripts/generate_phase_4_3_report.py` | 165 | Synthetic-alpha diagnostic (n=1200, APEX_SEED=42, logit = 1.5·ofi_signal). Emits Markdown + JSON with per-fold table, sorted importances, 10-bin calibration, smoke gate. |
+| `reports/phase_4_3/baseline_report.{md,json}` | n/a | Generated. **Smoke gate PASS (mean RF AUC 0.7630, std 0.0254).** |
+| `pyproject.toml` | +1 | `sklearn.*` added to mypy `ignore_missing_imports`. |
+| `requirements.txt` | +1 | `scikit-learn>=1.5.0,<2.0.0`. |
+
+### Quality Gates
+
+- ruff check: clean on the 8 new/modified files.
+- ruff format: clean.
+- mypy --strict on `features/meta_labeler/*`: 0 errors.
+- pytest: 66/66 pass locally in 27s.
+- Coverage on `features/meta_labeler/`: **94%** — above DoD threshold
+  of 90%.
+- Smoke gate: **PASS** (mean RF OOS AUC `0.7630` vs. 0.55 floor).
+- G7 gate (RF − LogReg ≥ +0.03): **not evaluated here** — deferred to
+  Phase 4.5 per spec. On synthetic linear alpha, LogReg edges RF by
+  2.3 pp (expected; linear DGP favours the linear model).
+
+### Architectural Decisions
+
+- New sibling module tree `features/meta_labeler/` (not a refactor of
+  `features/weights.py` or `features/labeling/`): keeps Phase 4.1-4.2
+  labelling pipeline decoupled from 4.3 learner concerns.
+- Strict-before-`t0` Phase 3 signal join enforces the ADR-0005 D8
+  anti-leakage invariant (`feature_compute_window_end < t0`); regime
+  codes use as-of-`t0` inclusive because a regime tag is a
+  point-in-time property known at the decision instant, not a lagged
+  signal.
+- 8-feature set capped at ADR-0005 D6 (3 activated Phase 3 signals +
+  2 regime codes + realized vol + 2 cyclical time); extensions
+  deferred to Phase 5.
+- `_DEFAULT_RF_HP = {n_estimators=200, max_depth=10, min_samples_leaf=5}`;
+  tuning is explicitly Phase 4.4 scope.
+
+### Scope
+
+Phase 4.3 deliverables only. No nested CV (Phase 4.4), no DSR/PBO
+(Phase 4.5), no persistence (Phase 4.6). Inputs are synthetic for the
+diagnostic — real Phase 3 signal history will be substituted in 4.5
+as part of the DSR audit.
+
+### Issues Addressed
+
+- Refs #127 (Phase 4.3 Baseline Meta-Labeler)
+- Refs ADR-0005 D3, D4, D6, D8
+
+### Next Steps
+
+- Push branch `phase/4.3-baseline-meta-labeler` to `origin` and open
+  PR against `main` with the quant PR template.
+- Wait for Copilot review + full CI (quality / rust / unit-tests /
+  integration / backtest-gate).
+- On merge: pull `main`, branch `phase/4.4-nested-tuning`, open work
+  on issue #128 (Nested Tuning).
