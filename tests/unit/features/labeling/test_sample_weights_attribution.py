@@ -254,3 +254,24 @@ class TestReturnAttributionEdgeCases:
         ret = _returns([-0.02, -0.01, -0.03, -0.04, -0.01])
         r = return_attribution_weights(t0, t1, bars, ret).to_numpy()
         assert np.all(r >= 0.0)
+
+    def test_empty_t0_nonempty_t1_raises(self) -> None:
+        """Regression guard for Copilot review on PR #139.
+
+        Mismatched ``t0`` / ``t1`` lengths must fail-loud even when the
+        empty-input fast path is otherwise active.
+        """
+        bars = _bars(3)
+        ret = _returns([0.0, 0.0, 0.0])
+        t0 = _times([])
+        t1 = _times([1])
+        with pytest.raises(ValueError, match="different lengths"):
+            return_attribution_weights(t0, t1, bars, ret)
+
+    def test_nonempty_t0_empty_t1_raises(self) -> None:
+        bars = _bars(3)
+        ret = _returns([0.0, 0.0, 0.0])
+        t0 = _times([1])
+        t1 = _times([])
+        with pytest.raises(ValueError, match="different lengths"):
+            return_attribution_weights(t0, t1, bars, ret)

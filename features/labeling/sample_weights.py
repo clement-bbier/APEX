@@ -40,8 +40,12 @@ Algorithmic contract:
 Performance contract:
 
 - Target: 10,000 samples x 100,000 bars in <= 30 s on a single CPU core
-  (issue #126 DoD section 5). The algorithm is O(n_samples + n_bars)
-  which comfortably fits the budget.
+  (issue #126 DoD section 5). The core concurrency / weight
+  accumulation scan is O(n_samples + n_bars), but the end-to-end
+  implementation also locates ``t0`` / ``t1`` in ``bars`` via
+  :func:`numpy.searchsorted`, so the overall complexity is
+  O(n_samples log n_bars + n_bars) unless the inputs are already
+  bar-index aligned. This still comfortably fits the budget.
 
 References:
     Lopez de Prado, M. (2018). *Advances in Financial Machine Learning*.
@@ -96,9 +100,13 @@ def _validate_datetime_series(series: pl.Series, name: str) -> None:
         )
     # Defense in depth: verify first element is UTC-aware. For a fully
     # typed UTC series this is redundant, but it catches the case where a
-    # caller hand-builds the series with ``strict=False`` coercion.
+    # caller hand-builds the series with ``strict=False`` coercion. We
+    # use constant-time scalar indexing instead of materializing the
+    # whole series via ``to_list()`` - the latter is an O(n) allocation
+    # that would hurt performance on large ``bars`` inputs (see Copilot
+    # review on PR #139).
     if len(series) > 0:
-        head = series.to_list()[0]
+        head = series[0]
         if head is not None:
             _ensure_utc_scalar(head, f"{name}[0]")
 
@@ -191,6 +199,18 @@ def _empty_float_series() -> pl.Series:
     return pl.Series(values=[], dtype=pl.Float64)
 
 
+def _check_same_length(t0: pl.Series, t1: pl.Series) -> None:
+    """Fail-loud length-parity check for the ``t0`` / ``t1`` span pair.
+
+    Called at the top of every public entry point so mismatched inputs
+    (e.g. ``t0=[]``, ``t1=[...]``) surface before any early-return path
+    can mask the bug. ``_locate_span_indices`` performs the same check,
+    but that is only reached when both series are non-empty.
+    """
+    if len(t0) != len(t1):
+        raise ValueError(f"t0 ({len(t0)}) and t1 ({len(t1)}) have different lengths")
+
+
 def compute_concurrency(
     t0: pl.Series,
     t1: pl.Series,
@@ -226,6 +246,7 @@ def compute_concurrency(
     _validate_datetime_series(t0, "t0")
     _validate_datetime_series(t1, "t1")
     _validate_datetime_series(bars, "bars")
+    _check_same_length(t0, t1)
 
     n_bars = len(bars)
     if len(t0) == 0:
@@ -280,6 +301,7 @@ def uniqueness_weights(
     _validate_datetime_series(t0, "t0")
     _validate_datetime_series(t1, "t1")
     _validate_datetime_series(bars, "bars")
+    _check_same_length(t0, t1)
 
     n_samples = len(t0)
     if n_samples == 0:
@@ -363,6 +385,7 @@ def return_attribution_weights(
     _validate_datetime_series(t1, "t1")
     _validate_datetime_series(bars, "bars")
     _validate_numeric_series(log_returns, "log_returns", expected_length=len(bars))
+    _check_same_length(t0, t1)
 
     n_samples = len(t0)
     if n_samples == 0:

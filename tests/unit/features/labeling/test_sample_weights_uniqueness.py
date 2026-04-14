@@ -256,6 +256,33 @@ class TestUniquenessEdgeCases:
         assert len(u) == 0
         assert u.dtype == pl.Float64
 
+    def test_empty_t0_nonempty_t1_raises(self) -> None:
+        """Mismatched lengths must fail-loud even on the empty fast path.
+
+        Regression guard for Copilot review on PR #139: the previous
+        empty fast-return masked this caller bug by silently producing
+        an empty result.
+        """
+        bars = _bars(5)
+        t0 = _times([])
+        t1 = _times([1])
+        with pytest.raises(ValueError, match="different lengths"):
+            uniqueness_weights(t0, t1, bars)
+
+    def test_nonempty_t0_empty_t1_raises(self) -> None:
+        bars = _bars(5)
+        t0 = _times([1])
+        t1 = _times([])
+        with pytest.raises(ValueError, match="different lengths"):
+            uniqueness_weights(t0, t1, bars)
+
+    def test_compute_concurrency_empty_t0_nonempty_t1_raises(self) -> None:
+        bars = _bars(5)
+        t0 = _times([])
+        t1 = _times([1])
+        with pytest.raises(ValueError, match="different lengths"):
+            compute_concurrency(t0, t1, bars)
+
     def test_empty_bars_but_nonempty_events_raises(self) -> None:
         bars = pl.Series(values=[], dtype=pl.Datetime("us", "UTC"))
         t0 = _times([0])
