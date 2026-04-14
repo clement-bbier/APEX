@@ -20,6 +20,26 @@ Usage:
     # Full production run (slow)
     APEX_SEED=42 APEX_FULL_TUNING=1 python3 scripts/generate_phase_4_4_report.py
 
+    # Byte-for-byte reproducible artefact (for audit diffs)
+    APEX_SEED=42 APEX_REPORT_NOW=2026-04-14T00:00:00+00:00 \\
+        APEX_REPORT_WALLCLOCK_MODE=omit \\
+        python3 scripts/generate_phase_4_4_report.py
+
+Reproducibility:
+    The two intrinsically time-dependent fields in the report are
+    ``generated_at`` (timestamp of the run) and ``wall_clock_seconds``
+    (how long ``tune()`` took). By default we record both so operators
+    can spot performance regressions across CI runs. Two environment
+    variables let downstream audit diffs be byte-for-byte stable:
+
+    - ``APEX_REPORT_NOW``: ISO 8601 timestamp used in place of
+      ``datetime.now(UTC)`` for the ``generated_at`` field. Use this
+      in audit scripts that diff two report runs for unchanged trial
+      ledgers. Invalid / unparseable values fail loud.
+    - ``APEX_REPORT_WALLCLOCK_MODE``: ``"record"`` (default, keeps
+      ``wall_clock_seconds``), ``"omit"`` (drops the key entirely), or
+      ``"zero"`` (forces ``0.0``). Use ``omit`` in audit diffs.
+
 Report contents:
 
 - Header: seed, dataset size, outer/inner CPCV geometry, search space,
@@ -46,6 +66,7 @@ from typing import Any
 
 import numpy as np
 import numpy.typing as npt
+import structlog
 
 from features.cv.cpcv import CombinatoriallyPurgedKFold
 from features.meta_labeler.feature_builder import FEATURE_NAMES, MetaLabelerFeatureSet
@@ -53,6 +74,40 @@ from features.meta_labeler.tuning import NestedCPCVTuner, TuningSearchSpace
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 REPORT_DIR = REPO_ROOT / "reports" / "phase_4_4"
+
+_log = structlog.get_logger(__name__)
+
+
+def _resolve_generated_at() -> str:
+    """Return the ``generated_at`` header.
+
+    Honors ``APEX_REPORT_NOW`` so audit diffs can freeze the timestamp.
+    Unparseable values fail loud rather than silently falling back.
+    """
+    override = os.environ.get("APEX_REPORT_NOW")
+    if override is not None:
+        try:
+            parsed = datetime.fromisoformat(override)
+        except ValueError as exc:
+            raise ValueError(
+                f"APEX_REPORT_NOW={override!r} is not ISO 8601; refusing to generate report"
+            ) from exc
+        if parsed.tzinfo is None:
+            raise ValueError("APEX_REPORT_NOW must include a timezone offset (e.g. '...+00:00')")
+        return parsed.isoformat()
+    return datetime.now(tz=UTC).isoformat()
+
+
+def _resolve_wallclock(measured: float) -> float | None:
+    """Return the wall-clock value to record, or ``None`` to omit it."""
+    mode = os.environ.get("APEX_REPORT_WALLCLOCK_MODE", "record").lower()
+    if mode == "record":
+        return float(measured)
+    if mode == "zero":
+        return 0.0
+    if mode == "omit":
+        return None
+    raise ValueError(f"APEX_REPORT_WALLCLOCK_MODE={mode!r} not in {{'record', 'zero', 'omit'}}")
 
 
 def _synthetic_dataset(
@@ -141,15 +196,15 @@ def main() -> None:
     # the statistical version (PBO).
     ranked = sorted(result.all_trials, key=lambda t: -t[2])[:5]
 
-    payload = {
-        "generated_at": datetime.now(tz=UTC).isoformat(),
+    wallclock = _resolve_wallclock(result.wall_clock_seconds)
+    payload: dict[str, Any] = {
+        "generated_at": _resolve_generated_at(),
         "seed": seed,
         "config_label": cfg["label"],
         "n_samples": int(fs.X.shape[0]),
         "outer_n_folds": cfg["outer"].get_n_splits(),
         "inner_n_folds": cfg["inner"].get_n_splits(),
         "search_space_cardinality": cfg["search_space"].cardinality,
-        "wall_clock_seconds": result.wall_clock_seconds,
         "stability_index": result.stability_index,
         "best_hyperparameters_per_fold": [dict(h) for h in result.best_hyperparameters_per_fold],
         "best_oos_auc_per_fold": best_oos,
@@ -164,6 +219,8 @@ def main() -> None:
             for (hp, inner_auc, oos_auc) in result.all_trials
         ],
     }
+    if wallclock is not None:
+        payload["wall_clock_seconds"] = wallclock
 
     json_path = REPORT_DIR / "tuning_trials.json"
     json_path.write_text(json.dumps(payload, indent=2, sort_keys=False), encoding="utf-8")
@@ -181,7 +238,10 @@ def main() -> None:
     )
     lines.append(f"- Search-space cardinality: `{payload['search_space_cardinality']}` trials")
     lines.append(f"- Total trials in ledger: `{len(result.all_trials)}`")
-    lines.append(f"- Wall-clock: `{result.wall_clock_seconds:.2f}s`")
+    if wallclock is not None:
+        lines.append(f"- Wall-clock: `{wallclock:.2f}s`")
+    else:
+        lines.append("- Wall-clock: *(omitted for reproducible audit diff)*")
     lines.append(
         f"- Stability index: `{result.stability_index:.4f}` "
         "(fraction of outer folds whose best hparams equal the mode)"
@@ -231,12 +291,13 @@ def main() -> None:
     md_path = REPORT_DIR / "tuning_report.md"
     md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
-    print(f"Wrote {json_path}")
-    print(f"Wrote {md_path}")
-    print(
-        f"Stability index: {result.stability_index:.4f}, "
-        f"mean best-OOS AUC: {mean_oos:.4f}, "
-        f"wall-clock: {result.wall_clock_seconds:.2f}s"
+    _log.info("phase_4_4.report_written", json_path=str(json_path), md_path=str(md_path))
+    _log.info(
+        "phase_4_4.tuning_summary",
+        stability_index=result.stability_index,
+        mean_best_oos_auc=mean_oos,
+        wall_clock_seconds=result.wall_clock_seconds,
+        wallclock_recorded=wallclock,
     )
 
 

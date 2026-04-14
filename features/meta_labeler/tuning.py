@@ -346,13 +346,21 @@ class NestedCPCVTuner:
                     f"|train|={len(in_train_idx)}, |test|={len(in_test_idx)}."
                 )
             y_in_test = y_train[in_test_idx]
-            # AUC is undefined on a constant target - fall back to 0.5
-            # (chance) for that inner fold rather than aborting the
-            # whole tune() call. The caller is expected to configure
-            # inner CPCV so this does not dominate, but defensive.
+            # AUC is undefined on a constant target. A silent fallback
+            # (e.g. ``0.5``) would mask a pathological CPCV partition
+            # and contaminate the inner-CV selection criterion, so we
+            # fail loud here. Callers must configure the inner CPCV
+            # (or upstream label generation) so every inner test fold
+            # contains both classes. This is consistent with the
+            # Phase 4.3 trainer which also fails loud on the same
+            # condition (see ``features.meta_labeler.baseline``).
             if len(np.unique(y_in_test)) < 2:
-                aucs.append(0.5)
-                continue
+                counts = Counter(y_in_test.tolist())
+                raise ValueError(
+                    f"inner CPCV produced a constant-target test fold at "
+                    f"fold {inner_idx}: class_counts={dict(counts)}. "
+                    "Use a larger inner CPCV or rebalance the target."
+                )
             rf = RandomForestClassifier(
                 **hparams,
                 random_state=fold_seed,
@@ -382,9 +390,17 @@ class NestedCPCVTuner:
         fold_seed: int,
     ) -> float:
         if len(np.unique(y_test)) < 2:
-            # OOS AUC undefined on constant y - log-neutral 0.5 matches
-            # the inner fallback so the per-trial record is consistent.
-            return 0.5
+            # OOS AUC is undefined on a constant target. Fail loud
+            # instead of returning a neutral 0.5 so a pathological
+            # outer partition cannot silently contaminate the Phase
+            # 4.5 DSR / PBO statistics that consume ``oos_auc`` from
+            # the trial ledger.
+            counts = Counter(y_test.tolist())
+            raise ValueError(
+                f"outer CPCV produced a constant-target test slice: "
+                f"class_counts={dict(counts)}. Use a larger outer CPCV "
+                "or rebalance the target."
+            )
         rf = RandomForestClassifier(
             **hparams,
             random_state=fold_seed,

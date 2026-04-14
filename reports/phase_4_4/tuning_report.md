@@ -1,13 +1,13 @@
 # Phase 4.4 - Nested CPCV tuning report
 
-- Generated at: `2026-04-14T17:38:18.224063+00:00`
+- Generated at: `2026-04-14T18:14:38.963112+00:00`
 - Seed: `42`
 - Config: **fast (CI default)**
 - Samples: `400`
 - Outer CPCV folds: `6` / Inner CPCV folds: `3`
 - Search-space cardinality: `8` trials
 - Total trials in ledger: `48`
-- Wall-clock: `22.23s`
+- Wall-clock: `16.76s`
 - Stability index: `0.3333` (fraction of outer folds whose best hparams equal the mode)
 
 ## Outer-fold winners

@@ -72,6 +72,41 @@ def dataset() -> tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray]:
 
 
 # --------------------------------------------------------------------
+# Micro fixtures for the determinism tests
+# --------------------------------------------------------------------
+# The determinism tests (``test_nested_run_deterministic_same_seed`` and
+# ``test_different_seeds_change_per_fold_seed_deterministically``) call
+# ``tune()`` twice per test and therefore need a very small search space
+# to fit in the 30s per-test CI timeout. A 2x1x1 search space on Outer
+# C(3, 1)=3 / Inner C(2, 1)=2 with n=120 runs about 2x(3*(2+1))=18 RF
+# fits per ``tune()`` call — comfortably sub-second on GH Actions.
+
+
+@pytest.fixture
+def micro_space() -> TuningSearchSpace:
+    return TuningSearchSpace(
+        n_estimators=(20, 30),
+        max_depth=(3,),
+        min_samples_leaf=(5,),
+    )
+
+
+@pytest.fixture
+def micro_outer_cpcv() -> CombinatoriallyPurgedKFold:
+    return CombinatoriallyPurgedKFold(n_splits=3, n_test_splits=1, embargo_pct=0.0)
+
+
+@pytest.fixture
+def micro_inner_cpcv() -> CombinatoriallyPurgedKFold:
+    return CombinatoriallyPurgedKFold(n_splits=2, n_test_splits=1, embargo_pct=0.0)
+
+
+@pytest.fixture
+def micro_dataset() -> tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray]:
+    return _make_synthetic_dataset(n=120, seed=42)
+
+
+# --------------------------------------------------------------------
 # A. Search-space primitives
 # --------------------------------------------------------------------
 
@@ -192,14 +227,14 @@ def test_best_oos_auc_matches_trials_ledger_entry(
 
 
 def test_nested_run_deterministic_same_seed(
-    tiny_space: TuningSearchSpace,
-    outer_cpcv: CombinatoriallyPurgedKFold,
-    inner_cpcv: CombinatoriallyPurgedKFold,
-    dataset: tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray],
+    micro_space: TuningSearchSpace,
+    micro_outer_cpcv: CombinatoriallyPurgedKFold,
+    micro_inner_cpcv: CombinatoriallyPurgedKFold,
+    micro_dataset: tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray],
 ) -> None:
-    fs, y, w = dataset
-    a = NestedCPCVTuner(tiny_space, outer_cpcv, inner_cpcv, seed=42).tune(fs, y, w)
-    b = NestedCPCVTuner(tiny_space, outer_cpcv, inner_cpcv, seed=42).tune(fs, y, w)
+    fs, y, w = micro_dataset
+    a = NestedCPCVTuner(micro_space, micro_outer_cpcv, micro_inner_cpcv, seed=42).tune(fs, y, w)
+    b = NestedCPCVTuner(micro_space, micro_outer_cpcv, micro_inner_cpcv, seed=42).tune(fs, y, w)
     assert a.best_hyperparameters_per_fold == b.best_hyperparameters_per_fold
     for oa, ob in zip(a.best_oos_auc_per_fold, b.best_oos_auc_per_fold, strict=True):
         assert oa == pytest.approx(ob, abs=1e-12)
@@ -210,22 +245,55 @@ def test_nested_run_deterministic_same_seed(
         assert oa_a == pytest.approx(oa_b, abs=1e-12)
 
 
-def test_different_seeds_can_change_oos_scores(
-    tiny_space: TuningSearchSpace,
-    outer_cpcv: CombinatoriallyPurgedKFold,
-    inner_cpcv: CombinatoriallyPurgedKFold,
-    dataset: tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray],
+def test_different_seeds_change_per_fold_seed_deterministically(
+    micro_space: TuningSearchSpace,
+    micro_outer_cpcv: CombinatoriallyPurgedKFold,
+    micro_inner_cpcv: CombinatoriallyPurgedKFold,
+    micro_dataset: tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray],
 ) -> None:
-    fs, y, w = dataset
-    a = NestedCPCVTuner(tiny_space, outer_cpcv, inner_cpcv, seed=42).tune(fs, y, w)
-    b = NestedCPCVTuner(tiny_space, outer_cpcv, inner_cpcv, seed=1337).tune(fs, y, w)
-    # OOS AUCs should not be bit-identical across seeds (probability
-    # one on non-degenerate RF).
-    same = all(
-        aa == pytest.approx(bb, abs=1e-12)
-        for aa, bb in zip(a.best_oos_auc_per_fold, b.best_oos_auc_per_fold, strict=True)
+    """Changing the tuner seed must change every RF's ``random_state``
+    by exactly the expected offset, which guarantees the RF population
+    is a different one.
+
+    This replaces an earlier probabilistic test that compared OOS AUC
+    floats across seeds — that check was flaky on pathological grids
+    where different RF populations can still tie on AUC. Seeds are the
+    causal root cause of determinism, so we pin them directly.
+    """
+    fs, y, w = micro_dataset
+    seed_a, seed_b = 42, 1337
+    seen_a: list[int] = []
+    seen_b: list[int] = []
+    orig_fit = RandomForestClassifier.fit
+
+    def spy_a(self, x_arr, y_arr, *args, **kwargs):  # type: ignore[no-untyped-def]
+        seen_a.append(int(self.get_params()["random_state"]))
+        return orig_fit(self, x_arr, y_arr, *args, **kwargs)
+
+    def spy_b(self, x_arr, y_arr, *args, **kwargs):  # type: ignore[no-untyped-def]
+        seen_b.append(int(self.get_params()["random_state"]))
+        return orig_fit(self, x_arr, y_arr, *args, **kwargs)
+
+    RandomForestClassifier.fit = spy_a  # type: ignore[method-assign]
+    try:
+        NestedCPCVTuner(micro_space, micro_outer_cpcv, micro_inner_cpcv, seed=seed_a).tune(fs, y, w)
+    finally:
+        RandomForestClassifier.fit = orig_fit  # type: ignore[method-assign]
+
+    RandomForestClassifier.fit = spy_b  # type: ignore[method-assign]
+    try:
+        NestedCPCVTuner(micro_space, micro_outer_cpcv, micro_inner_cpcv, seed=seed_b).tune(fs, y, w)
+    finally:
+        RandomForestClassifier.fit = orig_fit  # type: ignore[method-assign]
+
+    n_outer = micro_outer_cpcv.get_n_splits()
+    expected_a = {seed_a + i * 7 for i in range(n_outer)}
+    expected_b = {seed_b + i * 7 for i in range(n_outer)}
+    assert set(seen_a) == expected_a
+    assert set(seen_b) == expected_b
+    assert set(seen_a).isdisjoint(set(seen_b)), (
+        "seed-derived random_states must not collide across different tuner seeds"
     )
-    assert not same, "different seeds must change at least one OOS AUC value"
 
 
 # --------------------------------------------------------------------
