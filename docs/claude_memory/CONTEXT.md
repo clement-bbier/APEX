@@ -1,24 +1,35 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-14
-**Updated by**: Session 027
+**Updated by**: Session 028 (Phase 3 closure)
 
 ---
 
 ## Current State
 
+Phase 3 closed. See [`docs/phase_3_closure_report.md`](../phase_3_closure_report.md)
+for the full inventory. 3 features activated for downstream use:
+`gex_signal`, `har_rv_signal`, `ofi_signal`. S02 adapter scaffolded, not
+wired (issue #123 for streaming).
+
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 3 — Feature Validation Harness (3.13 PR PENDING, Phase 3 at 100%) |
-| Previous Phase | Phase 2 — Universal Data Infrastructure (DONE) |
-| Total tests | 1,828+ unit (1 xfailed latency) + 55 integration + skips |
-| Production LOC | ~35,770 |
-| Test LOC | ~22,700 |
+| Active Phase | Phase 4 (Fusion Engine + Meta-Labeler) — design-gate PR pending |
+| Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
+| Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests |
+| Production LOC | ~35,770 (+ ~8,271 `features/`) |
+| Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/`) |
 | mypy strict | 0 errors |
 | Services scaffolded | 10/10 (S01-S10) |
 | S01 fully implemented | Yes (78 files, 9,583 LOC) |
 | ADRs accepted | 10 (+ ADR-0004 Feature Validation Methodology) |
 | features/ coverage | ~93% (491 tests incl. Phase 3.13 adapter at 100%) |
+
+## On the horizon
+
+Phase 4 design-gate PR (Fusion Engine + Meta-Labeler). Prerequisites
+confirmed in the Phase 3 closure report. Expected to start with a
+dedicated design-gate PR before implementation begins.
 
 ## Audit Status
 

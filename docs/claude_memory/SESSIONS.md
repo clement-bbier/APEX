@@ -1295,3 +1295,58 @@ deferred to Phase 5 or an explicit decision point.
 - Await Copilot re-review on PR #122
 - Phase 3 is now **100% complete**; ready for Phase 3 closure report
 - Actual wiring of adapter into S02 deferred to later phase
+
+---
+
+## Session 029 — 2026-04-14
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-14 |
+| Mission | Phase 3 closure report + end-to-end pipeline integration test |
+| Agent Model | Claude Opus 4.6 |
+| Branch | `chore/phase-3-closure` |
+| PR | (pending, risk-zero docs + 1 integration test) |
+
+### What Was Done
+
+Closure checkpoint for Phase 3 (3.1 through 3.13 all merged to `main`).
+
+- [`docs/phase_3_closure_report.md`](../phase_3_closure_report.md):
+  full inventory — sub-phase table with measured per-PR LOC, calculator
+  status, keep/reject decision summary, tech-debt log (#115, #123),
+  Phase 4 prerequisite check, and §8 end-to-end test result.
+- [`tests/integration/test_phase_3_pipeline.py`](../../tests/integration/test_phase_3_pipeline.py):
+  single integration test (`@pytest.mark.integration`) that runs
+  IC -> multicollinearity -> DSR/PBO/MHT -> FeatureSelectionReport on
+  a synthetic 10-strategy scenario (1 true alpha + 9 noise). Asserts
+  exactly 1 keep (true alpha), 9 explicit rejects, and PBO of final
+  set `< 0.10`.
+
+### Key Findings During Closure
+
+- `SpearmanICMeasurer.measure_rich` compares `feature[t]` against
+  `forward_returns[t]` — the caller is expected to pre-shift the return
+  series so it represents the horizon-forward return. `horizon_bars`
+  governs Newey-West lag selection only. Documented in §5.3 of the
+  closure report; no new issue needed.
+- Composition of the full Phase 3 pipeline works end-to-end; no glue
+  code gap surfaced.
+
+### Scope
+
+- Zero production code added. Docs + one integration test file only.
+- Scope check `git diff --stat main..HEAD -- services/ features/
+  backtesting/ core/` returns empty.
+
+### Quality Gates
+
+- ruff check + ruff format: clean on new files.
+- Integration test: 1 passed in ~6.5 s.
+- Full unit suite (foreground): 1,833 passed, 1 xfailed (existing
+  adapter-latency xfail), 0 regressions.
+
+### Next Steps
+
+- Raise PR `chore/phase-3-closure` -> `main`.
+- After merge: open Phase 4 design-gate PR (separate).
