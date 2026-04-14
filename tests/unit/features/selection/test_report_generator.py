@@ -556,3 +556,209 @@ class TestEndToEndSynthetic8Features:
         assert parsed["n_candidates"] == 8
         assert parsed["n_kept"] == 3
         assert len(parsed["decisions"]) == 8
+
+
+# ---------------------------------------------------------------------------
+# Copilot PR #121 review — characterising tests for silent-bug fixes
+# ---------------------------------------------------------------------------
+
+
+class TestMHTSilentSkipFix:
+    """p_value_holm=None must reject explicitly when MHT is required.
+
+    Same anti-pattern family as PR #120 ``build_report`` silent skip.
+    When the hypothesis report claims Holm/BH correction was applied over
+    multiple features, a feature whose ``p_value_holm`` is ``None`` has
+    missing evidence — **reject with a named reason, never silent-skip**.
+    """
+
+    def test_missing_p_holm_when_mht_required_rejects_explicitly(self) -> None:
+        """Multi-feature Holm run with one missing p_holm → explicit reject."""
+        ic_report = ICReport(
+            [
+                _ic_result("feat_a"),
+                _ic_result("feat_b"),
+                _ic_result("feat_c"),
+            ]
+        )
+        mc = _multicoll_report(["feat_a", "feat_b", "feat_c"])
+
+        # feat_c has p_holm=None despite mht_correction="holm"
+        hyp_decisions = [
+            _hyp_decision("feat_a", p_holm=0.01),
+            _hyp_decision("feat_b", p_holm=0.02),
+            _hyp_decision("feat_c", p_holm=None),
+        ]
+        hr = _hyp_report(hyp_decisions, pbo=0.05)
+        assert hr.mht_correction == "holm"
+
+        gen = FeatureSelectionReportGenerator()
+        report = gen.generate(ic_report=ic_report, multicoll_report=mc, hypothesis_report=hr)
+
+        feat_c = next(d for d in report.decisions if d.feature_name == "feat_c")
+        assert feat_c.decision == "reject", (
+            f"feat_c should reject: missing p_holm under MHT. "
+            f"Got: {feat_c.decision}, reasons: {feat_c.reject_reasons}"
+        )
+        assert "p_value_holm_missing_when_mht_required" in feat_c.reject_reasons, (
+            f"Expected explicit 'p_value_holm_missing_when_mht_required' reason. "
+            f"Got: {feat_c.reject_reasons}"
+        )
+
+    def test_missing_p_holm_when_single_feature_is_ok(self) -> None:
+        """Single-feature run: p_holm=None is legitimate (no MHT required)."""
+        ic_report = ICReport([_ic_result("feat_solo")])
+        mc = _multicoll_report(["feat_solo"])
+        hr = _hyp_report([_hyp_decision("feat_solo", p_holm=None)], pbo=0.05)
+
+        gen = FeatureSelectionReportGenerator()
+        report = gen.generate(ic_report=ic_report, multicoll_report=mc, hypothesis_report=hr)
+
+        feat = report.decisions[0]
+        # Single feature → MHT not required → missing p_holm is fine
+        assert "p_value_holm_missing_when_mht_required" not in feat.reject_reasons
+
+    def test_missing_p_holm_when_mht_none_is_ok(self) -> None:
+        """mht_correction='none': p_holm=None never triggers reject."""
+        ic_report = ICReport([_ic_result("feat_a"), _ic_result("feat_b"), _ic_result("feat_c")])
+        mc = _multicoll_report(["feat_a", "feat_b", "feat_c"])
+        hyp_decisions = [_hyp_decision(n, p_holm=None) for n in ("feat_a", "feat_b", "feat_c")]
+        hr = HypothesisTestingReport(
+            feature_decisions=hyp_decisions,
+            pbo_result=None,
+            mht_correction="none",
+            alpha=0.05,
+            n_features=3,
+            n_pass=3,
+            n_fail=0,
+        )
+
+        gen = FeatureSelectionReportGenerator()
+        report = gen.generate(ic_report=ic_report, multicoll_report=mc, hypothesis_report=hr)
+        for d in report.decisions:
+            assert "p_value_holm_missing_when_mht_required" not in d.reject_reasons
+
+
+class TestCalculatorMapEmptyDict:
+    """Copilot #1: ``{}`` must not trigger the default fallback."""
+
+    def test_constructor_accepts_empty_calculator_map(self) -> None:
+        """Empty dict input is a legitimate signal to force 'unknown' for all."""
+        gen = FeatureSelectionReportGenerator(calculator_map={})
+        ic_report = ICReport([_ic_result("har_rv_signal")])
+        mc = _multicoll_report(["har_rv_signal"])
+        hr = _hyp_report([_hyp_decision("har_rv_signal")])
+
+        report = gen.generate(ic_report=ic_report, multicoll_report=mc, hypothesis_report=hr)
+        # Even though "har_rv_signal" is in the default map, our explicit
+        # empty dict means every feature maps to "unknown".
+        assert report.decisions[0].calculator == "unknown"
+
+    def test_constructor_uses_defaults_when_none(self) -> None:
+        """``calculator_map=None`` still yields the ADR-0004 defaults."""
+        gen = FeatureSelectionReportGenerator()
+        ic_report = ICReport([_ic_result("har_rv_signal")])
+        mc = _multicoll_report(["har_rv_signal"])
+        hr = _hyp_report([_hyp_decision("har_rv_signal")])
+        report = gen.generate(ic_report=ic_report, multicoll_report=mc, hypothesis_report=hr)
+        assert report.decisions[0].calculator == "HAR-RV"
+
+
+class TestUniqueFeatureNamePlaceholder:
+    """Copilot #2: missing feature_name must not collide."""
+
+    def test_unique_placeholder_when_feature_name_missing(self) -> None:
+        """Multiple IC results without names get unique placeholders."""
+        # Build two ICResults with feature_name=None (legacy)
+        ic_report = ICReport(
+            [
+                ICResult(
+                    ic=0.05,
+                    ic_ir=1.0,
+                    p_value=0.01,
+                    n_samples=500,
+                    ci_low=0.03,
+                    ci_high=0.07,
+                    feature_name=None,
+                    turnover_adj_ic=0.04,
+                ),
+                ICResult(
+                    ic=0.03,
+                    ic_ir=0.8,
+                    p_value=0.02,
+                    n_samples=500,
+                    ci_low=0.01,
+                    ci_high=0.05,
+                    feature_name=None,
+                    turnover_adj_ic=0.02,
+                ),
+            ]
+        )
+
+        gen = FeatureSelectionReportGenerator()
+        report = gen.generate(ic_report=ic_report, multicoll_report=None, hypothesis_report=None)
+
+        names = [d.feature_name for d in report.decisions]
+        assert len(set(names)) == 2, f"Expected unique names, got {names}"
+        assert all(n.startswith("unknown_") for n in names), (
+            f"Expected 'unknown_N' placeholders, got {names}"
+        )
+        assert all("feature_name_missing" in d.reject_reasons for d in report.decisions)
+
+
+class TestPBONarrativeUsesConfiguredThreshold:
+    """Copilot #4: Markdown PBO narrative must reflect configured gate."""
+
+    def test_narrative_quotes_configured_threshold(self) -> None:
+        """Markdown quotes the configured pbo_max, not a hardcoded 0.10."""
+        # Use a non-default threshold so the narrative diverges
+        gen = FeatureSelectionReportGenerator(pbo_max=0.15)
+        ic = ICReport([_ic_result("feat_a")])
+        mc = _multicoll_report(["feat_a"])
+        hr = _hyp_report([_hyp_decision("feat_a")], pbo=0.05)
+
+        report = gen.generate(ic_report=ic, multicoll_report=mc, hypothesis_report=hr)
+        md = report.to_markdown()
+
+        # Narrative must quote "< 0.15" (configured), never the hardcoded "0.10"
+        assert "0.15" in md
+        assert "configured gate" in md
+        # Must not misattribute to ADR-0004 when user used a different threshold
+        assert "PBO < 0.10 per ADR-0004" not in md
+
+    def test_report_exposes_pbo_strict_threshold(self) -> None:
+        """The report dataclass carries pbo_strict_threshold for downstream consumers."""
+        gen = FeatureSelectionReportGenerator(pbo_max=0.12)
+        ic = ICReport([_ic_result("feat_a")])
+        report = gen.generate(ic_report=ic, multicoll_report=None, hypothesis_report=None)
+        assert report.pbo_strict_threshold == 0.12
+
+
+class TestJSONFloatRounding:
+    """Copilot #8: JSON output must not leak float noise."""
+
+    def test_json_floats_rounded(self) -> None:
+        """0.07200000000000001 → 0.072 in serialised output."""
+        # Build a decision whose ic_mean would produce noise (0.1 + 0.2 = 0.30000...4)
+        ic_report = ICReport(
+            [
+                ICResult(
+                    ic=0.1 + 0.2,  # classic float noise
+                    ic_ir=1.0,
+                    p_value=0.01,
+                    n_samples=500,
+                    ci_low=0.2,
+                    ci_high=0.4,
+                    feature_name="feat_noisy",
+                    turnover_adj_ic=0.1 + 0.2,
+                )
+            ]
+        )
+        gen = FeatureSelectionReportGenerator()
+        report = gen.generate(ic_report=ic_report, multicoll_report=None, hypothesis_report=None)
+        parsed = json.loads(report.to_json())
+        ic_mean = parsed["decisions"][0]["ic_mean"]
+        # 0.1 + 0.2 == 0.30000000000000004 in raw repr; rounded → 0.3
+        assert ic_mean == 0.3, (
+            f"Expected rounded 0.3, got {ic_mean!r} — float noise leaked into JSON"
+        )

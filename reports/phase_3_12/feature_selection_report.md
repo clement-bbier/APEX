@@ -1,6 +1,6 @@
 # Phase 3 Feature Selection Report
 
-Generated: 2026-04-13T22:39:15Z
+Generated: 2026-04-14T00:05:46Z
 Candidates: 8
 Kept: 3
 Rejected: 5
@@ -119,7 +119,7 @@ PBO of final set: 0.0500
 ## PBO analysis
 
 Final set of 3 features, PBO = 0.0500.
-Strong evidence of genuine edge (PBO < 0.10 per ADR-0004).
+Strong evidence of genuine edge (PBO < 0.10 configured gate).
 
 ## References
 

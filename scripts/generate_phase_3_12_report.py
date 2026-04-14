@@ -1,4 +1,8 @@
-"""Generate Phase 3.12 Feature Selection Report (synthetic data, seed=42).
+"""Generate Phase 3.12 Feature Selection Report from hardcoded synthetic data.
+
+All metric values are hardcoded for exact reproducibility — no RNG is used.
+Rerunning the script produces byte-identical Markdown and JSON artefacts
+(modulo the UTC generation timestamp in the header).
 
 Produces:
 - reports/phase_3_12/feature_selection_report.md
@@ -40,7 +44,7 @@ def _ic(
         ci_low=ic - 0.02,
         ci_high=ic + 0.02,
         feature_name=name,
-        turnover_adj_ic=adj or ic * 0.9,
+        turnover_adj_ic=adj if adj is not None else ic * 0.9,
     )
 
 

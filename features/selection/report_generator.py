@@ -39,7 +39,12 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Literal
 
-from features.hypothesis.report import HypothesisTestingReport
+from features.hypothesis.report import (
+    FeatureDecision as HypothesisFeatureDecision,
+)
+from features.hypothesis.report import (
+    HypothesisTestingReport,
+)
 from features.ic.report import ICReport
 from features.multicollinearity import MulticollinearityReport
 from features.selection.decision import SelectionDecision
@@ -106,7 +111,13 @@ class FeatureSelectionReportGenerator:
         self._psr_min = psr_min
         self._alpha = alpha
         self._pbo_max = pbo_max
-        self._calculator_map = calculator_map or dict(_DEFAULT_CALCULATOR_MAP)
+        # Explicit None check — ``{}`` is a legitimate input (force every
+        # feature to "unknown" calculator) and must not trigger the default.
+        # Defensive copy prevents external mutation from affecting the generator.
+        if calculator_map is None:
+            self._calculator_map = dict(_DEFAULT_CALCULATOR_MAP)
+        else:
+            self._calculator_map = dict(calculator_map)
 
     def generate(
         self,
@@ -140,10 +151,21 @@ class FeatureSelectionReportGenerator:
             cluster_map = dict(multicoll_report.cluster_assignments)
             drops_set = set(multicoll_report.recommended_drops)
 
-        hyp_map: dict[str, Any] = {}
+        hyp_map: dict[str, HypothesisFeatureDecision] = {}
         if hypothesis_report is not None:
             for fd in hypothesis_report.feature_decisions:
                 hyp_map[fd.feature_name] = fd
+
+        # MHT requirement: if the hypothesis report claims Holm/BH correction
+        # was applied across multiple features, then every feature MUST carry
+        # a non-None ``p_value_holm``.  A missing p_holm in that configuration
+        # is a data gap — reject explicitly, never silent-skip the gate.
+        # Same anti-pattern family as PR #120 build_report silent skip.
+        mht_required = (
+            hypothesis_report is not None
+            and hypothesis_report.mht_correction != "none"
+            and len(hyp_map) > 1
+        )
 
         pbo_value: float | None = None
         if hypothesis_report is not None and hypothesis_report.pbo_result is not None:
@@ -151,11 +173,15 @@ class FeatureSelectionReportGenerator:
 
         decisions: list[SelectionDecision] = []
 
-        for ic_result in ic_report.results:
-            feature_name = ic_result.feature_name or "unknown"
+        for ic_index, ic_result in enumerate(ic_report.results):
+            raw_name = ic_result.feature_name
+            has_feature_name = bool(raw_name)
+            feature_name: str = raw_name if raw_name else f"unknown_{ic_index}"
             calculator = self._calculator_map.get(feature_name, "unknown")
 
             reject_reasons: list[str] = []
+            if not has_feature_name:
+                reject_reasons.append("feature_name_missing")
 
             # ── IC gates ─────────────────────────────────────────────
             if abs(ic_result.ic) < self._ic_min:
@@ -197,18 +223,27 @@ class FeatureSelectionReportGenerator:
             elif feature_name not in hyp_map:
                 reject_reasons.append("dsr_not_computed")
             else:
-                fd = hyp_map[feature_name]
-                sharpe = fd.sharpe_raw
-                psr = fd.psr
-                dsr = fd.dsr
-                min_trl = fd.min_trl
-                p_holm = fd.p_value_holm
+                fd_hyp = hyp_map[feature_name]
+                sharpe = fd_hyp.sharpe_raw
+                psr = fd_hyp.psr
+                dsr = fd_hyp.dsr
+                min_trl = fd_hyp.min_trl
+                p_holm = fd_hyp.p_value_holm
 
                 if dsr < self._dsr_min:
                     reject_reasons.append(f"dsr={dsr:.3f} < {self._dsr_min}")
                 if psr < self._psr_min:
                     reject_reasons.append(f"psr={psr:.3f} < {self._psr_min}")
-                if p_holm is not None and p_holm > self._alpha:
+
+                # Holm-adjusted p-value gate:
+                # - If MHT was declared but p_holm is None → explicit reject
+                #   (missing evidence is not a free pass).
+                # - If MHT not required (single-feature or correction="none"),
+                #   None legitimately skips the gate.
+                if p_holm is None:
+                    if mht_required:
+                        reject_reasons.append("p_value_holm_missing_when_mht_required")
+                elif p_holm > self._alpha:
                     reject_reasons.append(f"p_value_holm={p_holm:.4f} > {self._alpha}")
 
             # ── PBO gate (aggregate, applies to all) ─────────────────
@@ -256,7 +291,24 @@ class FeatureSelectionReportGenerator:
             n_kept=n_kept,
             n_rejected=len(decisions) - n_kept,
             generated_at=datetime.now(UTC),
+            pbo_strict_threshold=self._pbo_max,
         )
+
+
+def _round_floats(obj: object, ndigits: int = 6) -> object:
+    """Recursively round floats in nested dict/list structures.
+
+    Normalises float noise (``0.07200000000000001`` → ``0.072``) so that
+    committed JSON artefacts produce clean diffs and the byte-level
+    determinism guarantee survives arithmetic jitter.
+    """
+    if isinstance(obj, float):
+        return round(obj, ndigits)
+    if isinstance(obj, dict):
+        return {k: _round_floats(v, ndigits) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_round_floats(x, ndigits) for x in obj]
+    return obj
 
 
 @dataclass(frozen=True)
@@ -274,6 +326,7 @@ class FeatureSelectionReport:
     n_kept: int
     n_rejected: int
     generated_at: datetime
+    pbo_strict_threshold: float
 
     def to_markdown(self) -> str:
         """Render the report as deterministic Markdown.
@@ -364,13 +417,16 @@ class FeatureSelectionReport:
         lines.append("## PBO analysis")
         lines.append("")
         if self.pbo_of_final_set is not None:
+            strict = self.pbo_strict_threshold
             lines.append(f"Final set of {self.n_kept} features, PBO = {self.pbo_of_final_set:.4f}.")
-            if self.pbo_of_final_set < 0.10:
-                lines.append("Strong evidence of genuine edge (PBO < 0.10 per ADR-0004).")
+            if self.pbo_of_final_set < strict:
+                lines.append(
+                    f"Strong evidence of genuine edge (PBO < {strict:.2f} configured gate)."
+                )
             elif self.pbo_of_final_set < 0.50:
                 lines.append(
                     "Moderate evidence; PBO passes secondary threshold (< 0.50) "
-                    "but fails strict ADR-0004 gate (< 0.10)."
+                    f"but fails strict configured gate (< {strict:.2f})."
                 )
             else:
                 lines.append(
@@ -398,7 +454,10 @@ class FeatureSelectionReport:
     def to_json(self) -> str:
         """Serialize to deterministic JSON string.
 
-        Same inputs → same bytes.  Keys sorted, indent=2.
+        Same inputs → same bytes.  Keys sorted, indent=2.  Floats are
+        rounded to 6 decimals so committed artefacts are free of the
+        arithmetic noise (``0.0720000000000001``) that Python's native
+        repr would otherwise leak into diffs.
         """
         data: dict[str, Any] = {
             "generated_at": self.generated_at.strftime("%Y-%m-%dT%H:%M:%SZ"),
@@ -406,6 +465,7 @@ class FeatureSelectionReport:
             "n_kept": self.n_kept,
             "n_rejected": self.n_rejected,
             "pbo_of_final_set": self.pbo_of_final_set,
+            "pbo_strict_threshold": self.pbo_strict_threshold,
             "decisions": [d.to_dict() for d in self.decisions],
         }
-        return json.dumps(data, indent=2, sort_keys=True)
+        return json.dumps(_round_floats(data, ndigits=6), indent=2, sort_keys=True)
