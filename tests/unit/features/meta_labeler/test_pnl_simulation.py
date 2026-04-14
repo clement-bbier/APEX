@@ -374,8 +374,8 @@ def test_per_fold_tuple_length_mismatch_raises() -> None:
 
 def test_non_monotonic_bars_raise() -> None:
     bars = _make_bars()
-    closes = bars["close"].to_numpy()
-    timestamps = bars["timestamp"].to_numpy().astype("datetime64[us]")
+    closes = bars["close"].to_numpy().copy()
+    timestamps = bars["timestamp"].to_numpy().astype("datetime64[us]").copy()
     timestamps[5], timestamps[6] = timestamps[6], timestamps[5]
     bad = pl.DataFrame(
         {
@@ -396,7 +396,9 @@ def test_non_monotonic_bars_raise() -> None:
 
 def test_non_positive_close_raises() -> None:
     bars = _make_bars()
-    closes = bars["close"].to_numpy()
+    # Polars >= 1.x returns read-only numpy views from ``to_numpy()`` when
+    # the column is contiguous; force a writable copy before mutating.
+    closes = bars["close"].to_numpy().copy()
     closes[42] = 0.0
     timestamps = bars["timestamp"].to_numpy().astype("datetime64[us]")
     bad = pl.DataFrame(
