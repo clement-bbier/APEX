@@ -36,8 +36,6 @@ from core.math.labeling import (
     to_binary_target,
 )
 
-MIN_VOL_HISTORY = 2
-
 
 def _ensure_utc(ts: datetime, field: str) -> None:
     if ts.tzinfo is None:
@@ -204,19 +202,30 @@ def label_events_binary(
 
     labeler = TripleBarrierLabeler(cfg)
 
+    # Pre-zip (timestamp, close) once to avoid reconstructing tuples
+    # per event inside the loop. Slicing the result still allocates an
+    # O(n - i) list, but no per-tuple boxing.
+    all_future: list[tuple[datetime, Decimal]] = list(zip(bar_ts, bar_closes, strict=True))
+
     labels_out: list[BarrierLabel] = []
     for ts in event_ts:
         i = bar_ts_index[ts]
-        start = i - cfg.vol_lookback
-        if start < 0:
-            start = 0
-        vol_window = bar_closes[start:i]  # strict [i - N, i - 1]
 
-        if len(vol_window) < MIN_VOL_HISTORY:
+        # Strict warmup: the event must have the full vol_lookback
+        # history of prior bars. ADR-0005 D1 specifies "vol_lookback
+        # = 20 bars" and "window must end strictly before t"; a
+        # partial window would silently use a differently-calibrated
+        # sigma. Callers must filter events out of the warmup region
+        # (typically bars[cfg.vol_lookback:] for single-symbol feeds).
+        if i < cfg.vol_lookback:
             raise ValueError(
-                f"event at {ts} has only {len(vol_window)} prior bars "
-                f"(need >= {MIN_VOL_HISTORY}); cannot compute sigma_t without look-ahead"
+                f"event at {ts} is inside the volatility warmup region: "
+                f"bar_idx={i}, required_prior_bars={cfg.vol_lookback}. "
+                "ADR-0005 D1 requires a strict volatility window of width "
+                "vol_lookback; drop warmup events or extend the bar history."
             )
+
+        vol_window = bar_closes[i - cfg.vol_lookback : i]  # exactly cfg.vol_lookback bars
 
         daily_vol = labeler.compute_daily_vol(vol_window)
         if daily_vol <= 0:
@@ -225,7 +234,7 @@ def label_events_binary(
                 "ADR-0005 D1 forbids silent skipping of statistical evidence"
             )
 
-        future_prices = [(bar_ts[j], bar_closes[j]) for j in range(i + 1, len(bar_ts))]
+        future_prices = all_future[i + 1 :]
 
         labels_out.append(
             labeler.label_event(

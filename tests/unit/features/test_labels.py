@@ -18,7 +18,7 @@ class TestTripleBarrierLabelerAdapter:
     Phase 4.1 contract: adapter honours ADR-0005 D1 strict vol window
     (``[t - N, t - 1]``), fail-loud on insufficient history, and emits
     one labeled row per bar with enough prior history
-    (``i >= MIN_VOL_HISTORY``).
+    (``i >= vol_lookback``).
     """
 
     def test_output_columns(self) -> None:

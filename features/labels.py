@@ -81,8 +81,6 @@ class TripleBarrierLabelerAdapter:
         Learning*. Wiley, Ch. 3, Sections 3.1-3.6.
     """
 
-    MIN_VOL_HISTORY = 2
-
     def __init__(self, config: TripleBarrierConfig | None = None) -> None:
         self._labeler = TripleBarrierLabeler(config)
 
@@ -146,6 +144,11 @@ class TripleBarrierLabelerAdapter:
         pt_touch_list: list[bool] = []
         sl_touch_list: list[bool] = []
 
+        # Pre-zip (timestamp, close) once to avoid reconstructing
+        # tuples per bar inside the loop. Slicing the result still
+        # allocates an O(n - i) list, but no per-tuple boxing.
+        all_future: list[tuple[datetime, Decimal]] = list(zip(timestamps, closes, strict=True))
+
         for i in range(vol_lookback, len(closes)):
             vol_window = _vol_window(closes, i, vol_lookback)
             daily_vol = self._labeler.compute_daily_vol(vol_window)
@@ -157,9 +160,7 @@ class TripleBarrierLabelerAdapter:
                     "ADR-0005 D1 forbids silent skipping"
                 )
 
-            future_prices: list[tuple[datetime, Decimal]] = [
-                (timestamps[j], closes[j]) for j in range(i + 1, len(closes))
-            ]
+            future_prices = all_future[i + 1 :]
 
             result = self._labeler.label_event(
                 entry_price=closes[i],
@@ -267,6 +268,9 @@ class TripleBarrierLabelerAdapter:
 
         vol_lookback = self._labeler.config.vol_lookback
 
+        # Pre-zip once to avoid rebuilding tuples per event.
+        all_future: list[tuple[datetime, Decimal]] = list(zip(bar_ts, bar_closes, strict=True))
+
         out: list[BarrierLabel] = []
         for ts, direction in zip(event_ts, directions, strict=True):
             if direction != 1:
@@ -276,20 +280,27 @@ class TripleBarrierLabelerAdapter:
                 )
 
             i = ts_to_idx[ts]
-            vol_window = _vol_window(bar_closes, i, vol_lookback)
-            if len(vol_window) < self.MIN_VOL_HISTORY:
+
+            # Strict warmup per ADR-0005 D1: a full vol_lookback of
+            # prior bars is required. Aligned with the legacy
+            # ``label(df)`` path which starts at ``i = vol_lookback``.
+            if i < vol_lookback:
                 raise ValueError(
-                    f"event at {ts} has only {len(vol_window)} prior bars "
-                    f"(need >= {self.MIN_VOL_HISTORY}); cannot compute σ_t"
+                    f"event at {ts} is inside the volatility warmup region: "
+                    f"bar_idx={i}, required_prior_bars={vol_lookback}. "
+                    "ADR-0005 D1 requires a strict volatility window of width "
+                    "vol_lookback."
                 )
+
+            vol_window = _vol_window(bar_closes, i, vol_lookback)
             daily_vol = self._labeler.compute_daily_vol(vol_window)
             if daily_vol <= 0:
                 raise ValueError(
-                    f"σ_t is non-positive at event {ts} (value={daily_vol}); "
+                    f"sigma_t is non-positive at event {ts} (value={daily_vol}); "
                     "ADR-0005 D1 forbids silent skipping of statistical evidence"
                 )
 
-            future_prices = [(bar_ts[j], bar_closes[j]) for j in range(i + 1, len(bar_ts))]
+            future_prices = all_future[i + 1 :]
 
             label = self._labeler.label_event(
                 entry_price=bar_closes[i],
