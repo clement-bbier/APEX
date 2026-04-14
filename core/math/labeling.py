@@ -98,17 +98,37 @@ class TripleBarrierLabeler:
         """Estimate daily volatility from close-to-close log returns.
 
         Returns estimated vol as a fraction (e.g. 0.015 = 1.5% daily).
-        Minimum of 2 prices required; returns 0.01 as safe default otherwise.
+        Requires a strict minimum of 2 positive prices. ADR-0005 D1
+        mandates fail-loud behaviour: insufficient data raises
+        ``ValueError`` rather than returning a silent default.
+
+        Zero-variance inputs (constant prices) are a legitimate signal
+        of a dead market and return ``0.0``; the caller is expected to
+        reject that volatility via ``label_event``'s own guard.
+
+        Raises:
+            ValueError: when fewer than 2 prices are provided or no
+                valid log-return can be computed from the series.
         """
         if len(close_prices) < 2:
-            return 0.01
-        log_returns = [
-            math.log(float(close_prices[i]) / float(close_prices[i - 1]))
-            for i in range(1, len(close_prices))
-            if float(close_prices[i - 1]) > 0
-        ]
+            raise ValueError(
+                f"compute_daily_vol requires at least 2 prices, got {len(close_prices)}"
+            )
+        log_returns: list[float] = []
+        for i in range(1, len(close_prices)):
+            prev = float(close_prices[i - 1])
+            curr = float(close_prices[i])
+            if prev <= 0 or curr <= 0:
+                raise ValueError(
+                    "compute_daily_vol requires strictly positive prices; "
+                    f"got prev={prev}, curr={curr} at index {i}"
+                )
+            log_returns.append(math.log(curr / prev))
         if not log_returns:
-            return 0.01
+            raise ValueError(
+                "compute_daily_vol could not derive any log return; "
+                "all prior prices are non-positive"
+            )
         mean = sum(log_returns) / len(log_returns)
         variance = sum((r - mean) ** 2 for r in log_returns) / max(1, len(log_returns) - 1)
         return math.sqrt(max(0.0, variance))
@@ -134,6 +154,13 @@ class TripleBarrierLabeler:
         Returns:
             BarrierLabel with the outcome, exit price/time, holding periods.
         """
+        if daily_vol <= 0:
+            raise ValueError(
+                f"daily_vol must be strictly positive at entry_time={entry_time}, "
+                f"got {daily_vol}. ADR-0005 D1 forbids silent 1e-8 floors; "
+                "the caller must either raise on zero-variance inputs or skip the event."
+            )
+
         if not future_prices:
             return BarrierLabel(
                 entry_time=entry_time,
@@ -150,7 +177,7 @@ class TripleBarrierLabeler:
                 holding_periods=0,
             )
 
-        vol_move = Decimal(str(max(1e-8, daily_vol) * float(entry_price)))
+        vol_move = Decimal(str(daily_vol * float(entry_price)))
         upper_barrier = entry_price + Decimal(str(self.config.pt_multiplier)) * vol_move
         lower_barrier = entry_price - Decimal(str(self.config.sl_multiplier)) * vol_move
 
@@ -237,3 +264,35 @@ class TripleBarrierLabeler:
             vol_used=daily_vol,
             holding_periods=max_periods,
         )
+
+
+def to_binary_target(label: BarrierLabel) -> int:
+    """Project a ternary ``BarrierLabel`` to the binary Meta-Labeler target.
+
+    Per ADR-0005 D1, the Meta-Labeler consumes the binary projection
+    ``y = 1 iff BarrierLabel.label == +1 else 0``. Vertical-barrier
+    time-outs (``label == 0``) and lower-barrier hits (``label == -1``)
+    both map to ``0`` — "no profitable edge taken".
+
+    Intra-bar tie convention (upper wins): in the core ``label_event``
+    loop, the upper-barrier condition is tested before the lower-barrier
+    condition on every bar (see ``TripleBarrierLabeler.label_event``
+    ~L161 and ~L193). When a single future bar touches both barriers,
+    ``BarrierResult.UPPER`` is emitted and this helper returns ``1``.
+    The convention is deliberate: long-only Meta-Labeler training
+    favours the optimistic interpretation when the evidence is
+    ambiguous, which aligns with the MetaLabelGate bet-sizing
+    philosophy (gate on confidence, size via Kelly).
+
+    Args:
+        label: Any ``BarrierLabel`` from ``TripleBarrierLabeler``.
+
+    Returns:
+        ``1`` iff ``label.label == +1`` (upper barrier hit), else ``0``.
+
+    References:
+        López de Prado (2018), Advances in Financial Machine Learning,
+        Chapter 3.6 (Meta-Labeling).
+        ADR-0005 D1 — binary target projection.
+    """
+    return 1 if label.label == 1 else 0
