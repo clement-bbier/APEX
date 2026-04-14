@@ -13,6 +13,7 @@ fail-loud contracts:
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime
 
 import polars as pl
@@ -68,6 +69,11 @@ def build_events_from_signals(
         raise ValueError(f"signals missing required column: {timestamp_col!r}")
     if signal_col not in signals.columns:
         raise ValueError(f"signals missing required column: {signal_col!r}")
+    if not math.isfinite(threshold):
+        raise ValueError(
+            f"threshold must be finite; got {threshold!r}. "
+            "ADR-0005 D1 forbids silent behaviour with NaN/inf comparisons."
+        )
 
     ts_list: list[datetime] = signals[timestamp_col].to_list()
     _ensure_utc_series(ts_list, f"signals.{timestamp_col}")
@@ -81,7 +87,7 @@ def build_events_from_signals(
 
     raw_values = signals[signal_col].to_list()
     for idx, v in enumerate(raw_values):
-        if v is None:
+        if v is None or (isinstance(v, float) and math.isnan(v)):
             raise ValueError(
                 f"signals.{signal_col} has NaN/None at "
                 f"timestamp={ts_list[idx]}; ADR-0005 D1 forbids silent ffill"

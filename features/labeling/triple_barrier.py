@@ -83,14 +83,19 @@ def _validate_bars(
             )
 
     raw_closes = bars[close_col].to_list()
+    closes: list[Decimal] = []
     for idx, v in enumerate(raw_closes):
         if v is None:
             raise ValueError(
                 f"bars.{close_col} has NaN/None at timestamp={ts_list[idx]}; "
                 "ADR-0005 D1 forbids silent ffill"
             )
-
-    closes: list[Decimal] = [Decimal(str(v)) for v in raw_closes]
+        d = Decimal(str(v))
+        if d <= 0:
+            raise ValueError(
+                f"bars.{close_col} must be strictly positive; got {d} at timestamp={ts_list[idx]}"
+            )
+        closes.append(d)
     return ts_list, closes
 
 

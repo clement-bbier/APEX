@@ -114,11 +114,16 @@ class TripleBarrierLabeler:
             raise ValueError(
                 f"compute_daily_vol requires at least 2 prices, got {len(close_prices)}"
             )
-        log_returns = [
-            math.log(float(close_prices[i]) / float(close_prices[i - 1]))
-            for i in range(1, len(close_prices))
-            if float(close_prices[i - 1]) > 0
-        ]
+        log_returns: list[float] = []
+        for i in range(1, len(close_prices)):
+            prev = float(close_prices[i - 1])
+            curr = float(close_prices[i])
+            if prev <= 0 or curr <= 0:
+                raise ValueError(
+                    "compute_daily_vol requires strictly positive prices; "
+                    f"got prev={prev}, curr={curr} at index {i}"
+                )
+            log_returns.append(math.log(curr / prev))
         if not log_returns:
             raise ValueError(
                 "compute_daily_vol could not derive any log return; "

@@ -100,10 +100,12 @@ class TripleBarrierLabelerAdapter:
     ) -> pl.DataFrame:
         """Apply Triple Barrier labeling bar-by-bar.
 
-        Every bar with enough prior history (``i >= MIN_VOL_HISTORY``)
-        is treated as a candidate entry. Earlier bars are skipped from
-        the output — there is no ``σ_t`` estimate for them. The output
-        ``DataFrame`` therefore has ``len(df) - MIN_VOL_HISTORY`` rows.
+        Every bar with enough prior history (``i >= vol_lookback``)
+        is treated as a candidate entry, where ``vol_lookback`` is
+        taken from the configured :class:`TripleBarrierConfig`.
+        Earlier bars are skipped from the output because there is no
+        strict ``σ_t`` estimate for them. The output ``DataFrame``
+        therefore has ``len(df) - vol_lookback`` rows.
 
         Args:
             df: Bar DataFrame with at least *close_col* and
