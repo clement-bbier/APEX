@@ -16,7 +16,7 @@ streaming surface is representative (tick-level, no day boundaries).
 
 from __future__ import annotations
 
-import math
+import os
 import subprocess
 import time
 from dataclasses import dataclass
@@ -125,6 +125,69 @@ class TestConstructor:
         )
 
         assert adapter.on_observation("feat_b", {"value": 1.0}) is None
+
+    def test_weight_out_of_range_rejected(self) -> None:
+        cfg = _config({"feat_a"})
+        cals: dict[str, FeatureCalculator] = {"feat_a": _DummyCalculator("feat_a")}
+        wp = {"feat_a": 3}
+
+        with pytest.raises(ValueError, match=r"must be in \[0\.0, 1\.0\]"):
+            S02FeatureAdapter(
+                config=cfg, calculators=cals, warmup_periods=wp, weights={"feat_a": 1.5}
+            )
+        with pytest.raises(ValueError, match=r"must be in \[0\.0, 1\.0\]"):
+            S02FeatureAdapter(
+                config=cfg,
+                calculators=cals,
+                warmup_periods=wp,
+                weights={"feat_a": -0.1},
+            )
+
+    def test_weight_nan_or_inf_rejected(self) -> None:
+        cfg = _config({"feat_a"})
+        cals: dict[str, FeatureCalculator] = {"feat_a": _DummyCalculator("feat_a")}
+        wp = {"feat_a": 3}
+
+        with pytest.raises(ValueError, match="must be finite"):
+            S02FeatureAdapter(
+                config=cfg,
+                calculators=cals,
+                warmup_periods=wp,
+                weights={"feat_a": float("nan")},
+            )
+        with pytest.raises(ValueError, match="must be finite"):
+            S02FeatureAdapter(
+                config=cfg,
+                calculators=cals,
+                warmup_periods=wp,
+                weights={"feat_a": float("inf")},
+            )
+
+    def test_negative_threshold_rejected(self) -> None:
+        cfg = _config({"feat_a"})
+        cals: dict[str, FeatureCalculator] = {"feat_a": _DummyCalculator("feat_a")}
+        wp = {"feat_a": 3}
+
+        with pytest.raises(ValueError, match=r"must be >= 0\.0"):
+            S02FeatureAdapter(
+                config=cfg,
+                calculators=cals,
+                warmup_periods=wp,
+                trigger_thresholds={"feat_a": -0.5},
+            )
+
+    def test_non_finite_threshold_rejected(self) -> None:
+        cfg = _config({"feat_a"})
+        cals: dict[str, FeatureCalculator] = {"feat_a": _DummyCalculator("feat_a")}
+        wp = {"feat_a": 3}
+
+        with pytest.raises(ValueError, match="must be finite"):
+            S02FeatureAdapter(
+                config=cfg,
+                calculators=cals,
+                warmup_periods=wp,
+                trigger_thresholds={"feat_a": float("nan")},
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -458,19 +521,62 @@ class TestLatency:
 # ---------------------------------------------------------------------------
 
 
+def _resolve_base_ref(repo_root: Path) -> str | None:
+    """Resolve a git base ref for the scope-check test.
+
+    Tries ``GITHUB_BASE_REF`` first (set on GitHub Actions PR events),
+    then ``origin/main`` and ``main`` as fallbacks. Returns the first
+    that ``git rev-parse --verify`` accepts, or ``None`` if none
+    resolve (e.g. shallow clone with no base ref).
+    """
+    candidates: list[str] = []
+    env_ref = os.environ.get("GITHUB_BASE_REF")
+    if env_ref:
+        candidates.append(env_ref)
+        if "/" not in env_ref:
+            candidates.append(f"origin/{env_ref}")
+    candidates += ["origin/main", "main"]
+
+    for ref in candidates:
+        check = subprocess.run(
+            ["git", "rev-parse", "--verify", ref],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        if check.returncode == 0:
+            return ref
+    return None
+
+
 class TestScope:
-    """Zero diff in services/s02_signal_engine/ is non-negotiable (DoD)."""
+    """Zero diff in services/s02_signal_engine/ is non-negotiable (DoD).
+
+    The test must not silently skip. If the base ref cannot be resolved
+    (e.g. a CI runner with a shallow clone and no ``GITHUB_BASE_REF``),
+    the test fails loud so the DoD is never bypassed.
+    """
 
     def test_no_modification_of_s02_on_branch(self) -> None:
         repo_root = Path(__file__).resolve().parents[4]
         if not (repo_root / ".git").exists():
-            pytest.skip("Not in a git checkout")
+            pytest.skip("Not in a git checkout (scope check cannot run)")
+
+        base_ref = _resolve_base_ref(repo_root)
+        if base_ref is None:
+            pytest.fail(
+                "Could not resolve a base ref (tried GITHUB_BASE_REF, "
+                "origin/main, main). DoD 'zero diff in S02' cannot be "
+                "verified; this check must not silently skip."
+            )
 
         cmd = [
             "git",
             "diff",
             "--stat",
-            "main..HEAD",
+            f"{base_ref}..HEAD",
             "--",
             "services/s02_signal_engine/",
         ]
@@ -483,18 +589,15 @@ class TestScope:
                 timeout=10,
                 check=False,
             )
-        except (OSError, subprocess.TimeoutExpired):
-            pytest.skip("git not available or timed out")
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            pytest.fail(f"git subprocess failed: {exc}. Cannot verify DoD 'zero diff in S02'.")
 
         if result.returncode != 0:
-            pytest.skip(f"git diff failed: {result.stderr.strip()}")
+            pytest.fail(f"git diff returned {result.returncode}: {result.stderr.strip()}")
 
-        diff_output = result.stdout.strip()
-        assert diff_output == "", (
-            "Phase 3.13 adapter must not touch services/s02_signal_engine/. "
-            f"Observed diff:\n{diff_output}"
+        assert result.stdout.strip() == "", (
+            "DoD violation: services/s02_signal_engine/ has modifications "
+            f"on this branch. Phase 3.13 is scaffolding-only.\n"
+            f"git diff --stat {base_ref}..HEAD -- services/s02_signal_engine/:\n"
+            f"{result.stdout}"
         )
-
-
-# Silence unused-import lint where the import is only for typing/assertion.
-_ = math

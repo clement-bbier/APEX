@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 from datetime import UTC, datetime
 from pathlib import Path
@@ -139,6 +140,55 @@ class TestFromReportJson:
         with pytest.raises(ValueError, match="pbo_of_final_set"):
             FeatureActivationConfig.from_report_json(path)
 
+    def test_duplicate_feature_name_different_decisions_raises(self, tmp_path: Path) -> None:
+        """Duplicate feature_name with conflicting decisions must fail loud."""
+        payload = _minimal_payload()
+        payload["decisions"] = [
+            {"feature_name": "ofi_signal", "decision": "keep"},
+            {"feature_name": "ofi_signal", "decision": "reject"},
+        ]
+        path = _write_report(tmp_path, payload)
+
+        with pytest.raises(ValueError, match="Duplicate feature_name"):
+            FeatureActivationConfig.from_report_json(path)
+
+    def test_duplicate_feature_name_same_decision_raises(self, tmp_path: Path) -> None:
+        """Even same-decision duplicates fail loud (schema violation)."""
+        payload = _minimal_payload()
+        payload["decisions"] = [
+            {"feature_name": "ofi_signal", "decision": "keep"},
+            {"feature_name": "ofi_signal", "decision": "keep"},
+        ]
+        path = _write_report(tmp_path, payload)
+
+        with pytest.raises(ValueError, match="Duplicate feature_name"):
+            FeatureActivationConfig.from_report_json(path)
+
+    def test_naive_timestamp_rejected(self, tmp_path: Path) -> None:
+        """UTC-only rule: timezone-naive timestamps must fail loud."""
+        payload = _minimal_payload()
+        payload["generated_at"] = "2026-04-14T12:00:00"  # no TZ
+        path = _write_report(tmp_path, payload)
+
+        with pytest.raises(ValueError, match="timezone-naive"):
+            FeatureActivationConfig.from_report_json(path)
+
+    def test_utc_offset_forms_accepted(self, tmp_path: Path) -> None:
+        """Both 'Z' and '+00:00' forms accepted; result normalised to UTC."""
+        for i, ts in enumerate(("2026-04-14T12:00:00Z", "2026-04-14T12:00:00+00:00")):
+            subdir = tmp_path / f"case_{i}"
+            subdir.mkdir()
+            payload = _minimal_payload()
+            payload["generated_at"] = ts
+            path = _write_report(subdir, payload)
+
+            cfg = FeatureActivationConfig.from_report_json(path)
+
+            assert cfg.generated_at.tzinfo is not None
+            offset = cfg.generated_at.tzinfo.utcoffset(cfg.generated_at)
+            assert offset is not None
+            assert offset.total_seconds() == 0
+
     def test_empty_activated_set_is_valid(self, tmp_path: Path) -> None:
         payload = _minimal_payload()
         payload["decisions"] = [{"feature_name": "x", "decision": "reject"}]
@@ -157,7 +207,7 @@ class TestFrozenSemantics:
         path = _write_report(tmp_path, _minimal_payload())
         cfg = FeatureActivationConfig.from_report_json(path)
 
-        with pytest.raises((AttributeError, Exception)):
+        with pytest.raises(dataclasses.FrozenInstanceError):
             cfg.activated_features = frozenset()  # type: ignore[misc]
 
     def test_activated_is_frozenset(self, tmp_path: Path) -> None:

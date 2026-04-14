@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 
@@ -72,6 +72,7 @@ class FeatureActivationConfig:
 
         activated: set[str] = set()
         rejected: set[str] = set()
+        seen: set[str] = set()
         for entry in decisions:
             if not isinstance(entry, dict):
                 raise ValueError("Each decision entry must be a JSON object")
@@ -79,6 +80,12 @@ class FeatureActivationConfig:
             decision = entry.get("decision")
             if not isinstance(name, str) or not name:
                 raise ValueError("Decision entry missing 'feature_name'")
+            if name in seen:
+                raise ValueError(
+                    f"Duplicate feature_name {name!r} in selection report. "
+                    f"Each feature must appear exactly once (schema violation)."
+                )
+            seen.add(name)
             if decision == "keep":
                 activated.add(name)
             elif decision == "reject":
@@ -116,9 +123,21 @@ class FeatureActivationConfig:
 
 
 def _parse_iso8601(value: str) -> datetime:
-    """Parse an ISO-8601 timestamp, tolerating a trailing ``Z``."""
+    """Parse an ISO-8601 timestamp; require timezone info (UTC-aware).
+
+    Per the CLAUDE.md UTC-only convention, timezone-naive timestamps are
+    rejected fail-loud. A trailing ``Z`` is accepted as a synonym for
+    ``+00:00``. The returned datetime is always normalised to UTC.
+    """
     normalised = value.replace("Z", "+00:00") if value.endswith("Z") else value
     try:
-        return datetime.fromisoformat(normalised)
+        dt = datetime.fromisoformat(normalised)
     except ValueError as exc:
         raise ValueError(f"Invalid ISO-8601 timestamp: {value!r}") from exc
+    if dt.tzinfo is None:
+        raise ValueError(
+            f"Timestamp {value!r} is timezone-naive. "
+            f"Phase 3 reports require UTC-aware timestamps "
+            f"(use 'Z' or '+00:00' suffix)."
+        )
+    return dt.astimezone(UTC)

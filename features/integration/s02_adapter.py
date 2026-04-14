@@ -52,6 +52,26 @@ from features.integration.warmup_gate import WarmupGate
 from services.s02_signal_engine.signal_scorer import SignalComponent
 
 
+def _validate_weight(name: str, value: float) -> float:
+    """Enforce the SignalComponent.weight contract: finite and in [0, 1]."""
+    if not math.isfinite(value):
+        raise ValueError(f"weight[{name!r}]={value!r} must be finite")
+    if not 0.0 <= value <= 1.0:
+        raise ValueError(
+            f"weight[{name!r}]={value!r} must be in [0.0, 1.0] (per SignalComponent contract)"
+        )
+    return value
+
+
+def _validate_threshold(name: str, value: float) -> float:
+    """Enforce the trigger-threshold contract: finite and non-negative."""
+    if not math.isfinite(value):
+        raise ValueError(f"trigger_threshold[{name!r}]={value!r} must be finite")
+    if value < 0.0:
+        raise ValueError(f"trigger_threshold[{name!r}]={value!r} must be >= 0.0")
+    return value
+
+
 class S02FeatureAdapter:
     """Adapts Phase 3 batch calculators to S02's SignalComponent API.
 
@@ -62,20 +82,43 @@ class S02FeatureAdapter:
     and from any bar-aggregation logic.
 
     Contract:
-        * Returns ``None`` for features not in
-          :class:`FeatureActivationConfig.activated_features`.
+        * Returns ``None`` for feature names known to
+          :class:`FeatureActivationConfig` but NOT activated
+          (``decision == "reject"`` in the Phase 3.12 report).
         * Returns ``None`` while the per-feature warmup is incomplete.
-        * Returns ``None`` when the calculator emits NaN (e.g. edge
-          cases at the very start of the buffer).
-        * Otherwise returns a :class:`SignalComponent` whose ``name``
+        * Returns ``None`` when the calculator emits NaN or null on the
+          last row of its output.
+        * Returns a valid :class:`SignalComponent` once warmup is
+          complete and the calculator produced a finite value. ``name``
           equals the feature name, ``score`` equals the calculator's
-          last-row output value (clamped to [-1, +1]) and
+          last-row output value clamped to ``[-1, +1]`` and
           ``triggered`` reflects an ``abs(score) > trigger_threshold``
           test.
+        * Raises :class:`ValueError` for feature names unknown to the
+          activation config (neither activated nor rejected -- caller
+          bug, not a data event).
 
     The output column read from the calculator is assumed to match
     the feature name (holds for all Phase 3 ``*_signal`` outputs:
     ``har_rv_signal``, ``ofi_signal``, ``gex_signal``).
+
+    Note on :attr:`SignalComponent.weight` propagation:
+        The current :class:`SignalScorer.compute` in S02 ignores the
+        ``weight`` field on incoming :class:`SignalComponent` objects
+        and looks up weights via ``SignalScorer.WEIGHTS.get(name, 0.1)``.
+        Weights passed to this adapter therefore control
+        ``SignalComponent.weight`` (for audit / introspection) but do
+        not yet influence scoring until S02 is modified to honour
+        component-level weights. :attr:`DEFAULT_WEIGHT` is ``0.1`` so
+        the adapter agrees with the existing fallback out of the box.
+
+    Note on measured latency:
+        The original DoD target was ``<1 ms per (feature, tick)``.
+        With the batch-only calculators of Phase 3.4-3.8 and the
+        rolling-buffer recompute loop used here, the measured
+        ``p50`` on OFI is ~4-9 ms. Resolution requires a streaming
+        calculator surface -- tracked in GitHub issue #123 and
+        prerequisite for eventual wiring into S02 (Phase 5).
     """
 
     DEFAULT_WEIGHT: float = 0.1
@@ -113,9 +156,10 @@ class S02FeatureAdapter:
 
         Raises:
             ValueError: If an activated feature is missing from
-                ``calculators``, ``warmup_periods``, or if
+                ``calculators`` / ``warmup_periods``, if
                 ``max_buffer_size`` is not strictly greater than the
-                largest declared warmup.
+                largest declared warmup, or if any weight /
+                trigger_threshold value is non-finite or out of range.
         """
         missing_calc = sorted(config.activated_features - set(calculators))
         if missing_calc:
@@ -135,11 +179,14 @@ class S02FeatureAdapter:
         self._config = config
         self._calculators: dict[str, FeatureCalculator] = dict(calculators)
         self._weights: dict[str, float] = {
-            name: float((weights or {}).get(name, self.DEFAULT_WEIGHT))
+            name: _validate_weight(name, float((weights or {}).get(name, self.DEFAULT_WEIGHT)))
             for name in config.activated_features
         }
         self._trigger_thresholds: dict[str, float] = {
-            name: float((trigger_thresholds or {}).get(name, self.DEFAULT_TRIGGER_THRESHOLD))
+            name: _validate_threshold(
+                name,
+                float((trigger_thresholds or {}).get(name, self.DEFAULT_TRIGGER_THRESHOLD)),
+            )
             for name in config.activated_features
         }
         self._warmup_gates: dict[str, WarmupGate] = {

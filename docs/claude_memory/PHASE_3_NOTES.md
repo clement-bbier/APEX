@@ -131,3 +131,10 @@
 - Scope check test: `git diff --stat main..HEAD -- services/s02_signal_engine/` empty (DoD PASS)
 - 46 tests on features/integration/, 100% coverage, 1,828 total tests (0 regressions, 1 xfailed latency)
 - **Phase 3 is now at 100%**: 3.1-3.13 complete, ready for Phase 3 closure report
+- 3.13 hotfix (PR #122 Copilot): fail-loud on duplicate feature_name in report JSON (schema violation); fail-loud on timezone-naive `generated_at` (CLAUDE.md UTC-only); D030 validation of weight [0,1] and trigger_threshold >= 0 finite; docstring aligned with on_observation behaviour (None for rejected, ValueError for unknown); scope-check test hardened with GITHUB_BASE_REF -> origin/main -> main fallback chain (never silent-skip)
+- 3.13 hotfix test count: 46 -> 54 (+8 characterization tests, still 1 xfailed latency)
+
+## Technical debt (Phase 3 → later)
+
+- **Streaming calculators** (issue #123): Phase 3.4-3.8 calculators expose only batch `compute(df)`. The Phase 3.13 adapter maintains a rolling buffer and re-runs compute per observation — p50 ~4-9 ms on OFI, exceeds the original <1 ms DoD. xfailed in `TestLatency` with honest measurement. Prerequisite for wiring the adapter into S02 (Phase 5). Not a Phase 4 prerequisite.
+- **Adapter weight propagation**: `S02FeatureAdapter` sets `SignalComponent.weight` but `SignalScorer.compute()` currently ignores it (uses `SignalScorer.WEIGHTS.get(name, 0.1)`). DEFAULT_WEIGHT=0.1 matches the fallback so behavior is consistent, but proper component-level weighting is a future S02 change (outside Phase 3 scope).
