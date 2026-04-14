@@ -129,13 +129,17 @@ class TestBarrierLevels:
 
 
 class TestComputeDailyVol:
-    def test_single_price_returns_default(self) -> None:
+    def test_single_price_raises(self) -> None:
+        """ADR-0005 D1 fail-loud: < 2 prices must raise, no silent default."""
         lb = TripleBarrierLabeler()
-        assert lb.compute_daily_vol([Decimal("100")]) == pytest.approx(0.01)
+        with pytest.raises(ValueError, match="at least 2 prices"):
+            lb.compute_daily_vol([Decimal("100")])
 
-    def test_empty_returns_default(self) -> None:
+    def test_empty_raises(self) -> None:
+        """ADR-0005 D1 fail-loud: empty input must raise, no silent default."""
         lb = TripleBarrierLabeler()
-        assert lb.compute_daily_vol([]) == pytest.approx(0.01)
+        with pytest.raises(ValueError, match="at least 2 prices"):
+            lb.compute_daily_vol([])
 
     def test_vol_estimate_positive(self) -> None:
         lb = TripleBarrierLabeler()
@@ -143,9 +147,38 @@ class TestComputeDailyVol:
         assert lb.compute_daily_vol(prices) > 0
 
     def test_constant_prices_zero_vol(self) -> None:
+        """Constant prices legitimately produce zero variance.
+
+        The function returns 0.0 honestly; the downstream
+        ``label_event`` caller is responsible for rejecting that
+        volatility via its own fail-loud guard.
+        """
         lb = TripleBarrierLabeler()
         prices = [Decimal("100")] * 10
         assert lb.compute_daily_vol(prices) == pytest.approx(0.0)
+
+    def test_label_event_zero_vol_raises(self) -> None:
+        """ADR-0005 D1 fail-loud: daily_vol<=0 must raise at label_event."""
+        lb = TripleBarrierLabeler()
+        with pytest.raises(ValueError, match="daily_vol must be strictly positive"):
+            lb.label_event(
+                entry_price=Decimal("100"),
+                entry_time=_ts(),
+                side=+1,
+                future_prices=_future(100, [0.001, 0.002]),
+                daily_vol=0.0,
+            )
+
+    def test_label_event_negative_vol_raises(self) -> None:
+        lb = TripleBarrierLabeler()
+        with pytest.raises(ValueError, match="daily_vol must be strictly positive"):
+            lb.label_event(
+                entry_price=Decimal("100"),
+                entry_time=_ts(),
+                side=+1,
+                future_prices=_future(100, [0.001]),
+                daily_vol=-0.01,
+            )
 
 
 class TestProperties:
