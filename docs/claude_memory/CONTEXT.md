@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-14
-**Updated by**: Session 030 (Phase 4 design gate)
+**Updated by**: Session 031 (Phase 4.2 Sample Weights)
 
 ---
 
@@ -13,18 +13,32 @@ the full inventory. 3 features activated for downstream use:
 `gex_signal`, `har_rv_signal`, `ofi_signal`. S02 adapter scaffolded,
 not wired (issue #123 for streaming).
 
-Phase 4 design-gate in progress on branch `design-gate/phase-4`.
-Artifacts: [`docs/adr/ADR-0005-meta-labeling-fusion-methodology.md`](../adr/ADR-0005-meta-labeling-fusion-methodology.md)
-and [`docs/phases/PHASE_4_SPEC.md`](../phases/PHASE_4_SPEC.md). Issues
-`#125`–`#135` (9 sub-phase + 2 transverse: leakage audit `#134`,
-closure tracking `#135`). Phase 4.1 Triple Barrier Labeling (`#125`)
-is next, to be started after the design-gate PR is merged. Technical
-debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123` (streaming
-calculators, Phase 5).
+Phase 4 design-gate merged. Phase 4.1 Triple Barrier Labeling (`#125`)
+merged via PR #138 on `main`.
+
+Phase 4.2 Sample Weights (`#126`) in progress on branch
+`phase/4.2-sample-weights`. Canonical bar-indexed uniqueness ×
+return-attribution weights per ADR-0005 D2 / LdP §§4.4-4.5:
+`features/labeling/sample_weights.py` with 4 public helpers
+(`compute_concurrency`, `uniqueness_weights`,
+`return_attribution_weights`, `combined_weights`). 52 new unit tests,
+94% coverage. Coexists with the Phase 3.1 prototype
+`features/weights.py::SampleWeighter` (untouched, 21 tests still
+green); migration of `features/pipeline.py` deferred to the Phase 4
+closure report (#133) as technical debt.
+
+Remaining Phase 4 work: #127 (Baseline Meta-Labeler), #128 (Nested
+Tuning), #129 (Statistical Validation), #130 (Persistence + Model
+Card), #131 (Fusion Engine IC-weighted), #132 (E2E Pipeline Test),
+#133 (Closure Report), plus #134 (mid-phase leakage audit) and #135
+(closure tracking).
+
+Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
+(streaming calculators, Phase 5).
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 4 (Fusion Engine + Meta-Labeler) — design-gate PR pending |
+| Active Phase | Phase 4.2 (Sample Weights — #126 PR pending); 4.1 merged (PR #138) |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
 | Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests |
 | Production LOC | ~35,770 (+ ~8,271 `features/`) |
@@ -37,9 +51,10 @@ calculators, Phase 5).
 
 ## On the horizon
 
-Phase 4 design-gate PR (Fusion Engine + Meta-Labeler). Prerequisites
-confirmed in the Phase 3 closure report. Expected to start with a
-dedicated design-gate PR before implementation begins.
+Phase 4.3 Baseline Meta-Labeler (issue #127) once PR for #126 merges.
+Builds on the `t0/t1` schema from Phase 4.1 + the sample weights from
+Phase 4.2 to train a `RandomForestClassifier` (ADR-0005 D3) with
+CPCV-based validation.
 
 ## Audit Status
 

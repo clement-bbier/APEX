@@ -1452,3 +1452,77 @@ services/ features/ backtesting/ core/ tests/` is empty.
   risk).
 - After merge: start Phase 4.1 Triple Barrier Labeling (#125) in a
   fresh Claude Code session.
+
+## Session 031 — 2026-04-14
+
+### Focus
+
+Phase 4.2 — Sample Weights (issue #126). Canonical bar-indexed
+uniqueness × return-attribution weights per ADR-0005 D2 and López de
+Prado (2018) §§4.4-4.5.
+
+### Branch
+
+`phase/4.2-sample-weights` (off `main` after PR #138 for Phase 4.1
+merged).
+
+### Deliverables
+
+| Artifact | LOC | Notes |
+|---|---|---|
+| `reports/phase_4_2/audit.md` | 327 | Pre-impl audit, verdict CRÉER (new sibling, not refactor). Documents coexistence with `features/weights.py::SampleWeighter`. |
+| `features/labeling/sample_weights.py` | 478 | Public API: `compute_concurrency`, `uniqueness_weights`, `return_attribution_weights`, `combined_weights`. O(n_samples + n_bars). |
+| `features/labeling/__init__.py` | +14 | Phase 4.2 re-exports section. |
+| `tests/unit/features/labeling/test_sample_weights_uniqueness.py` | 262 | 21 tests (concurrency, disjoint→1.0, LdP §4.4 Table 4.1 reference, fail-loud validation, helpers). |
+| `tests/unit/features/labeling/test_sample_weights_attribution.py` | 206 | 15 tests incl. Hypothesis anti-leakage property (200 cases): shuffle post-`max(t1)` preserves weights to 1e-12. |
+| `tests/unit/features/labeling/test_sample_weights_combined.py` | 152 | 16 tests: normalization invariant `sum(w) == n_samples`, identity `w ∝ u × r`, all-zero returns preserved. |
+| `reports/phase_4_2/weights_distribution.md` | 176 | Diagnostic: 100 events × 1,000 bars seed 42, histograms + P05/P50/P95 for `c_t`, `u`, `r`, `w`; normalization drift 1.42e-14. |
+
+### Quality Gates
+
+- ruff check: clean on the 5 new/modified files (all rules: E,W,F,I,N,UP,ANN,S,B,A,C4,PT,RUF).
+- ruff format: clean.
+- mypy --strict on `features/labeling/sample_weights.py`: 0 errors.
+- pytest: 52/52 pass locally.
+- Coverage on `features/labeling/sample_weights.py`: **94%** (137 stmts,
+  7 missed), above DoD threshold of 92%. Remaining 6% are unreachable
+  defensive branches: dtype mismatch inside `_locate_span_indices` (pre-filtered
+  by `_validate_datetime_series`), `c_t == 0` inside a consistent span,
+  and the `sum(w) drift > 1e-9` defensive raise.
+- Anti-leakage property test: 200 Hypothesis cases, all pass.
+
+### Architectural Decisions
+
+- Coexistence of `features/weights.py::SampleWeighter` (Phase 3.1
+  prototype, duration-weighted, 21 existing tests) with
+  `features/labeling/sample_weights.py` (new canonical LdP §4.4 bar-
+  indexed implementation). Zero modification to the old module.
+  Migration of `features/pipeline.py` to the canonical API is deferred
+  to the Phase 4 closure report (issue #133) as technical debt.
+- Closed interval `[t0, t1]` (both bars inclusive) — matches LdP §4.4
+  convention; internally mapped to half-open `[i0, i1+1)` via
+  `np.searchsorted` for cumsum-based O(n) scans.
+- Fail-loud on every edge case (tz-naive, non-UTC, orphan timestamps,
+  non-monotonic bars, NaN/Inf returns). ADR-0005 D2 explicitly forbids
+  silent ffill or zero-weight remap.
+
+### Scope
+
+Phase 4.2 deliverables only. `features/weights.py` untouched — 21
+existing tests must remain green. No changes to
+`features/labeling/triple_barrier.py` (Phase 4.1, consumer of `t0/t1`
+schema).
+
+### Issues Addressed
+
+- Refs #126 (Phase 4.2 Sample Weights)
+- Refs ADR-0005 D2
+
+### Next Steps
+
+- Push branch `phase/4.2-sample-weights` to `origin` and open PR
+  against `main` with the quant PR template.
+- Wait for Copilot review + full CI (quality / rust / unit-tests /
+  integration / backtest-gate).
+- On merge: pull `main`, branch `phase/4.3-baseline-meta-labeler`,
+  open issue #127 (Baseline Meta-Labeler).
