@@ -508,7 +508,7 @@ class TestReproducibility:
         # earlier in this same test function. There is no untrusted
         # input, and joblib/pickle is the ADR-0005 D6 persistence
         # format we will ship in sub-phase 4.6.
-        loaded = pickle.loads(pickle.dumps(cfg))  # noqa: S301
+        loaded = pickle.loads(pickle.dumps(cfg))
         assert loaded.pt_multiplier == cfg.pt_multiplier
         assert loaded.sl_multiplier == cfg.sl_multiplier
         assert loaded.max_holding_periods == cfg.max_holding_periods
