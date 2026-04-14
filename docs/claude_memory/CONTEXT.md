@@ -1,16 +1,26 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-14
-**Updated by**: Session 029 (Phase 3 closure)
+**Updated by**: Session 030 (Phase 4 design gate)
 
 ---
 
 ## Current State
 
-Phase 3 closed. See [`docs/phase_3_closure_report.md`](../phase_3_closure_report.md)
-for the full inventory. 3 features activated for downstream use:
-`gex_signal`, `har_rv_signal`, `ofi_signal`. S02 adapter scaffolded, not
-wired (issue #123 for streaming).
+Phase 3 closed (PR #124 merged). See
+[`docs/phase_3_closure_report.md`](../phase_3_closure_report.md) for
+the full inventory. 3 features activated for downstream use:
+`gex_signal`, `har_rv_signal`, `ofi_signal`. S02 adapter scaffolded,
+not wired (issue #123 for streaming).
+
+Phase 4 design-gate in progress on branch `design-gate/phase-4`.
+Artifacts: [`docs/adr/ADR-0005-meta-labeling-fusion-methodology.md`](../adr/ADR-0005-meta-labeling-fusion-methodology.md)
+and [`docs/phases/PHASE_4_SPEC.md`](../phases/PHASE_4_SPEC.md). Issues
+`#125`–`#135` (9 sub-phase + 2 transverse: leakage audit `#134`,
+closure tracking `#135`). Phase 4.1 Triple Barrier Labeling (`#125`)
+is next, to be started after the design-gate PR is merged. Technical
+debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123` (streaming
+calculators, Phase 5).
 
 | Metric | Value |
 |---|---|
