@@ -34,3 +34,4 @@ EXTENSIONS.md
 # Graphify local state
 .graphify_python
 graphify-out/
+.claude/scheduled_tasks.lock
