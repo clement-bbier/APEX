@@ -1350,3 +1350,105 @@ Closure checkpoint for Phase 3 (3.1 through 3.13 all merged to `main`).
 
 - Raise PR `chore/phase-3-closure` -> `main`.
 - After merge: open Phase 4 design-gate PR (separate).
+
+---
+
+## Session 030 — 2026-04-14
+
+| Field | Value |
+|---|---|
+| Date | 2026-04-14 |
+| Mission | Phase 4 Design Gate — ADR-0005 + PHASE_4_SPEC + 11 issues |
+| Agent Model | Claude Opus 4.6 (1M context) |
+| Branch | `design-gate/phase-4` |
+| PR | (pending — docs-only exception cycle) |
+
+### What Was Done
+
+Architectural spec for Phase 4 (Fusion Engine + Meta-Labeler). Zero
+production code. Three artifacts:
+
+- [`docs/adr/ADR-0005-meta-labeling-fusion-methodology.md`](../adr/ADR-0005-meta-labeling-fusion-methodology.md):
+  ten numbered decisions — D1 Triple Barrier (mandatory, k_up=2.0,
+  k_down=1.0, vol_lookback=20, binary target, long-only MVP),
+  D2 sample weights (uniqueness × return attribution), D3 Random
+  Forest default + mandatory LogisticRegression baseline (beat by
+  AUC ≥ 0.03), D4 nested CPCV (outer 6-split×2-test, inner
+  4-split×1-test), D5 seven deployment gates G1–G7 with numerical
+  thresholds (AUC 0.55/0.52, DSR 0.95, PBO < 0.10, Brier ≤ 0.25,
+  minority ≥ 10 %, RF − LogReg ≥ 0.03), D6 reproducibility
+  (APEX_SEED=42, joblib, ModelCardV1 schema), D7 IC-weighted fusion
+  (baseline only, regime-conditional deferred), D8 three-scenario
+  transaction costs (DSR under realistic), D9 streaming deferred,
+  D10 drift monitoring deferred (PSI + KS).
+
+- [`docs/phases/PHASE_4_SPEC.md`](../phases/PHASE_4_SPEC.md): nine
+  sub-phases (4.1 Triple Barrier, 4.2 Sample Weights, 4.3 Baseline
+  Meta-Labeler, 4.4 Nested Tuning, 4.5 Statistical Validation,
+  4.6 Persistence + Model Card, 4.7 Fusion Engine, 4.8 E2E test,
+  4.9 Closure). Each sub-phase: full public API signatures,
+  explicit test specs, anti-leakage checks, per-gate DoD,
+  dependencies, LOC + test-count estimates, Copilot cycle estimate.
+  Section 2 (Existing Infrastructure Assessment) documents what's
+  reusable as-is, what's extended, what's new — Phase 4 is
+  emphatically not greenfield.
+
+- 11 GitHub issues (#125–#135): nine per-sub-phase + two transverse
+  (mid-Phase-4 leakage audit #134, closure tracking #135).
+
+### Key Findings During the Audit
+
+Pre-existing state significantly shapes Phase 4 scope:
+
+- `core/math/labeling.py` already implements `TripleBarrierLabeler`
+  with ternary labels `{-1, 0, +1}` and vol-adaptive barriers. 4.1
+  extends (adds binary projection + Polars batch entry point) rather
+  than rewrites.
+- `services/s04_fusion_engine/meta_labeler.py` ships a **deterministic
+  rules-based** MetaLabeler with in-code roadmap note "Phase 5:
+  deterministic rules, Phase 6: trained classifier". ADR-0005 §1
+  documents that the Phase 4 trained classifier sits alongside this
+  deterministic scorer during the 4.x window; Phase 5 wiring
+  replaces `.score()` with trained-classifier inference.
+- `services/s05_risk_manager/meta_label_gate.py` is frozen;
+  Phase 4 persists calibrated probabilities to
+  `meta_label:latest:{symbol}` in Redis for S05 to consume (wiring
+  itself is Phase 5).
+- ADR-0002 does **not** define an `OBJ-0`/`OBJ-5` sequence. The
+  mission brief's reference was informal shorthand from in-code
+  docstrings; ADR-0005 references decision numbers (D1…D10) only.
+
+### Scope
+
+Zero production code written. `git diff --stat main..HEAD --
+services/ features/ backtesting/ core/ tests/` is empty.
+
+### Quality Gates
+
+- Markdown-only diff; no lint targets apply.
+- Preflight: every new markdown file is non-empty (verified).
+- No Python code added.
+
+### Issues Created
+
+| Sub-phase / Concern | Issue |
+|---|---|
+| 4.1 Triple Barrier Labeling | #125 |
+| 4.2 Sample Weights | #126 |
+| 4.3 Baseline Meta-Labeler | #127 |
+| 4.4 Nested Tuning | #128 |
+| 4.5 Statistical Validation | #129 |
+| 4.6 Persistence + Model Card | #130 |
+| 4.7 Fusion Engine (IC-weighted) | #131 |
+| 4.8 E2E Pipeline Test | #132 |
+| 4.9 Closure Report | #133 |
+| Mid-Phase-4 leakage audit | #134 |
+| Phase 4 closure tracking | #135 |
+
+### Next Steps
+
+- Open PR `design-gate/phase-4` -> `main`. Exception to the usual
+  cycle: mergeable after Copilot review positive (docs-only, zero
+  risk).
+- After merge: start Phase 4.1 Triple Barrier Labeling (#125) in a
+  fresh Claude Code session.
