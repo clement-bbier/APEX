@@ -932,7 +932,7 @@ class ModelCardV1(TypedDict):
     hyperparameters: dict[str, Any]
     training_date_utc: str             # ISO-8601 Z-suffixed
     training_commit_sha: str           # 40-char git SHA
-    training_dataset_hash: str         # sha256 hex
+    training_dataset_hash: str         # "sha256:" + 64-char hex digest
     cpcv_splits_used: list[list[list[int]]]
     features_used: list[str]
     sample_weight_scheme: str
@@ -982,9 +982,30 @@ def load_model(
   test rows must yield **bit-exact** predicted probabilities
   (tolerance 0.0). Non-determinism is a deployment blocker per
   ADR-0005 D6.
-- `training_dataset_hash` is computed as
-  `sha256(pyarrow.Table.from_pandas(X).schema.to_string() +
-  str(X.tobytes()) + str(y.tobytes()))`, captured at save time.
+- `training_dataset_hash` is computed at save time as a
+  library-agnostic SHA-256 digest over a deterministic byte
+  serialization of the training data plus schema metadata. The
+  hasher consumes, in this exact order:
+
+  1. UTF-8 encoding of `json.dumps(feature_names, sort_keys=True,
+     separators=(",", ":"))` where `feature_names` is the ordered
+     list of column names used during training.
+  2. UTF-8 encoding of `json.dumps({"shape": list(X.shape),
+     "dtype": str(X.dtype)}, sort_keys=True, separators=(",", ":"))`.
+  3. `X.tobytes(order="C")` — raw bytes of the `X` numpy array in
+     C-contiguous order.
+  4. UTF-8 encoding of `json.dumps({"shape": list(y.shape),
+     "dtype": str(y.dtype)}, sort_keys=True, separators=(",", ":"))`.
+  5. `y.tobytes(order="C")` — raw bytes of the `y` numpy array in
+     C-contiguous order.
+
+  The final value stored in the model card is
+  `"sha256:" + hashlib.sha256(...).hexdigest()`. This scheme is
+  deterministic, library-agnostic (no pandas or pyarrow dependency),
+  and stable across numpy versions. A reference test in
+  `tests/unit/features/meta_labeler/test_persistence.py` validates
+  the hash against a fixed `X`/`y` pair to detect unintended
+  regressions.
 - `training_commit_sha` is read via
   `subprocess.check_output(["git", "rev-parse", "HEAD"])`. The
   saver raises `ValueError` if the working tree is dirty, to
@@ -1181,7 +1202,7 @@ Minimum 16 tests. Selected cases:
 Integration test exercising the full Phase 4 pipeline end-to-end
 on a synthetic scenario: Phase 3 signals → Triple Barrier labels
 → sample weights → Meta-Labeler training → Fusion → bet-sized
-P&L. Verify ordering-invariant of performance contracts.
+P&L. Verify ordering invariance of the performance contracts.
 
 ### Scope
 - **IN**: one integration test module; one synthetic-alpha
@@ -1249,7 +1270,7 @@ generator correctness.
 ### DoD
 1. Test passes deterministically.
 2. Runtime ≤ 5 min on CI.
-3. All four assertions above pass.
+3. All five assertions above pass.
 4. No regressions in `tests/integration/test_phase_3_pipeline.py`.
 
 ### Dependencies

@@ -231,7 +231,7 @@ Phase 3 for additional features.
     "hyperparameters": {"n_estimators": 300, "max_depth": 10, "...": "..."},
     "training_date_utc": "2026-05-01T14:30:00Z",
     "training_commit_sha": "4cbbdfc...",
-    "training_dataset_hash": "sha256:...",
+    "training_dataset_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     "cpcv_splits_used": [[[0,1,2,3], [4,5]], ["..."]],
     "features_used": ["gex_signal", "har_rv_signal", "ofi_signal",
                       "regime_vol", "regime_trend", "realized_vol_28d",
