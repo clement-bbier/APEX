@@ -241,10 +241,12 @@ class TestPhase3EndToEndPipeline:
             "strict threshold of 0.10"
         )
 
-        # Determinism: report serializes consistently to JSON + Markdown.
+        # Determinism: repeated serialization yields identical JSON + Markdown.
         json_blob = selection_report.to_json()
+        json_blob_repeat = selection_report.to_json()
         md_blob = selection_report.to_markdown()
+        md_blob_repeat = selection_report.to_markdown()
         assert json_blob
         assert md_blob
-        assert true_alpha_name in json_blob
-        assert "keep" in json_blob
+        assert json_blob == json_blob_repeat
+        assert md_blob == md_blob_repeat
