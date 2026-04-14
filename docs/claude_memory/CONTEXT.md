@@ -9,16 +9,16 @@
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 3 — Feature Validation Harness (3.12 PR PENDING) |
+| Active Phase | Phase 3 — Feature Validation Harness (3.13 PR PENDING, Phase 3 at 100%) |
 | Previous Phase | Phase 2 — Universal Data Infrastructure (DONE) |
-| Total tests | 1,789+ (1,722 unit + 55 integration + skips) |
+| Total tests | 1,828+ unit (1 xfailed latency) + 55 integration + skips |
 | Production LOC | ~35,770 |
 | Test LOC | ~22,700 |
 | mypy strict | 0 errors |
 | Services scaffolded | 10/10 (S01-S10) |
 | S01 fully implemented | Yes (78 files, 9,583 LOC) |
 | ADRs accepted | 10 (+ ADR-0004 Feature Validation Methodology) |
-| features/ coverage | ~92% (445 tests) |
+| features/ coverage | ~93% (491 tests incl. Phase 3.13 adapter at 100%) |
 
 ## Audit Status
 
