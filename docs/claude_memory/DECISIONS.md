@@ -916,3 +916,69 @@ Row-level IC on such features produces artificial zero returns on same-snapshot 
 
 - PR #116 Copilot review comment #4
 - PHASE_3_SPEC §2.8
+
+## D035 — Coexistence of `features/weights.py` Prototype and Canonical Phase 4.2 Sample Weights (2026-04-14)
+
+### Context
+
+Phase 4.2 (issue #126) requires the canonical bar-indexed uniqueness ×
+return-attribution sample weights from López de Prado (2018) §§4.4-4.5,
+consumed by sub-phases 4.3 / 4.4 / 4.5 of the Meta-Labeler training
+pipeline. The repository already contains `features/weights.py` with a
+Phase 3.1 prototype `SampleWeighter` class that:
+
+- operates on `list[datetime]` entry/exit times (not Polars Series),
+- implements a *duration-weighted* uniqueness formula (not the
+  bar-indexed LdP §4.4 canonical form),
+- raises `NotImplementedError` for `return_attribution_weights`,
+- is wired into `features/pipeline.py` and covered by 21 passing tests
+  in `tests/unit/features/test_weights.py`,
+- is also exercised by `test_pipeline.py` and
+  `test_pipeline_with_store.py`.
+
+### Decision
+
+Create the canonical module at `features/labeling/sample_weights.py`
+as a **sibling**, not a refactor. The Phase 3.1 prototype remains
+untouched. Phase 4.2 introduces the ADR-0005 D2 implementation with
+Polars-native `pl.Series` I/O, vectorized O(n_samples + n_bars)
+algorithms, and full `return_attribution_weights` + `combined_weights`
+coverage.
+
+Both modules will coexist for the remainder of Phase 4. Migration of
+`features/pipeline.py` onto the canonical API is logged as technical
+debt to be addressed in the Phase 4 closure report (issue #133),
+alongside deletion of the now-redundant prototype.
+
+### Rationale
+
+1. **Non-negotiable: 21 existing tests stay green.** Refactoring
+   `features/weights.py` in-place would force touching `pipeline.py`
+   and those 21 tests in the same PR, dramatically expanding the
+   Phase 4.2 scope and risking regressions in paths unrelated to the
+   meta-labeler.
+2. **Clean SRP boundary.** The canonical module lives inside
+   `features/labeling/` next to its direct consumer schema from
+   Phase 4.1 (`triple_barrier.py`). This matches PHASE_4_SPEC §3.2.
+3. **Explicit documentation.** Both the module docstring and
+   `reports/phase_4_2/audit.md` call out the coexistence and the
+   migration contract, so no future reader mistakes the old prototype
+   for canonical behavior.
+
+### Consequences
+
+- Short term: two modules named `weights` in the repo. Mitigated by
+  distinct paths (`features/weights.py` vs
+  `features/labeling/sample_weights.py`) and explicit docstring notes.
+- Long term: must retire the prototype before Phase 5, or at the Phase
+  4 closure report. Tracked under issue #133.
+- Test double-maintenance: `test_weights.py` (21 tests, Phase 3.1)
+  remains; Phase 4.2 adds `test_sample_weights_{uniqueness,attribution,combined}.py`
+  (52 tests).
+
+### References
+
+- [`reports/phase_4_2/audit.md`](../../reports/phase_4_2/audit.md) §0 / §1
+- [`docs/adr/ADR-0005-meta-labeling-fusion-methodology.md`](../adr/ADR-0005-meta-labeling-fusion-methodology.md) D2
+- [`docs/phases/PHASE_4_SPEC.md`](../phases/PHASE_4_SPEC.md) §3.2
+- LdP (2018) §§4.4-4.5 and Table 4.1

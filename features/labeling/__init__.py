@@ -14,11 +14,19 @@ Public API:
 - :func:`build_events_from_signals` - event-time construction helper.
 - :func:`compute_label_diagnostics` - distribution + sanity stats.
 
+Phase 4.2 additions (ADR-0005 D2 - sample weights):
+
+- :func:`compute_concurrency` - bar-indexed concurrency count ``c_t``.
+- :func:`uniqueness_weights` - uniqueness weight ``u_i``.
+- :func:`return_attribution_weights` - return-attribution weight ``r_i``.
+- :func:`combined_weights` - final training weight ``w_i = u_i * r_i``.
+
 References:
     Lopez de Prado (2018), Advances in Financial Machine Learning,
-    Chapter 3.4 - 3.6.
+    Chapter 3.4 - 3.6 and Chapter 4.4 - 4.5.
     ADR-0005 D1 - Triple Barrier Method contract.
-    PHASE_4_SPEC section 3.1 - module structure and public API.
+    ADR-0005 D2 - Sample weights contract.
+    PHASE_4_SPEC section 3.1 and 3.2 - module structure and public API.
 """
 
 from __future__ import annotations
@@ -32,6 +40,12 @@ from core.math.labeling import (
 )
 from features.labeling.diagnostics import LabelDiagnostics, compute_label_diagnostics
 from features.labeling.events import build_events_from_signals
+from features.labeling.sample_weights import (
+    combined_weights,
+    compute_concurrency,
+    return_attribution_weights,
+    uniqueness_weights,
+)
 from features.labeling.triple_barrier import label_events_binary
 
 __all__ = [
@@ -41,7 +55,11 @@ __all__ = [
     "TripleBarrierConfig",
     "TripleBarrierLabeler",
     "build_events_from_signals",
+    "combined_weights",
+    "compute_concurrency",
     "compute_label_diagnostics",
     "label_events_binary",
+    "return_attribution_weights",
     "to_binary_target",
+    "uniqueness_weights",
 ]
