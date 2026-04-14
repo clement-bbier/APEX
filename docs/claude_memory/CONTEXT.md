@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-14
-**Updated by**: Session 032 (Phase 4.3 Baseline Meta-Labeler)
+**Updated by**: Session 034 (Phase 4.4 Nested CPCV Tuning)
 
 ---
 
@@ -17,8 +17,8 @@ Phase 4 design-gate merged. Phase 4.1 Triple Barrier Labeling (`#125`)
 merged via PR #138 on `main`. Phase 4.2 Sample Weights (`#126`) merged
 via PR #139 on `main`.
 
-Phase 4.3 Baseline Meta-Labeler (`#127`) in progress on branch
-`phase/4.3-baseline-meta-labeler`. Implements ADR-0005 D3:
+Phase 4.3 Baseline Meta-Labeler (`#127`) merged via PR #140
+(commit `d5dc3a0`). Implements ADR-0005 D3:
 `RandomForestClassifier` primary + mandatory `LogisticRegression`
 baseline, trained with outer CPCV (`n_splits=6, n_test_splits=2,
 embargo_pct=0.02` → 15 folds). Module tree `features/meta_labeler/`:
@@ -34,17 +34,38 @@ APEX_SEED=42, n=1200). G7 gate (RF−LogReg ≥ +0.03) deferred to 4.5
 per spec; synthetic alpha is linear so LogReg edges RF by 2.3 pp —
 expected.
 
-Remaining Phase 4 work: #128 (Nested Tuning), #129 (Statistical
-Validation), #130 (Persistence + Model Card), #131 (Fusion Engine
-IC-weighted), #132 (E2E Pipeline Test), #133 (Closure Report), plus
-#134 (mid-phase leakage audit) and #135 (closure tracking).
+Mid-phase leakage audit (`#134`) PASS — `phase/4-leakage-audit`
+branch pushed, `reports/phase_4_leakage_audit.md` records strict
+`feature_compute_window_end_i < t0_i` compliance plus the
+`realized_vol` and cyclical-time columns strictly before `t0`, and
+the regime-code columns as-of `t0` (documented exception).
+
+Phase 4.4 Nested CPCV Tuning (`#128`) in progress on branch
+`phase/4.4-nested-tuning`. ADR-0005 D4 and PHASE_4_SPEC §3.4. New
+module `features/meta_labeler/tuning.py`:
+- `TuningSearchSpace` (3x3x2 = 18 default trials),
+- `TuningResult` (per-fold winners, full trial ledger, stability
+  index, wall-clock),
+- `NestedCPCVTuner` with explicit nested loop (not `GridSearchCV`
+  — rationale in `reports/phase_4_4/audit.md` §10).
+32 unit tests, 100% pass, mypy --strict clean, ruff clean. Fast
+config (n=400, 8-trial x 6 outer x 3 inner = 144+48 fits) runs in
+~22 s with APEX_SEED=42; full config gated behind
+`APEX_FULL_TUNING=1` (18-trial x 15 outer x 4 inner = 1,350 fits).
+Report generator: `scripts/generate_phase_4_4_report.py` →
+`reports/phase_4_4/{tuning_report.md, tuning_trials.json}`.
+
+Remaining Phase 4 work: #129 (Statistical Validation DSR/PBO),
+#130 (Persistence + Model Card), #131 (Fusion Engine IC-weighted),
+#132 (E2E Pipeline Test), #133 (Closure Report), #135 (closure
+tracking).
 
 Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 (streaming calculators, Phase 5).
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 4.3 (Baseline Meta-Labeler — #127 PR pending); 4.1/4.2 merged (PRs #138/#139) |
+| Active Phase | Phase 4.4 (Nested CPCV Tuning — #128 in progress); 4.1-4.3 merged (PRs #138/#139/#140); #134 leakage audit PASS on `phase/4-leakage-audit` |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
 | Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests |
 | Production LOC | ~35,770 (+ ~8,271 `features/` + ~970 `features/meta_labeler/`) |
@@ -57,11 +78,11 @@ Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 
 ## On the horizon
 
-Phase 4.4 Nested Tuning (issue #128) once PR for #127 merges. Wraps
-the 4.3 outer CPCV in an inner `GridSearchCV` (or equivalent) for
-honest-nested hyperparameter selection on RF depth / estimators /
-min_samples_leaf, without touching the outer OOS slices used for
-4.5's DSR/PBO statistical validation.
+Phase 4.5 Statistical Validation (issue #129): compute DSR
+(Bailey & Lopez de Prado 2014) and PBO (Bailey, Borwein, Lopez
+de Prado, Zhu 2014) on the `tuning_trials.json` ledger produced
+by 4.4, plus Harvey & Liu (2015) haircut-Sharpe. Gates G4/G5 from
+PHASE_4_SPEC §3.5.
 
 ## Audit Status
 

@@ -1606,3 +1606,118 @@ as part of the DSR audit.
   integration / backtest-gate).
 - On merge: pull `main`, branch `phase/4.4-nested-tuning`, open work
   on issue #128 (Nested Tuning).
+
+---
+
+## Session 034 — Phase 4.4 Nested CPCV Tuning (issue #128)
+
+**Date**: 2026-04-14
+**Branch**: `phase/4.4-nested-tuning`
+**Status**: IMPLEMENTATION COMPLETE, PR pending
+**Predecessor**: Session 033 (`phase/4-leakage-audit`, PASS).
+
+### Scope
+
+Phase 4.4 (ADR-0005 D4 / PHASE_4_SPEC §3.4): nested CPCV
+hyperparameter search for the Phase 4.3 Random Forest Meta-Labeler.
+Outer CPCV is the caller's splitter (spec default C(6,2)=15 folds),
+inner CPCV runs strictly inside each outer training slice (spec
+default C(4,1)=4 folds). Selection criterion is inner-mean weighted
+ROC-AUC; OOS AUC on the outer test slice is observed but never used
+to pick the winner — the honest nested CV premise of Lopez de Prado
+(2018) §7.4 and the pre-condition for Phase 4.5's PBO computation.
+
+### Deliverables
+
+1. `reports/phase_4_4/audit.md` — pre-implementation audit (~285
+   lines) covering reuse inventory, frozen API contract, explicit
+   nested algorithm skeleton, 18-test plan, anti-leakage property-
+   test obligation, budget (1,350 fits ≈ 45 min single-core, ~5-8
+   min with `n_jobs=-1`), seed discipline (`random_state = seed +
+   outer_idx * 7`), and risk register (including the deliberate
+   rejection of `GridSearchCV` in favour of an explicit nested loop
+   for `sample_weight` routing + per-fold seeding).
+2. `features/meta_labeler/tuning.py` — new module:
+   - `TuningSearchSpace` (frozen dataclass, 3x3x2=18 default trials,
+     explicit validation of every tuple).
+   - `TuningResult` (per-fold winners, full trial ledger for 4.5
+     PBO, stability index, wall-clock).
+   - `NestedCPCVTuner` with explicit nested loop, per-fold seeding
+     (`seed + outer_idx * 7`), `class_weight="balanced"`, per-fit
+     `sample_weight` propagation, constant-target fallback to
+     AUC=0.5 on degenerate inner/outer test slices, reserved-key
+     guard at construction (`random_state`, `class_weight`, `n_jobs`
+     are tuner-controlled).
+3. `tests/unit/features/meta_labeler/test_tuning.py` — 32 unit tests
+   across 8 groups: search-space primitives, happy-path shapes,
+   determinism, stability index, input validation, **anti-leakage
+   fit-spy** (replaces the naive permute-outer-test-rows probe
+   because in CPCV every row is test in some folds and train in
+   others — the spy captures every `RandomForestClassifier.fit`
+   call and verifies no outer-test row enters any inner fit),
+   wall-clock, side-effect propagation (class_weight, sample_weight,
+   per-fold seed derivation).
+4. `scripts/generate_phase_4_4_report.py` — producer of
+   `reports/phase_4_4/{tuning_report.md, tuning_trials.json}`. Fast
+   CI config (n=400, 8-trial x 6 outer x 3 inner = 144+48 = 192
+   fits, ~22 s wall-clock) is the default; full spec config
+   (18-trial x 15 outer x 4 inner = 1,350 fits) gated behind
+   `APEX_FULL_TUNING=1`.
+5. Memory docs updated: `CONTEXT.md` reflects Phase 4.3 MERGED and
+   Phase 4.4 IN PROGRESS; this session entry in `SESSIONS.md`.
+
+### Quality Gates
+
+- `ruff check` + `ruff format --check`: clean on every new file.
+- `mypy --strict features/meta_labeler/tuning.py
+  scripts/generate_phase_4_4_report.py`: 0 errors.
+- `pytest tests/unit/features/meta_labeler/test_tuning.py`:
+  **32/32 pass** in ~4 min under the Python 3.10 sandbox (CI runs
+  3.12 and will be faster).
+- Report generated with `APEX_SEED=42`, fast config: stability
+  index `0.333`, mean best-OOS AUC `0.7324 ± 0.0229`, wall-clock
+  `22.23 s`.
+
+### Architectural Decisions
+
+- **Explicit nested loop, not `GridSearchCV`**: `GridSearchCV`
+  routes `sample_weight` through `fit_params` asymmetrically across
+  sklearn versions and does not support CPCV-aware splitters without
+  a wrapper. The explicit loop gives full control over per-fold
+  seeding and the shape of `TuningResult.all_trials`. Documented in
+  `reports/phase_4_4/audit.md` §10.
+- **Anti-leakage test changed from global-permute to fit-spy**: the
+  initial naive probe (permute all outer-test rows, re-run, expect
+  inner-CV-mean AUC invariance) was wrong — in CPCV every row is
+  test in some outer folds and train in others, so global
+  mutation perturbs inner-train data for other folds. The fit-spy
+  captures every RF.fit call and asserts by-row-hash membership;
+  this is the strict invariant from Lopez de Prado (2018) §7.4.
+- **Constant-target fallback to AUC=0.5**: AUC is undefined on a
+  single-class test slice. Rather than abort `tune()`, we fall back
+  to the neutral chance score so one pathological split does not
+  destroy the whole ledger. Both inner and outer scorers behave
+  identically; documented in the module docstring.
+
+### References (canonical, peer-reviewed only)
+
+- PHASE_4_SPEC §3.4 — Nested Hyperparameter Tuning.
+- ADR-0005 D4 — Nested CPCV methodology rationale.
+- Lopez de Prado, M. (2018). *Advances in Financial Machine
+  Learning*, §7.4 (purged / nested CV). This is the canonical
+  source cited in every docstring and commit message for Phase 4.4.
+
+### Issues Addressed
+
+- Refs #128 (Phase 4.4 Nested Tuning)
+- Refs ADR-0005 D4
+
+### Next Steps
+
+- Open PR for `phase/4-leakage-audit` (#134) — branch pushed, PR
+  creation still to be done by user because api.github.com is
+  blocked in the sandbox.
+- Push `phase/4.4-nested-tuning` and open PR #(new) for #128.
+- Await Copilot review + CI; address feedback, merge.
+- Continue with #129 (Statistical Validation — DSR/PBO consuming
+  `tuning_trials.json`).
