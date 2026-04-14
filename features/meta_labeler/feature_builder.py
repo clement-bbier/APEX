@@ -110,6 +110,11 @@ class MetaLabelerFeatureSet:
     def __post_init__(self) -> None:
         if self.X.ndim != 2:
             raise ValueError(f"X must be 2-D; got shape {self.X.shape}")
+        if self.X.dtype != np.float64:
+            raise ValueError(
+                f"X must be np.float64 (the downstream sklearn trainers expect "
+                f"a contiguous float64 matrix); got dtype {self.X.dtype}"
+            )
         if self.X.shape[1] != len(FEATURE_NAMES):
             raise ValueError(
                 f"X has {self.X.shape[1]} columns but expected {len(FEATURE_NAMES)} "
@@ -122,6 +127,12 @@ class MetaLabelerFeatureSet:
             )
         if self.feature_names != FEATURE_NAMES:
             raise ValueError(f"feature_names must equal FEATURE_NAMES; got {self.feature_names}")
+        # ``t0`` / ``t1`` must be datetime64 arrays so downstream CPCV (which
+        # calls ``searchsorted`` on them) has comparable ordering semantics.
+        if self.t0.dtype.kind != "M":
+            raise ValueError(f"t0 must be a datetime64 array; got dtype {self.t0.dtype}")
+        if self.t1.dtype.kind != "M":
+            raise ValueError(f"t1 must be a datetime64 array; got dtype {self.t1.dtype}")
 
 
 def _validate_utc_column(df: pl.DataFrame, col: str, where: str) -> None:

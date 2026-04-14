@@ -282,18 +282,18 @@ class BaselineMetaLabeler:
         y: npt.NDArray[np.int_],
         sample_weights: npt.NDArray[np.float64],
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int_], npt.NDArray[np.float64]]:
-        x = features.X
+        x = np.asarray(features.X, dtype=np.float64)
         if x.ndim != 2:
             raise ValueError(f"features.X must be 2-D; got shape {x.shape}")
-        if len(y) != x.shape[0]:
-            raise ValueError(f"y length ({len(y)}) != n_samples ({x.shape[0]})")
-        if len(sample_weights) != x.shape[0]:
-            raise ValueError(
-                f"sample_weights length ({len(sample_weights)}) != n_samples ({x.shape[0]})"
-            )
         if x.shape[0] == 0:
             raise ValueError("cannot train on an empty feature matrix")
+        if not np.isfinite(x).all():
+            raise ValueError("features.X contains non-finite values (NaN/Inf)")
         y_arr = np.asarray(y)
+        if y_arr.ndim != 1:
+            raise ValueError(f"y must be 1-D; got shape {y_arr.shape}")
+        if y_arr.shape[0] != x.shape[0]:
+            raise ValueError(f"y length ({y_arr.shape[0]}) != n_samples ({x.shape[0]})")
         if y_arr.dtype.kind not in ("i", "u"):
             raise ValueError(f"y must be an integer array; got dtype {y_arr.dtype}")
         unique = np.unique(y_arr)
@@ -306,8 +306,14 @@ class BaselineMetaLabeler:
                 "degenerate target."
             )
         w_arr = np.asarray(sample_weights, dtype=np.float64)
+        if w_arr.ndim != 1:
+            raise ValueError(f"sample_weights must be 1-D; got shape {w_arr.shape}")
+        if w_arr.shape[0] != x.shape[0]:
+            raise ValueError(
+                f"sample_weights length ({w_arr.shape[0]}) != n_samples ({x.shape[0]})"
+            )
         if not np.isfinite(w_arr).all():
             raise ValueError("sample_weights contains non-finite values (NaN/Inf)")
         if np.any(w_arr < 0.0):
             raise ValueError("sample_weights must be non-negative")
-        return x.astype(np.float64), y_arr, w_arr
+        return x, y_arr, w_arr

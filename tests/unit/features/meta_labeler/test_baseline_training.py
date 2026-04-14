@@ -296,3 +296,38 @@ def test_cpcv_empty_split_is_detected(
     trainer = BaselineMetaLabeler(fake_cpcv, seed=42)
     with pytest.raises(ValueError, match="empty split"):
         trainer.train(fs, y, w)
+
+
+def test_train_rejects_nan_in_feature_matrix(
+    cpcv_small: CombinatoriallyPurgedKFold,
+    dataset: tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray],
+) -> None:
+    fs, y, w = dataset
+    # ``MetaLabelerFeatureSet`` is a frozen dataclass but the underlying
+    # ndarray is mutable — we poke a NaN in-place to simulate a
+    # pathological upstream feature-build failure that the Phase 4.3
+    # trainer must now reject fail-loud.
+    fs.X[0, 0] = np.nan
+    trainer = BaselineMetaLabeler(cpcv_small, seed=42)
+    with pytest.raises(ValueError, match=r"features\.X contains non-finite"):
+        trainer.train(fs, y, w)
+
+
+def test_train_rejects_2d_y(
+    cpcv_small: CombinatoriallyPurgedKFold,
+    dataset: tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray],
+) -> None:
+    fs, y, w = dataset
+    trainer = BaselineMetaLabeler(cpcv_small, seed=42)
+    with pytest.raises(ValueError, match=r"y must be 1-D"):
+        trainer.train(fs, y.reshape(-1, 1), w)
+
+
+def test_train_rejects_2d_sample_weights(
+    cpcv_small: CombinatoriallyPurgedKFold,
+    dataset: tuple[MetaLabelerFeatureSet, np.ndarray, np.ndarray],
+) -> None:
+    fs, y, w = dataset
+    trainer = BaselineMetaLabeler(cpcv_small, seed=42)
+    with pytest.raises(ValueError, match=r"sample_weights must be 1-D"):
+        trainer.train(fs, y, w.reshape(-1, 1))

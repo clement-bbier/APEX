@@ -47,6 +47,13 @@ def _validate_pair(
         )
     if len(y_true) == 0:
         raise ValueError("y_true / y_prob are empty; cannot compute metric on an empty fold")
+    # Float ``y_true`` (e.g., the result of ``astype(np.float64)`` by an
+    # upstream caller) is permitted by the signature, so we explicitly
+    # reject NaN/Inf before the ``np.isin`` binary check below.
+    if np.issubdtype(y_true.dtype, np.floating) and not np.isfinite(y_true).all():
+        raise ValueError("y_true contains non-finite values (NaN/Inf)")
+    if not np.isin(y_true, (0, 1)).all():
+        raise ValueError("y_true must contain only binary labels in {0, 1}")
     if not np.isfinite(y_prob).all():
         raise ValueError("y_prob contains non-finite values (NaN/Inf)")
     if np.any(y_prob < 0.0) or np.any(y_prob > 1.0):

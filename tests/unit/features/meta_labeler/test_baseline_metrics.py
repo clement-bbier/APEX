@@ -100,3 +100,17 @@ def test_calibration_bins_rejects_one_bin() -> None:
 def test_calibration_bins_empty_raises() -> None:
     with pytest.raises(ValueError, match="empty"):
         calibration_bins(np.array([], dtype=int), np.array([], dtype=float))
+
+
+def test_fold_auc_rejects_non_binary_y_true() -> None:
+    y = np.array([0, 1, 2, 1, 0])  # 2 is illegal
+    p = np.array([0.1, 0.9, 0.5, 0.7, 0.2])
+    with pytest.raises(ValueError, match="binary labels"):
+        fold_auc(y, p)
+
+
+def test_fold_auc_rejects_nan_in_float_y_true() -> None:
+    y = np.array([0.0, 1.0, np.nan, 1.0])
+    p = np.array([0.1, 0.9, 0.5, 0.7])
+    with pytest.raises(ValueError, match=r"y_true contains non-finite"):
+        fold_auc(y, p)

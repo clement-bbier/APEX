@@ -682,6 +682,36 @@ def test_feature_set_rejects_1d_x() -> None:
         )
 
 
+def test_feature_set_rejects_non_float64_x() -> None:
+    with pytest.raises(ValueError, match=r"np\.float64"):
+        MetaLabelerFeatureSet(
+            X=np.zeros((1, len(FEATURE_NAMES)), dtype=np.float32),
+            feature_names=FEATURE_NAMES,
+            t0=np.array(["2025-01-01"], dtype="datetime64[us]"),
+            t1=np.array(["2025-01-02"], dtype="datetime64[us]"),
+        )
+
+
+def test_feature_set_rejects_non_datetime_t0() -> None:
+    with pytest.raises(ValueError, match=r"t0 must be a datetime64 array"):
+        MetaLabelerFeatureSet(
+            X=np.zeros((1, len(FEATURE_NAMES)), dtype=np.float64),
+            feature_names=FEATURE_NAMES,
+            t0=np.array([0], dtype=np.int64),
+            t1=np.array(["2025-01-02"], dtype="datetime64[us]"),
+        )
+
+
+def test_feature_set_rejects_non_datetime_t1() -> None:
+    with pytest.raises(ValueError, match=r"t1 must be a datetime64 array"):
+        MetaLabelerFeatureSet(
+            X=np.zeros((1, len(FEATURE_NAMES)), dtype=np.float64),
+            feature_names=FEATURE_NAMES,
+            t0=np.array(["2025-01-01"], dtype="datetime64[us]"),
+            t1=np.array([0], dtype=np.int64),
+        )
+
+
 def test_realized_vol_window_property_is_readable() -> None:
     builder = MetaLabelerFeatureBuilder(
         _make_activation_config(),
