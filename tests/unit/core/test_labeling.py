@@ -169,6 +169,17 @@ class TestComputeDailyVol:
                 daily_vol=0.0,
             )
 
+    def test_compute_daily_vol_rejects_non_positive_current_price(self) -> None:
+        """Phase 4.1 fail-loud: curr <= 0 raises instead of math domain error."""
+        lb = TripleBarrierLabeler()
+        with pytest.raises(ValueError, match="strictly positive"):
+            lb.compute_daily_vol([Decimal("100"), Decimal("0")])
+
+    def test_compute_daily_vol_rejects_non_positive_prior_price(self) -> None:
+        lb = TripleBarrierLabeler()
+        with pytest.raises(ValueError, match="strictly positive"):
+            lb.compute_daily_vol([Decimal("0"), Decimal("100")])
+
     def test_label_event_negative_vol_raises(self) -> None:
         lb = TripleBarrierLabeler()
         with pytest.raises(ValueError, match="daily_vol must be strictly positive"):

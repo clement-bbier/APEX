@@ -330,6 +330,32 @@ class TestBusinessLogic:
         with pytest.raises(ValueError, match="missing required column"):
             label_events_binary(events, bars)
 
+    def test_event_in_warmup_region_raises(self) -> None:
+        """Event with ``i < vol_lookback`` must raise per ADR-0005 D1."""
+        cfg = TripleBarrierConfig(
+            pt_multiplier=2.0, sl_multiplier=1.0, max_holding_periods=10, vol_lookback=20
+        )
+        bars = _make_bars(_trending_closes(50))
+        events = pl.DataFrame(
+            {"timestamp": [_ts(5)], "symbol": ["BTC"], "direction": [1]},
+            schema={
+                "timestamp": pl.Datetime("us", "UTC"),
+                "symbol": pl.Utf8,
+                "direction": pl.Int8,
+            },
+        )
+        with pytest.raises(ValueError, match="warmup region"):
+            label_events_binary(events, bars, cfg)
+
+    def test_non_positive_close_raises(self) -> None:
+        """_validate_bars must reject non-positive close prices."""
+        closes = _trending_closes(50)
+        closes[10] = 0.0  # inject non-positive price
+        bars = _make_bars(closes)
+        events = _make_event(_ts(30))
+        with pytest.raises(ValueError, match="strictly positive"):
+            label_events_binary(events, bars)
+
     def test_short_direction_raises(self) -> None:
         bars = _make_bars(_trending_closes(30))
         events = pl.DataFrame(

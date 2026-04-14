@@ -56,6 +56,22 @@ class TestBuildEventsFromSignals:
         with pytest.raises(ValueError, match="signal_missing"):
             build_events_from_signals(signals, "signal_missing", threshold=0.5, symbol="BTC")
 
+    def test_threshold_must_be_finite(self) -> None:
+        """NaN / +inf / -inf threshold is rejected explicitly."""
+        signals = _make_signals([0.1, 0.5, 0.9])
+        with pytest.raises(ValueError, match="finite"):
+            build_events_from_signals(signals, "signal", float("nan"), symbol="BTC")
+        with pytest.raises(ValueError, match="finite"):
+            build_events_from_signals(signals, "signal", float("inf"), symbol="BTC")
+        with pytest.raises(ValueError, match="finite"):
+            build_events_from_signals(signals, "signal", float("-inf"), symbol="BTC")
+
+    def test_float_nan_signal_raises(self) -> None:
+        """Polars float NaN (distinct from None) must raise too."""
+        signals = _make_signals([0.1, float("nan"), 0.3])
+        with pytest.raises(ValueError, match="NaN/None"):
+            build_events_from_signals(signals, "signal", threshold=0.2, symbol="BTC")
+
     def test_non_monotonic_raises(self) -> None:
         timestamps = [_ts_utc(0), _ts_utc(1), _ts_utc(1), _ts_utc(3)]
         signals = pl.DataFrame({"timestamp": timestamps, "signal": [0.1, 0.2, 0.3, 0.4]})
