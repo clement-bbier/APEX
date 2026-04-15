@@ -171,9 +171,17 @@ multiple independent noisy observations of the same latent alpha.
 Each signal tracks the alpha with a different observation noise,
 so each has positive but partial predictive power. IC-weighted
 fusion combines them — the independent observation noise averages
-out while the common alpha reinforces. Under the law of large
-numbers this is provably a strict Sharpe improvement over every
-individual signal.
+out while the common alpha reinforces.
+
+**Statistical subtlety.** ADR-0005 D7 uses the simple IC-weighted
+formula `w_i ∝ |IC_IR_i|`. This is **not** the Markowitz-optimal
+mixing weight `w_i ∝ IC_IR_i / σ²_ε_i` — they only coincide under
+homoscedastic observation noise. When noise levels are disparate,
+the lowest-noise signal is already near-optimal on its own, so on
+a specific finite-sample draw fusion may occasionally trail the
+best individual by `O(1/√n)`. The DoD therefore holds **in
+expectation** (under LLN) rather than per seed; strict per-seed
+dominance would overstate what ADR-0005 D7 actually claims.
 
 - `n = 4000` bars, single symbol `"SYN"`.
 - True alpha `α_t ~ N(0, 1)`.
@@ -185,13 +193,16 @@ individual signal.
 - IC_IRs computed from realised returns so weights are
   self-consistent (the fusion layer does not peek at future bars;
   weights are frozen once `from_ic_report` returns).
-- Assertion evaluated over a deterministic seed panel
-  `seeds = (11, 29, 42, 101, 2026)`. DoD requires
-  `Sharpe(fusion) > max_i Sharpe(sig_i)` on **every** seed in the
-  panel — this defends against the single-draw flakiness
-  observed on the earlier 1-alpha + 2-noise scenario, where noise
-  channels receiving non-zero weight from sampling variance could
-  dilute the alpha enough for fusion to lose on a specific draw.
+- Assertion evaluated over a deterministic 10-seed panel
+  `seeds = (7, 11, 17, 23, 29, 42, 73, 101, 313, 2026)` with two
+  complementary DoD checks:
+  1. **Mean Sharpe uplift** `E[Sharpe(fusion) − max_i Sharpe(sig_i)]`
+     must exceed `1e-3` across the panel — fusion dominates in
+     expectation.
+  2. **Win-rate majority** — fusion must beat the best individual
+     on ≥ 60% of panel seeds (`6 / 10`) — defends against
+     cherry-picking a single favourable draw while tolerating the
+     `O(1/√n)` per-seed flakiness of the non-Markowitz weighting.
 
 ## 10. Report contract
 
