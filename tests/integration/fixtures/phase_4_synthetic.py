@@ -389,10 +389,11 @@ def build_scenario(
             X[row_idx, 5] = float(np.std(window, ddof=1))
         else:
             X[row_idx, 5] = 0.0
-        # Cols 6..7 — sin/cos time-of-day.
+        # Cols 6..7 — hour_of_day_sin and day_of_week_sin.
         hour = float(t0.hour) + float(t0.minute) / 60.0
+        day_of_week = float(t0.weekday())
         X[row_idx, 6] = float(np.sin(2.0 * np.pi * hour / 24.0))
-        X[row_idx, 7] = float(np.cos(2.0 * np.pi * hour / 24.0))
+        X[row_idx, 7] = float(np.sin(2.0 * np.pi * day_of_week / 7.0))
 
     t0_np = np.array(t0_all, dtype="datetime64[us]")
     t1_np = np.array(t1_all, dtype="datetime64[us]")
