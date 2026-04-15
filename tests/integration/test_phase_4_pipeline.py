@@ -65,8 +65,10 @@ pytestmark = pytest.mark.integration
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 # Allow-list of directories under REPO_ROOT that the end-to-end test
-# is permitted to write to. ``tmp_path`` is whitelisted separately
-# because it lives outside REPO_ROOT by construction.
+# is permitted to write to.  The guard only snapshots paths under
+# REPO_ROOT (via ``REPO_ROOT.rglob``), so ``tmp_path`` — which pytest
+# places outside the checked-out repo — is inherently invisible to the
+# diff and needs no explicit exemption.
 _SCOPE_ALLOWED_PREFIXES: tuple[str, ...] = (
     "reports/phase_4_",
     "models/meta_labeler/",
@@ -603,7 +605,7 @@ def test_phase_4_pipeline_end_to_end(git_repo: Path) -> None:
     loaded_model, loaded_card = load_model(model_path, card_path)
 
     # Bit-exact probability reproduction on a 1000-row fixture. We
-    # sample from ``feature_set.X`` with replacement to keep the
+    # sample from ``feature_set.X`` without replacement to keep the
     # fixture in-distribution.
     fix_rng = np.random.default_rng(DEFAULT_SEED + 3)
     n_fix = min(1000, scenario.feature_set.X.shape[0])
