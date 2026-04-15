@@ -442,7 +442,7 @@ def main() -> None:
         "fusion": _sharpe(fusion_pnl),
         "random": _sharpe(random_pnl),
     }
-    per_signal_sharpe = {}
+    per_signal_sharpe: dict[str, float] = {}
     for name in SCENARIO_SIGNAL_NAMES:
         sig_at_evt = scenario.feature_set.X[:, SCENARIO_SIGNAL_NAMES.index(name)]
         per_signal_sharpe[name] = _sharpe(np.sign(sig_at_evt) * evt_log)
