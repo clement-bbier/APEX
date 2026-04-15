@@ -35,7 +35,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -148,11 +150,33 @@ def save_model(
     model_path = output_dir / f"{stem}{_MODEL_SUFFIX}"
     card_path = output_dir / f"{stem}{_CARD_SUFFIX}"
 
-    # joblib first, then card: if the card write fails for any reason,
-    # we leave the (still reproducible) joblib behind rather than a
-    # dangling card claiming to describe a model that was never saved.
-    joblib.dump(model, model_path)
-    _write_card_json(validated, card_path)
+    # Atomic write: both files land or neither does. We write to temp
+    # files in the same directory (guaranteeing same filesystem) then
+    # os.replace() into the final paths. If either write fails, we
+    # remove the temp files so no dangling artifact is left behind.
+    tmp_model_fd, tmp_model_str = tempfile.mkstemp(
+        suffix=_MODEL_SUFFIX, dir=output_dir
+    )
+    os.close(tmp_model_fd)
+    tmp_model_path = Path(tmp_model_str)
+
+    tmp_card_fd, tmp_card_str = tempfile.mkstemp(
+        suffix=_CARD_SUFFIX, dir=output_dir
+    )
+    os.close(tmp_card_fd)
+    tmp_card_path = Path(tmp_card_str)
+
+    try:
+        joblib.dump(model, tmp_model_path)
+        _write_card_json(validated, tmp_card_path)
+    except BaseException:
+        tmp_model_path.unlink(missing_ok=True)
+        tmp_card_path.unlink(missing_ok=True)
+        raise
+
+    # Both writes succeeded; atomically move into place.
+    os.replace(tmp_model_path, model_path)
+    os.replace(tmp_card_path, card_path)
 
     return model_path, card_path
 
