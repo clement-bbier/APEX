@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-15
-**Updated by**: Session 035 (Phase 4.6 Persistence + Model Card)
+**Updated by**: Session 036 (Phase 4.7 Fusion Engine IC-weighted)
 
 ---
 
@@ -60,8 +60,8 @@ New modules `features/meta_labeler/pnl_simulation.py` (López de Prado
 `validation.py` (`MetaLabelerValidator.validate` with Politis-Romano
 1994 stationary bootstrap and PBO matrix pivot).
 
-Phase 4.6 Persistence + Model Card (`#130`) on branch
-`phase-4.6-persistence-model-card`. ADR-0005 D6 / PHASE_4_SPEC §3.6:
+Phase 4.6 Persistence + Model Card (`#130`) merged via PR #144
+(commit `1371a12`). ADR-0005 D6 / PHASE_4_SPEC §3.6:
 joblib serialization + schema-v1 JSON model card. New modules
 `features/meta_labeler/model_card.py` (`ModelCardV1` TypedDict +
 `validate_model_card` with exact-key-set enforcement, Z-suffix
@@ -81,20 +81,49 @@ as the canonical reference card. Report generator:
 excludes `models/meta_labeler/*.{joblib,json}` — trained weights
 are artefacts, not source.
 
-Remaining Phase 4 work: #131 (Fusion Engine IC-weighted),
-#132 (E2E Pipeline Test), #133 (Closure Report), #135 (closure
-tracking).
+Phase 4.7 Fusion Engine IC-weighted (`#131`) on branch
+`phase-4.7-fusion-ic-weighted`. ADR-0005 D7 / PHASE_4_SPEC §3.7:
+library-level `features/fusion/` package ships
+`ICWeightedFusionConfig` (frozen dataclass on the simplex: weights
+non-negative, sum to 1.0 within `1e-9`, names sorted alphabetically
+for determinism) + `ICWeightedFusion` (stateless `compute(signals:
+pl.DataFrame) -> pl.DataFrame[timestamp, symbol, fusion_score]` via
+`pl.sum_horizontal` — no Python row loops). `from_ic_report(ic_report,
+activation_config)` computes `w_i = |IC_IR_i| / Σ_j |IC_IR_j|` over
+the intersection of Phase 3.3 `ICReport.results` and Phase 3.12
+`FeatureActivationConfig.activated_features`; silently drops extra
+report entries, hard-errors on missing-activation, duplicate-in-report,
+or `Σ|IC_IR|=0` (no silent uniform fallback). Weights **frozen at
+construction** — no lookahead via per-call recalibration (tested via
+property test permuting future rows). `compute` rejects missing
+columns, null/NaN feature values, and zero-row frames with explicit
+`ValueError`. ~30 unit tests covering simplex contract, linear-
+combination sanity, mismatch handling, determinism, compute
+validation, output schema, direct-construction invariants, anti-
+leakage, and the DoD Sharpe assertion (fusion Sharpe > best
+individual on a 1-alpha + 2-noise synthetic scenario). Scope guard
+test verifies `services/s04_fusion_engine/` is untouched by the 4.7
+branch via `git diff --name-only main...HEAD`. Report generator:
+`scripts/generate_phase_4_7_report.py` →
+`reports/phase_4_7/fusion_diagnostics.{md,json}` (weights vector,
+P05/P25/P50/P75/P95 of `fusion_score`, per-signal Pearson
+correlations, Sharpe comparison table). Streaming wiring into
+`services/s04_fusion_engine/` stays out of scope (Phase 5, issue
+#123).
+
+Remaining Phase 4 work: #132 (E2E Pipeline Test), #133 (Closure
+Report), #135 (closure tracking).
 
 Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 (streaming calculators, Phase 5).
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 4.6 (Persistence + Model Card — #130 on branch `phase-4.6-persistence-model-card`); 4.1-4.5 merged (PRs #138/#139/#140/#141/#143) + #142 leakage audit |
+| Active Phase | Phase 4.7 (Fusion Engine IC-weighted — #131 on branch `phase-4.7-fusion-ic-weighted`); 4.1-4.6 merged (PRs #138/#139/#140/#141/#143/#144) + #142 leakage audit |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
-| Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests; +~56 Phase 4.6 (card schema + persistence round-trip) |
-| Production LOC | ~35,770 (+ ~8,271 `features/` + ~1,280 `features/meta_labeler/` including 4.6 persistence) |
-| Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/` + ~1,360 `tests/unit/features/meta_labeler/` including 4.6) |
+| Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests; +~56 Phase 4.6 (card schema + persistence round-trip) + ~30 Phase 4.7 (IC-weighted fusion) |
+| Production LOC | ~35,770 (+ ~8,271 `features/` + ~1,280 `features/meta_labeler/` + ~280 `features/fusion/` Phase 4.7) |
+| Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/` + ~1,360 `tests/unit/features/meta_labeler/` + ~515 `tests/unit/features/fusion/` Phase 4.7) |
 | mypy strict | 0 errors |
 | Services scaffolded | 10/10 (S01-S10) |
 | S01 fully implemented | Yes (78 files, 9,583 LOC) |
@@ -103,11 +132,11 @@ Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 
 ## On the horizon
 
-Phase 4.7 Fusion Engine (issue #131): IC-weighted combination of
-the meta-labeler probability with the Phase 3 signal bundle per
-ADR-0005 D7 — consumes the persisted model from 4.6 via
-`load_model`, produces the `SignalComponent`-compatible output that
-S02 will subscribe to once streaming is wired (issue #123).
+Phase 4.8 End-to-End Pipeline Test (issue #132): integration
+fixture that chains Phase 4.1 labels → 4.2 weights → 4.3 RF train
+→ 4.4 tuning → 4.5 validator → 4.6 save/load → 4.7 fusion on a
+single synthetic scenario, asserting the full Phase 4 invariant
+stack holds end-to-end before the closure report (#133).
 
 ## Audit Status
 

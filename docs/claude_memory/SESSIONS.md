@@ -1827,3 +1827,105 @@ gate — non-determinism is a blocker per ADR-0005 D6.
   user for merge.
 - Follow up with #131 (Fusion Engine IC-weighted) — consumes the
   persisted model.
+
+---
+
+## Session 036 — Phase 4.7 Fusion Engine IC-weighted (issue #131)
+
+**Date**: 2026-04-15
+**Branch**: `phase-4.7-fusion-ic-weighted`
+**Status**: IMPLEMENTATION COMPLETE, PR pending
+**Predecessor**: PR #144 (Phase 4.6 Persistence + Model Card, merged
+commit `1371a12`).
+
+### Scope
+
+Phase 4.7 (ADR-0005 D7 / PHASE_4_SPEC §3.7): library-level
+IC-weighted fusion baseline. Combines activated Phase 3 signals
+into a scalar `fusion_score`:
+
+```
+fusion_score(symbol, t) = Σ_i (w_i · signal_i(symbol, t))
+    where w_i = |IC_IR_i| / Σ_j |IC_IR_j|
+```
+
+Weights **frozen at construction time** from a reference IC
+measurement window — NOT re-calibrated per `compute` call. Scope
+strictly additive: new `features/fusion/` package + unit tests +
+diagnostic report. `services/s04_fusion_engine/` untouched (Phase 5
+wiring tracked by issue #123).
+
+### Deliverables
+
+| Artifact | Notes |
+|---|---|
+| `reports/phase_4_7/audit.md` | Pre-impl audit: 13 sections covering objective, reuse inventory, public API contract, construction semantics, compute semantics, anti-leakage, test plan (≥16 tests listed), synthetic scenario for DoD Sharpe, report contract, fail-loud inventory, out-of-scope (regime-conditional, HRP, rolling recalibration deferred). |
+| `features/fusion/__init__.py` | Public re-exports (`ICWeightedFusion`, `ICWeightedFusionConfig`). |
+| `features/fusion/ic_weighted.py` | `ICWeightedFusionConfig` frozen dataclass + `from_ic_report` classmethod (intersection of `ICReport.results` ∩ `FeatureActivationConfig.activated_features`; silent drop extras, hard error on missing/duplicate/`Σ=0`; sorted feature order + float re-normalisation). `ICWeightedFusion.compute(signals)` validates required columns, rejects null/NaN/empty, emits `[timestamp, symbol, fusion_score]` Float64 via `pl.sum_horizontal` (no Python row loops). |
+| `tests/unit/features/fusion/test_ic_weighted.py` | ~30 unit tests across 10 sections: simplex contract, linear-combination sanity, mismatch handling, determinism, compute validation, output schema, direct-construction invariants, anti-leakage property test (permuting future rows must not change past scores), DoD Sharpe assertion (fusion Sharpe > best individual on 1-alpha + 2-noise synthetic, seed 42, n=2000), scope guard asserting `services/s04_fusion_engine/` untouched via `git diff --name-only main...HEAD`. |
+| `scripts/generate_phase_4_7_report.py` | Env-var-driven demo (APEX_SEED / APEX_REPORT_NOW / APEX_REPORT_WALLCLOCK_MODE) mirroring 4.3/4.4/4.5/4.6. Builds synthetic scenario, computes per-signal IC/IC_IR (Pearson + 20-fold mean/std proxy), materialises `ICReport`, builds `ICWeightedFusionConfig.from_ic_report`, runs `compute`, writes `reports/phase_4_7/fusion_diagnostics.{md,json}` (weights vector, score percentiles P05/P25/P50/P75/P95, per-signal Pearson correlations, Sharpe comparison table). |
+
+### Quality Gates
+
+- `ruff check` + `ruff format --check`: clean on all new files
+  (5/5 formatted, 0 errors).
+- AST parse clean on all three new Python modules (3.12 syntax).
+- Unit tests written but not executed in sandbox (Python 3.10 vs.
+  project target 3.12 incompatibility: `from datetime import UTC`
+  in the shared conftest); CI `unit-tests` job is authoritative.
+- `mypy --strict` not run locally (sandbox full-tree run is
+  resource-limited); CI covers it.
+
+### Architectural Decisions
+
+- **Frozen weights at construction**: re-calibrating per `compute`
+  call would be lookahead. The property test
+  `test_weights_frozen_permuting_future_signals_does_not_change_past_score`
+  is the regression guard.
+- **Silent drop of `ic_report` entries not in `activated_features`**:
+  Phase 3.12 already rejected them; re-raising would force callers
+  to pre-filter, which is unnecessary coupling.
+- **Hard error on activated feature missing from `ic_report`**:
+  incompatible artefacts (Phase 3.3 and 3.12 out of sync). No
+  silent fallback to zero or uniform weight.
+- **No silent uniform fallback when Σ|IC_IR|=0**: a degenerate
+  `ic_report` is a symptom that upstream validation is broken; the
+  fusion layer should not paper over it.
+- **Sorted feature order**: `tuple(sorted(abs_ir_by_name))`
+  guarantees deterministic weights regardless of `ic_report`
+  insertion order — matters for byte-identical reports across
+  different `ICMeasurer` runs.
+- **Single polars expression for `compute`**: `pl.sum_horizontal`
+  of `[pl.col(f) * w for f, w in zip(names, weights)]` — no Python
+  row loops, scales to the tick-rate hot path even though the
+  current MVP is batch-only.
+- **Scope guard test**: Phase 4.7 is strictly additive; a CI-level
+  check that `services/s04_fusion_engine/` is untouched prevents
+  accidental premature streaming wiring.
+
+### References (canonical)
+
+- PHASE_4_SPEC §3.7 — Fusion Engine IC-weighted.
+- ADR-0005 D7 — Fusion Engine baseline.
+- Grinold, R. C. & Kahn, R. N. (1999). *Active Portfolio
+  Management* (2nd ed.), McGraw-Hill, §4 — IC-IR framework
+  underpinning the weighting formula.
+
+### Issues Addressed
+
+- Closes #131 (Fusion Engine IC-weighted) via this PR.
+- Refs ADR-0005 D7, PHASE_4_SPEC §3.7.
+- Refs #123 (streaming S04 wiring — explicitly out of scope and
+  enforced by `test_services_s04_fusion_engine_untouched_by_phase_4_7_branch`).
+
+### Next Steps
+
+- Commit with conventional message
+  `phase(4.7): IC-weighted fusion engine baseline (closes #131)`
+  and `Co-Authored-By: Claude <noreply@anthropic.com>` trailer.
+- Push branch and open PR against `main` with the body at
+  `docs/pr_bodies/phase_4_7_pr_body.md`.
+- Await Copilot review + full CI; address feedback, hand over to
+  user for merge.
+- Follow up with #132 (E2E Pipeline Test) — chains 4.1→4.7 on a
+  single synthetic to assert the full Phase 4 invariant stack.
