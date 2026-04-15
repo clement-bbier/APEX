@@ -131,8 +131,10 @@ ADR-0005 D4; inner = `(n_splits=4, n_test_splits=1, embargo=0.0)`.
 
 ## 7. Fusion + three-Sharpe comparison
 
-1. **Per-signal IC measurement** — Spearman (not Pearson) on the
+1. **Per-signal IC measurement** — Pearson correlation proxy on the
    raw signal vs realised forward-return, one value per signal.
+   This matches the synthetic fixture and Phase 4.7 report generator,
+   which use Pearson as a pragmatic proxy here rather than Spearman.
    `IC_IR_i ≈ IC_i / sqrt(Var(IC_i))`; a ``20``-chunk bootstrap
    gives a stable denominator (same proxy used by 4.7).
 2. **Fusion config** — `ICWeightedFusionConfig.from_ic_report`
