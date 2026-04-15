@@ -391,6 +391,17 @@ def test_scenario_alpha_coefficients_are_recoverable_via_ols() -> None:
 # ======================================================================
 
 
+# The Phase 4.8 composition gate runs two full CPCV training passes,
+# two nested-CPCV tuning passes (pool + single-symbol), the D5 gate
+# battery, a per-fold bet-sized P&L refit loop (6 outer folds), the
+# fusion compute, and the save/load round-trip.  ``audit.md §13``
+# budgets this at <= 5 min on the ``integration-tests`` GH Actions
+# runner, but the top-level ``pytest ... --timeout=60`` wired into
+# ``.github/workflows/ci.yml`` applies to every test in the suite.
+# Override the per-test budget to the spec target so this one
+# composition gate is not guillotined at 60 s while every other
+# integration test keeps its strict 60 s budget.
+@pytest.mark.timeout(300)
 def test_phase_4_pipeline_end_to_end(git_repo: Path) -> None:
     """Chain every Phase 4 module on the shared scenario and assert §8.
 
