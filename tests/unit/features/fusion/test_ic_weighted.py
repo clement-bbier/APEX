@@ -266,6 +266,21 @@ def test_compute_nan_value_raises() -> None:
         ICWeightedFusion(cfg).compute(df)
 
 
+def test_compute_int64_feature_column_is_accepted() -> None:
+    cfg = ICWeightedFusionConfig(feature_names=("a",), weights=(1.0,))
+    df = pl.DataFrame(
+        {
+            "timestamp": [1, 2, 3],
+            "symbol": ["X", "X", "X"],
+            "a": pl.Series("a", [1, 2, 3], dtype=pl.Int64),
+        }
+    )
+
+    result = ICWeightedFusion(cfg).compute(df)
+
+    assert result.height == df.height
+
+
 def test_compute_empty_dataframe_raises() -> None:
     cfg = ICWeightedFusionConfig(feature_names=("a",), weights=(1.0,))
     empty = pl.DataFrame(
