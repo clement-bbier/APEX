@@ -334,12 +334,29 @@ def test_scenario_bar_and_label_schemas_match_phase_4_contracts() -> None:
 
 
 def test_scenario_alpha_coefficients_are_recoverable_via_ols() -> None:
-    """OLS on the pooled bar panel recovers the hidden alpha coefficients.
+    """OLS on the pooled bar panel recovers the latent alpha coefficients.
 
-    ``log_ret = κ · α + N(0, σ)`` with
-    ``α = 0.5·gex + 0.3·har_rv + 0.2·ofi``, so
-    ``log_ret / κ ≈ α + noise/κ`` and OLS on ``(signals, log_ret/κ)``
-    must return the signed coefficients within a loose tolerance.
+    The Phase 4.8 DGP is::
+
+        log_ret_t = κ · s_vol(|α_t|) · α_t  +  κ · γ · gex_t · ofi_t  +  σ · ε_t
+
+    with ``α = 0.5·gex + 0.3·har_rv + 0.2·ofi`` and
+    ``E[s_vol] = 1`` across the pooled ``|α|`` distribution.
+
+    Linearly regressing ``log_ret / κ`` on the three signals gives::
+
+        β_i = SCENARIO_ALPHA_COEFFS[i] · E[s_vol · signal_i²]
+            = K · SCENARIO_ALPHA_COEFFS[i]
+
+    because the three signals are i.i.d. ``N(0, 1)`` and the regime
+    multiplier enters identically through each squared signal (the
+    ``γ · gex · ofi`` term contributes zero to every marginal
+    covariance by independence). The **ratio** between coefficients is
+    therefore exactly conserved: ``β / ||β||₁ ≈ SCENARIO_ALPHA_COEFFS``
+    (which sum to ``1.0``).
+
+    Raw magnitudes are inflated by ``K = E[s_vol · signal²] ≈ 1.5``, so
+    the test normalises ``β`` by its L1-sum before comparison.
     """
     from tests.integration.fixtures.phase_4_synthetic import (
         SCENARIO_KAPPA,
@@ -379,11 +396,19 @@ def test_scenario_alpha_coefficients_are_recoverable_via_ols() -> None:
     # OLS closed form: β = (X'X)^-1 X'y.
     beta, *_ = np.linalg.lstsq(X_sig, y, rcond=None)
 
-    # Expect sign + magnitude close to SCENARIO_ALPHA_COEFFS. The
-    # tolerance is set so the test is robust to the σ=0.001 noise
-    # channel at n ≈ 2000.
+    # Sign check — each signed α-coefficient is positive by construction,
+    # so each recovered β must also be positive. This catches any DGP
+    # sign flip before the normalisation step disguises it.
+    assert np.all(beta > 0.0), f"all β must be > 0 (got {beta!s})"
+
+    # The latent-alpha **proportions** are the scenario-generator
+    # invariant: ``β / ||β||₁`` must match ``SCENARIO_ALPHA_COEFFS``
+    # (which sum to 1.0) within a ``0.05`` tolerance robust to the
+    # ``σ = 0.001`` noise channel and the ``γ·gex·ofi`` sample-
+    # correlation residual at ``n ≈ 2000`` pooled bars.
     expected = np.asarray(SCENARIO_ALPHA_COEFFS, dtype=np.float64)
-    np.testing.assert_allclose(beta, expected, atol=0.05)
+    beta_normalised = beta / np.sum(beta)
+    np.testing.assert_allclose(beta_normalised, expected, atol=0.05)
 
 
 # ======================================================================
