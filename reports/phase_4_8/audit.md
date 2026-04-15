@@ -98,16 +98,20 @@ The 8-feature matrix is built directly (the regime-history path via
 `MetaLabelerFeatureBuilder` is unit-tested separately and adds no
 composition risk):
 
+Column order follows the canonical `FEATURE_NAMES` tuple in
+`features/meta_labeler/feature_builder.py` (positional —
+`feature_importances_` is positional, so we never re-order):
+
 | Col | Name | Source in the scenario |
 | --- | --- | --- |
 | 0 | `gex_signal` | value at `t0_i` |
 | 1 | `har_rv_signal` | value at `t0_i` |
 | 2 | `ofi_signal` | value at `t0_i` |
-| 3 | `vol_regime_code` | sampled from `{0, 1, 2}` uniformly |
-| 4 | `trend_regime_code` | sampled from `{-1, 0, 1}` uniformly |
-| 5 | `realized_vol` | rolling std of log-return over 28 prior bars |
-| 6 | `sin_time_of_day` | `sin(2π · hour/24)` at `t0_i` |
-| 7 | `cos_time_of_day` | `cos(2π · hour/24)` at `t0_i` |
+| 3 | `regime_vol_code` | sampled from `{0, 1, 2}` uniformly |
+| 4 | `regime_trend_code` | sampled from `{-1, 0, 1}` uniformly |
+| 5 | `realized_vol_28d` | rolling std of log-return over 28 prior bars |
+| 6 | `hour_of_day_sin` | `sin(2π · hour/24)` at `t0_i` |
+| 7 | `day_of_week_sin` | `sin(2π · weekday/7)` at `t0_i` |
 
 Binary target `y_i` is the Phase 4.1 `binary_target` column.
 
