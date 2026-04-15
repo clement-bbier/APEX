@@ -351,6 +351,19 @@ def build_scenario(
     labels_df = pl.concat(labels_parts)
     sample_weights = np.concatenate(weights_parts).astype(np.float64)
 
+    # CPCV (``features.cv.cpcv.CombinatoriallyPurgedKFold.split``) hardens
+    # its input contract by rejecting any ``t1`` that is not monotonically
+    # non-decreasing. Per-symbol label frames are individually sorted by
+    # ``t1`` already, but ``pl.concat`` preserves the per-symbol blocks so
+    # the pooled series resets to early times at every symbol boundary
+    # (e.g. AAPL t1 ends 2025-01-19 then MSFT t1 restarts at 2025-01-01).
+    # Globally re-sort by ``(t1, t0)`` and apply the same permutation to
+    # the parallel ``sample_weights`` array to keep them aligned.
+    labels_df = labels_df.with_row_index("__orig_row").sort(["t1", "t0"])
+    sort_order = labels_df["__orig_row"].to_numpy().astype(np.int64)
+    sample_weights = sample_weights[sort_order]
+    labels_df = labels_df.drop("__orig_row")
+
     # 5. 8-feature matrix ----------------------------------------------
     n_samples = labels_df.height
     X = np.zeros((n_samples, len(FEATURE_NAMES)), dtype=np.float64)  # noqa: N806 - sklearn convention
