@@ -94,8 +94,8 @@ def save_model(
         output_dir: Target directory. Created if missing.
 
     Returns:
-        ``(model_path, card_path)`` with absolute paths to the two
-        written files.
+        ``(model_path, card_path)`` with the paths to the two written
+        files.
 
     Raises:
         ValueError: on invalid card, dirty working tree, or a
