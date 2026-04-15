@@ -112,7 +112,7 @@ SCENARIO_NOISE_SIGMA: float = 0.001
 # stressed regime and weaker in the calm regime — a non-linear
 # ``α × vol_code`` interaction RF captures via tree splits but LogReg
 # cannot represent in its additive feature space.  This is the canonical
-# setup that yields the ≥ 0.03 AUC RF–LogReg gap required by G7.
+# setup that yields the ≥ 0.03 AUC RF—LogReg gap required by G7.
 #
 # Noise scale is kept **constant** across regimes — heteroscedastic
 # noise mis-calibrates the Triple-Barrier vertical-barrier rolling
@@ -315,9 +315,7 @@ def build_scenario(
         alpha_per_symbol[symbol] = alpha
 
     # Pooled |α| quantiles — breakpoints for the three-level vol regime.
-    pooled_abs_alpha = np.concatenate(
-        [np.abs(alpha_per_symbol[s]) for s in SCENARIO_SYMBOLS]
-    )
+    pooled_abs_alpha = np.concatenate([np.abs(alpha_per_symbol[s]) for s in SCENARIO_SYMBOLS])
     q_lo, q_hi = np.quantile(pooled_abs_alpha, _VOL_REGIME_QUANTILES)
 
     vol_codes_per_bar_per_symbol: dict[str, npt.NDArray[np.int_]] = {}
