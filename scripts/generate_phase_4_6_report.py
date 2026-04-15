@@ -163,7 +163,7 @@ def _load_phase_4_5_gates() -> tuple[dict[str, float], dict[str, bool], float]:
     data = json.loads(PHASE_4_5_JSON.read_text(encoding="utf-8"))
     for g in data.get("gates", []):
         name = g["name"]
-        gates_measured[name] = float(g["measured"])
+        gates_measured[name] = float(g["value"])
         gates_passed[name] = bool(g["passed"])
     gates_passed["aggregate"] = bool(data.get("all_passed", all(gates_passed.values())))
     baseline = float(data.get("baseline_auc_logreg", 0.54))
