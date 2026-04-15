@@ -237,7 +237,10 @@ class ICWeightedFusion:
             )
 
         # Reject nulls / NaNs in any feature column explicitly. Polars
-        # treats null and NaN separately; both are fatal here.
+        # treats null and NaN separately; both are fatal here. NaN
+        # checks are only valid for floating dtypes, while integer
+        # columns are still acceptable because they are cast to
+        # Float64 during the weighted sum below.
         for col in cfg.feature_names:
             null_count = int(signals.select(pl.col(col).is_null().sum()).item())
             if null_count > 0:
@@ -246,13 +249,15 @@ class ICWeightedFusion:
                     f"value(s); Phase 3 pipeline must materialise before "
                     f"fusion (no silent zero-fill)"
                 )
-            nan_count = int(signals.select(pl.col(col).is_nan().sum()).item())
-            if nan_count > 0:
-                raise ValueError(
-                    f"signals column {col!r} contains {nan_count} NaN "
-                    f"value(s); Phase 3 pipeline must materialise before "
-                    f"fusion (no silent zero-fill)"
-                )
+            col_dtype = signals.schema[col]
+            if col_dtype in (pl.Float32, pl.Float64):
+                nan_count = int(signals.select(pl.col(col).is_nan().sum()).item())
+                if nan_count > 0:
+                    raise ValueError(
+                        f"signals column {col!r} contains {nan_count} NaN "
+                        f"value(s); Phase 3 pipeline must materialise before "
+                        f"fusion (no silent zero-fill)"
+                    )
 
         # Single polars expression: Σ_i w_i · col(f_i). We explicitly
         # cast each feature column to Float64 to defend against
