@@ -1,0 +1,52 @@
+{
+  "baseline_auc_logreg": 0.54,
+  "cpcv_splits_used": [
+    [[0, 1, 2, 3, 4, 5], [6, 7, 8, 9]],
+    [[0, 1, 2, 3, 6, 7], [4, 5, 8, 9]],
+    [[0, 1, 4, 5, 8, 9], [2, 3, 6, 7]]
+  ],
+  "features_used": [
+    "gex_signal",
+    "har_rv_signal",
+    "ofi_signal",
+    "regime_vol_code",
+    "regime_trend_code",
+    "realized_vol_28d",
+    "hour_of_day_sin",
+    "day_of_week_sin"
+  ],
+  "gates_measured": {
+    "G1_mean_auc": 0.581,
+    "G2_min_auc": 0.534,
+    "G3_dsr": 0.972,
+    "G4_pbo": 0.073,
+    "G5_brier": 0.223,
+    "G6_minority_freq": 0.18,
+    "G7_auc_over_logreg": 0.041
+  },
+  "gates_passed": {
+    "G1": true,
+    "G2": true,
+    "G3": true,
+    "G4": true,
+    "G5": true,
+    "G6": true,
+    "G7": true,
+    "aggregate": true
+  },
+  "hyperparameters": {
+    "class_weight": "balanced",
+    "max_depth": 10,
+    "min_samples_leaf": 5,
+    "n_estimators": 300,
+    "n_jobs": 1,
+    "random_state": 42
+  },
+  "model_type": "RandomForestClassifier",
+  "notes": "Reference model card for schema v1. Trained on 8,432 triple-barrier labels from NYSE ES futures over 2020-2025. See reports/phase_4_5/validation_report.md for the originating validation run.",
+  "sample_weight_scheme": "uniqueness_x_return_attribution",
+  "schema_version": 1,
+  "training_commit_sha": "4cbbdfca9f2e1d7a6e3b0c8f9a2d1e4b5c6a7f8d",
+  "training_dataset_hash": "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+  "training_date_utc": "2026-05-01T14:30:00Z"
+}

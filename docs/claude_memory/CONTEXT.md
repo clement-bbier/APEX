@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
-**Last updated**: 2026-04-14
-**Updated by**: Session 034 (Phase 4.4 Nested CPCV Tuning)
+**Last updated**: 2026-04-15
+**Updated by**: Session 035 (Phase 4.6 Persistence + Model Card)
 
 ---
 
@@ -40,23 +40,48 @@ branch pushed, `reports/phase_4_leakage_audit.md` records strict
 `realized_vol` and cyclical-time columns strictly before `t0`, and
 the regime-code columns as-of `t0` (documented exception).
 
-Phase 4.4 Nested CPCV Tuning (`#128`) in progress on branch
-`phase/4.4-nested-tuning`. ADR-0005 D4 and PHASE_4_SPEC §3.4. New
-module `features/meta_labeler/tuning.py`:
-- `TuningSearchSpace` (3x3x2 = 18 default trials),
-- `TuningResult` (per-fold winners, full trial ledger, stability
-  index, wall-clock),
-- `NestedCPCVTuner` with explicit nested loop (not `GridSearchCV`
-  — rationale in `reports/phase_4_4/audit.md` §10).
-32 unit tests, 100% pass, mypy --strict clean, ruff clean. Fast
-config (n=400, 8-trial x 6 outer x 3 inner = 144+48 fits) runs in
-~22 s with APEX_SEED=42; full config gated behind
-`APEX_FULL_TUNING=1` (18-trial x 15 outer x 4 inner = 1,350 fits).
-Report generator: `scripts/generate_phase_4_4_report.py` →
+Phase 4.4 Nested CPCV Tuning (`#128`) merged via PR #141. Module
+`features/meta_labeler/tuning.py`: `TuningSearchSpace` (3x3x2 = 18
+default trials), `TuningResult` (per-fold winners, full trial
+ledger, stability index, wall-clock), `NestedCPCVTuner` with
+explicit nested loop (not `GridSearchCV` — rationale in
+`reports/phase_4_4/audit.md` §10). 32 unit tests, 100% pass,
+mypy --strict clean. Report generator:
+`scripts/generate_phase_4_4_report.py` →
 `reports/phase_4_4/{tuning_report.md, tuning_trials.json}`.
 
-Remaining Phase 4 work: #129 (Statistical Validation DSR/PBO),
-#130 (Persistence + Model Card), #131 (Fusion Engine IC-weighted),
+Phase 4.5 Statistical Validation (`#129`) merged via PR #143
+(commit `d4768a3`). ADR-0005 D5 / PHASE_4_SPEC §3.5: the seven-gate
+deployment validator (G1 mean AUC ≥ 0.55, G2 min AUC ≥ 0.52, G3 DSR
+≥ 0.95 on bet-sized P&L with realistic costs, G4 PBO < 0.10, G5
+Brier ≤ 0.25, G6 minority freq ≥ 10%, G7 RF − LogReg AUC ≥ +0.03).
+New modules `features/meta_labeler/pnl_simulation.py` (López de Prado
+2018 §3.7 `bet = 2p − 1` + ADR-0002 D7 cost model) and
+`validation.py` (`MetaLabelerValidator.validate` with Politis-Romano
+1994 stationary bootstrap and PBO matrix pivot).
+
+Phase 4.6 Persistence + Model Card (`#130`) on branch
+`phase-4.6-persistence-model-card`. ADR-0005 D6 / PHASE_4_SPEC §3.6:
+joblib serialization + schema-v1 JSON model card. New modules
+`features/meta_labeler/model_card.py` (`ModelCardV1` TypedDict +
+`validate_model_card` with exact-key-set enforcement, Z-suffix
+ISO-8601 date, 40-char SHA regex, `sha256:` + 64-hex dataset-hash
+regex, aggregate-gate cross-check) and
+`features/meta_labeler/persistence.py` (`save_model` / `load_model`
+round-trip with working-tree-clean + HEAD SHA guards,
+`compute_dataset_hash` over fixed-order `(feature_names, X, y)`
+bytes, deterministic canonical JSON card, bit-exact `predict_proba`
+round-trip on 1000 fixed rows under `np.array_equal`). Filename
+stem `{training_date_iso_no_colons}_{commit_sha8}` shared by
+`.joblib` and `.json`. ~34 tests on card schema, ~22 tests on
+persistence, plus `docs/examples/model_card_v1_example.json`
+as the canonical reference card. Report generator:
+`scripts/generate_phase_4_6_report.py` →
+`reports/phase_4_6/persistence_report.{md,json}`. `.gitignore`
+excludes `models/meta_labeler/*.{joblib,json}` — trained weights
+are artefacts, not source.
+
+Remaining Phase 4 work: #131 (Fusion Engine IC-weighted),
 #132 (E2E Pipeline Test), #133 (Closure Report), #135 (closure
 tracking).
 
@@ -65,24 +90,24 @@ Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 4.4 (Nested CPCV Tuning — #128 in progress); 4.1-4.3 merged (PRs #138/#139/#140); #134 leakage audit PASS on `phase/4-leakage-audit` |
+| Active Phase | Phase 4.6 (Persistence + Model Card — #130 on branch `phase-4.6-persistence-model-card`); 4.1-4.5 merged (PRs #138/#139/#140/#141/#143) + #142 leakage audit |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
-| Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests |
-| Production LOC | ~35,770 (+ ~8,271 `features/` + ~970 `features/meta_labeler/`) |
-| Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/` + ~820 `tests/unit/features/meta_labeler/`) |
+| Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests; +~56 Phase 4.6 (card schema + persistence round-trip) |
+| Production LOC | ~35,770 (+ ~8,271 `features/` + ~1,280 `features/meta_labeler/` including 4.6 persistence) |
+| Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/` + ~1,360 `tests/unit/features/meta_labeler/` including 4.6) |
 | mypy strict | 0 errors |
 | Services scaffolded | 10/10 (S01-S10) |
 | S01 fully implemented | Yes (78 files, 9,583 LOC) |
 | ADRs accepted | 10 (+ ADR-0004 Feature Validation Methodology) |
-| features/ coverage | ~93% (557 tests incl. meta-labeler at 94%) |
+| features/ coverage | ~93% (613 tests incl. meta-labeler at 94%) |
 
 ## On the horizon
 
-Phase 4.5 Statistical Validation (issue #129): compute DSR
-(Bailey & Lopez de Prado 2014) and PBO (Bailey, Borwein, Lopez
-de Prado, Zhu 2014) on the `tuning_trials.json` ledger produced
-by 4.4, plus Harvey & Liu (2015) haircut-Sharpe. Gates G4/G5 from
-PHASE_4_SPEC §3.5.
+Phase 4.7 Fusion Engine (issue #131): IC-weighted combination of
+the meta-labeler probability with the Phase 3 signal bundle per
+ADR-0005 D7 — consumes the persisted model from 4.6 via
+`load_model`, produces the `SignalComponent`-compatible output that
+S02 will subscribe to once streaming is wired (issue #123).
 
 ## Audit Status
 

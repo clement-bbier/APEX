@@ -35,3 +35,7 @@ EXTENSIONS.md
 .graphify_python
 graphify-out/
 .claude/scheduled_tasks.lock
+
+# Phase 4.6 model artefacts — trained weights and cards are not source
+models/meta_labeler/*.joblib
+models/meta_labeler/*.json
