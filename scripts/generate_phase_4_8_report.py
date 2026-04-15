@@ -159,7 +159,8 @@ def _event_log_returns(scenario: Scenario) -> npt.NDArray[np.float64]:
     ).sort("row_idx")
     c0 = with_c01["close_t0"].to_numpy().astype(np.float64)
     c1 = with_c01["close_t1"].to_numpy().astype(np.float64)
-    return np.log(c1) - np.log(c0)
+    result: npt.NDArray[np.float64] = np.log(c1) - np.log(c0)
+    return result
 
 
 def _fusion_score_at_events(fusion_df: pl.DataFrame, scenario: Scenario) -> npt.NDArray[np.float64]:
@@ -230,7 +231,8 @@ def _bet_sized_pool_pnl(scenario: Scenario, best_hp: dict[str, Any]) -> npt.NDAr
         net = gross - rt_cost * np.abs(bets)
         pooled_net[te_idx] = net
         seen[te_idx] = True
-    return pooled_net[seen]
+    result: npt.NDArray[np.float64] = pooled_net[seen]
+    return result
 
 
 # ----------------------------------------------------------------------
