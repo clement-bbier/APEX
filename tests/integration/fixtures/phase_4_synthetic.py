@@ -395,8 +395,20 @@ def build_scenario(
         X[row_idx, 6] = float(np.sin(2.0 * np.pi * hour / 24.0))
         X[row_idx, 7] = float(np.sin(2.0 * np.pi * day_of_week / 7.0))
 
-    t0_np = np.array(t0_all, dtype="datetime64[us]")
-    t1_np = np.array(t1_all, dtype="datetime64[us]")
+    # NumPy ``datetime64`` has no timezone representation; passing tz-aware
+    # ``datetime`` objects emits ``UserWarning: no explicit representation of
+    # timezones available for np.datetime64`` which is promoted to an error
+    # by the project-wide ``filterwarnings = ["error", ...]`` pytest policy.
+    # Strip the tz to a naive UTC ``datetime`` before handing off to NumPy.
+    # Scenario timestamps are always UTC by construction (§4 of the audit).
+    t0_np = np.array(
+        [ts.astimezone(UTC).replace(tzinfo=None) for ts in t0_all],
+        dtype="datetime64[us]",
+    )
+    t1_np = np.array(
+        [ts.astimezone(UTC).replace(tzinfo=None) for ts in t1_all],
+        dtype="datetime64[us]",
+    )
 
     feature_set = MetaLabelerFeatureSet(
         X=X,
