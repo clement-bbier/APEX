@@ -1721,3 +1721,109 @@ to pick the winner — the honest nested CV premise of Lopez de Prado
 - Await Copilot review + CI; address feedback, merge.
 - Continue with #129 (Statistical Validation — DSR/PBO consuming
   `tuning_trials.json`).
+
+---
+
+## Session 035 — Phase 4.6 Persistence + Model Card (issue #130)
+
+**Date**: 2026-04-15
+**Branch**: `phase-4.6-persistence-model-card`
+**Status**: IMPLEMENTATION COMPLETE, PR pending
+**Predecessor**: PR #143 (Phase 4.5 Statistical Validation, merged
+commit `d4768a3`). Phase 4.5 session was not separately logged;
+this entry covers only 4.6.
+
+### Scope
+
+Phase 4.6 (ADR-0005 D6 / PHASE_4_SPEC §3.6): serialise a validated
+Meta-Labeler (post-4.5 PASS verdict) to disk with a schema-v1 JSON
+model card. Joblib as the binary format; sibling `.json` card with
+full training provenance (hyperparameters, UTC training date, HEAD
+commit SHA, deterministic dataset hash, CPCV splits, feature names,
+sample-weight scheme, 4.5 gate outcomes, baseline LogReg AUC,
+notes). Bit-exact `predict_proba` round-trip as the deployment
+gate — non-determinism is a blocker per ADR-0005 D6.
+
+### Deliverables
+
+| Artifact | Notes |
+|---|---|
+| `reports/phase_4_6/audit.md` | Pre-impl audit: 12 sections, reuse inventory, schema-v1 rules, hash protocol, save/load contract, determinism requirements, out-of-scope (ONNX deferred). |
+| `features/meta_labeler/model_card.py` | `ModelCardV1` TypedDict (schema_version: Literal[1]) + `validate_model_card` with exact-key-set enforcement. Regex guards on commit SHA (`[0-9a-f]{40}`), dataset hash (`sha256:[0-9a-f]{64}`), and Z-suffix training date. Enforces aggregate gate = AND of per-gate bools. |
+| `features/meta_labeler/persistence.py` | `save_model` / `load_model` (working-tree-clean + HEAD SHA pre-flight checks), `compute_dataset_hash` (library-agnostic SHA-256 over ordered `(feature_names, X_meta, X.tobytes, y_meta, y.tobytes)`), `derive_artifact_stem` (Windows-safe colon→dash). `MetaLabelerModel: TypeAlias = RandomForestClassifier \| LogisticRegression`. |
+| `tests/unit/features/meta_labeler/test_model_card.py` | ~34 tests: happy path + every negative branch (wrong schema_version, missing/extra keys, non-Z date, bad SHA regex, non-bool gates, aggregate-vs-per-gate mismatch, out-of-range baseline AUC, non-string feature names). |
+| `tests/unit/features/meta_labeler/test_persistence.py` | ~22 tests including the ADR-0005 D6 gate `test_load_roundtrip_bit_exact_predictions` (`np.array_equal(predict_proba(x_fixture))` on 1000 rows, tolerance 0.0), dirty-tree rejection, HEAD-SHA-mismatch rejection, type/card cross-check on load, canonical-JSON byte-determinism. `git_repo` fixture spins a throwaway repo per test. |
+| `scripts/generate_phase_4_6_report.py` | Env-var-driven demo (APEX_SEED / APEX_REPORT_NOW / APEX_REPORT_WALLCLOCK_MODE) mirroring 4.4/4.5 contracts. Reads `reports/phase_4_5/validation_report.json` when present, else synthesises defaults; fits a small RF, saves, re-loads, verifies round-trip, emits `persistence_report.{md,json}`. |
+| `docs/examples/model_card_v1_example.json` | Canonical reference card (sorted keys, all 7 gates PASS + aggregate). |
+| `.gitignore` | Excludes `models/meta_labeler/*.{joblib,json}` — artefacts, not source. |
+| `pyproject.toml` | `"joblib.*"` added to mypy `ignore_missing_imports`. |
+
+### Quality Gates
+
+- `ruff check` + `ruff format --check`: clean on all new / modified
+  files.
+- `py_compile` clean on every new module (sandbox runs Python 3.10;
+  CI runs 3.12 and is authoritative).
+- `mypy --strict` clean on card + persistence modules
+  individually; full-tree run OOM-killed in sandbox, CI will cover
+  it.
+- Unit tests written but not executed in sandbox (Python 3.10 vs.
+  project target 3.12 incompatibility: `from datetime import UTC`);
+  CI `unit-tests` job is authoritative.
+
+### Architectural Decisions
+
+- **joblib over pickle**: survives sklearn version pinning and is
+  the documented sklearn persistence format. ONNX deferred (no
+  Phase 4 consumer needs interoperability).
+- **Schema-v1 card with TypedDict + runtime validator**: TypedDict
+  is the static-typing contract; `validate_model_card` is the
+  runtime guard so a card loaded from disk by a future Claude
+  session cannot silently drift from the schema. Schema bump
+  (v2, v3, ...) triggers an explicit `schema_version` rejection
+  today — forces a migration conversation when the time comes.
+- **Working-tree-clean + HEAD-SHA cross-check on save**: a dirty
+  tree means `training_commit_sha` cannot reproduce the artefact,
+  which defeats the card. Fail loud at `save_model` call-site
+  rather than discover the drift at audit time.
+- **Library-agnostic dataset hash**: no pandas / pyarrow dependency;
+  consumes `(feature_names JSON, X_meta JSON, X.tobytes, y_meta
+  JSON, y.tobytes)` in fixed order. Stable across numpy versions
+  because `tobytes(order="C")` is defined by `(shape, dtype)` alone.
+- **Filename stem `{training_date}_{commit_sha8}`**: colons
+  replaced with dashes so Windows developers can also read the
+  artefact directory; the 8-char SHA suffix disambiguates
+  same-minute trainings.
+- **Bit-exact round-trip (tolerance 0.0)**: `np.array_equal` —
+  not `np.allclose`. Anything less is a deployment blocker
+  because prod and training predictions must be identical bit-for-
+  bit; tolerance-based checks hide silent drift.
+
+### References (canonical)
+
+- PHASE_4_SPEC §3.6 — Persistence + Model Card.
+- ADR-0005 D6 — Persistence format, round-trip gate, card schema.
+- López de Prado, M. (2018). *Advances in Financial Machine
+  Learning*, §7 (baseline for the upstream 4.3–4.5 contract this
+  module serialises).
+
+### Issues Addressed
+
+- Closes #130 (Persistence + Model Card) via this PR.
+- Refs ADR-0005 D6, PHASE_4_SPEC §3.6.
+- Verification pass for #127 (Phase 4.3) and #128 (Phase 4.4) —
+  merged via PR #140 / PR #141; `gh issue close 127 128` pending
+  user action (prior PRs used "Refs #NNN" rather than "Closes").
+
+### Next Steps
+
+- Commit with conventional message
+  `phase(4.6): persistence module + schema-v1 model card (closes #130)`
+  and `Co-Authored-By: Claude <noreply@anthropic.com>` trailer.
+- Push branch and open PR against `main` with the body at
+  `docs/pr_bodies/phase_4_6_pr_body.md`.
+- Await Copilot review + full CI (quality / rust / unit-tests /
+  integration / backtest-gate); address feedback, hand over to
+  user for merge.
+- Follow up with #131 (Fusion Engine IC-weighted) — consumes the
+  persisted model.
