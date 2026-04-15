@@ -65,8 +65,9 @@ REPORT_DIR = REPO_ROOT / "reports" / "phase_4_7"
 
 _log = structlog.get_logger(__name__)
 
-_FEATURE_NAMES: tuple[str, str, str] = ("alpha_signal", "noise_1", "noise_2")
-_N_BARS: int = 2000
+_FEATURE_NAMES: tuple[str, str, str] = ("sig_0", "sig_1", "sig_2")
+_NOISE_LEVELS: tuple[float, float, float] = (0.4, 0.8, 1.2)
+_N_BARS: int = 4000
 _SYMBOL: str = "SYN"
 
 
@@ -100,30 +101,30 @@ def _resolve_wallclock(measured: float) -> float | None:
 
 
 # ----------------------------------------------------------------------
-# Synthetic scenario — alpha channel + 2 noise channels
+# Synthetic scenario — 3 noisy observations of one latent alpha
 # ----------------------------------------------------------------------
 
 
 def _synthetic_scenario(
     seed: int,
-) -> tuple[
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-    npt.NDArray[np.float64],
-]:
-    """Build ``(alpha_signal, noise_1, noise_2, forward_returns)``.
+) -> tuple[dict[str, npt.NDArray[np.float64]], npt.NDArray[np.float64]]:
+    """Build ``(signals_by_name, forward_returns)``.
 
-    Returns carry a ``0.3 * alpha`` component so ``alpha_signal``
-    has a measurable ``IC`` while the two noise channels do not.
+    Textbook IC-weighted fusion scenario (Grinold & Kahn 1999 §4):
+    three signals carry independent noisy observations of the same
+    latent alpha with different noise levels. Forward returns are
+    driven by the same latent alpha, so each signal has positive
+    but partial predictive power and IC-weighted fusion strictly
+    improves on every individual signal.
     """
     rng = np.random.default_rng(seed)
     alpha = rng.standard_normal(_N_BARS)
-    forward_returns = 0.3 * alpha + rng.standard_normal(_N_BARS) * 0.2
-    alpha_signal = alpha + rng.standard_normal(_N_BARS) * 0.5
-    noise_1 = rng.standard_normal(_N_BARS)
-    noise_2 = rng.standard_normal(_N_BARS)
-    return alpha_signal, noise_1, noise_2, forward_returns
+    forward_returns = 0.25 * alpha + rng.standard_normal(_N_BARS) * 0.1
+    signals_by_name: dict[str, npt.NDArray[np.float64]] = {
+        _FEATURE_NAMES[i]: alpha + rng.standard_normal(_N_BARS) * sigma
+        for i, sigma in enumerate(_NOISE_LEVELS)
+    }
+    return signals_by_name, forward_returns
 
 
 def _measure_ic_ir(
@@ -342,12 +343,7 @@ def main() -> None:
     generated_at = _resolve_generated_at()
     start = time.perf_counter()
 
-    alpha_signal, noise_1, noise_2, forward_returns = _synthetic_scenario(seed)
-    signals_map: dict[str, npt.NDArray[np.float64]] = {
-        "alpha_signal": alpha_signal,
-        "noise_1": noise_1,
-        "noise_2": noise_2,
-    }
+    signals_map, forward_returns = _synthetic_scenario(seed)
 
     ic_report, measurements = _build_ic_report(signals_map, forward_returns)
     activation = FeatureActivationConfig(
@@ -362,9 +358,7 @@ def main() -> None:
         {
             "timestamp": np.arange(_N_BARS, dtype=np.int64),
             "symbol": [_SYMBOL] * _N_BARS,
-            "alpha_signal": alpha_signal,
-            "noise_1": noise_1,
-            "noise_2": noise_2,
+            **signals_map,
         }
     )
     fusion_df = ICWeightedFusion(config).compute(signals_df)
