@@ -8,8 +8,15 @@ Design (see ``reports/phase_4_8/audit.md`` §4 for the full contract):
 
 - **4 symbols**: ``AAPL``, ``MSFT`` (equities) and ``BTCUSDT``,
   ``ETHUSDT`` (crypto). Labels are pooled across symbols.
-- **500 bars per symbol**. Hourly UTC grid anchored at
-  ``2025-01-01T00:00:00+00:00``.
+- **500 bars per symbol**, placed on **disjoint hourly blocks** so
+  the pooled bar panel is globally strictly monotonic in
+  ``timestamp``. Each symbol ``i`` (in ``SCENARIO_SYMBOLS`` order)
+  starts at ``_BAR_ANCHOR + i · _N_BARS_PER_SYMBOL · _BAR_STEP``.
+  This is what lets the pooled 376 events serve as input to
+  :class:`features.meta_labeler.validation.MetaLabelerValidator`:
+  the validator's P&L simulator does ``np.searchsorted`` on a flat
+  ``timestamp`` column and requires strict monotonicity, which a
+  same-anchor 4-symbol panel would violate.
 - **3 Phase-3 signals** — ``gex_signal``, ``har_rv_signal``,
   ``ofi_signal`` — independent ``N(0, 1)`` per bar.
 - **Latent alpha**: ``α_t = 0.5·gex + 0.3·har_rv + 0.2·ofi``.
@@ -220,7 +227,7 @@ def build_scenario(
     signals_per_symbol: dict[str, dict[str, npt.NDArray[np.float64]]] = {}
     timestamps_per_symbol: dict[str, list[datetime]] = {}
 
-    for symbol in SCENARIO_SYMBOLS:
+    for symbol_idx, symbol in enumerate(SCENARIO_SYMBOLS):
         sym_signals = {
             name: rng.standard_normal(bars_per_symbol).astype(np.float64)
             for name in SCENARIO_SIGNAL_NAMES
@@ -233,7 +240,17 @@ def build_scenario(
 
         closes = 100.0 * np.exp(np.cumsum(log_ret))
 
-        timestamps: list[datetime] = [_BAR_ANCHOR + i * _BAR_STEP for i in range(bars_per_symbol)]
+        # Disjoint per-symbol time blocks — each symbol is shifted by
+        # ``symbol_idx · bars_per_symbol`` hours past the anchor so the
+        # concatenated bar panel is **globally** strictly monotonic in
+        # ``timestamp``. This is what lets the validator's P&L simulator
+        # (flat-timestamp ``searchsorted``) consume the pooled events
+        # directly rather than being restricted to a single symbol's
+        # slice. See module-level docstring and audit §4 for context.
+        sym_offset = symbol_idx * bars_per_symbol * _BAR_STEP
+        timestamps: list[datetime] = [
+            _BAR_ANCHOR + sym_offset + i * _BAR_STEP for i in range(bars_per_symbol)
+        ]
         timestamps_per_symbol[symbol] = timestamps
         log_returns_per_symbol[symbol] = log_ret
         signals_per_symbol[symbol] = sym_signals
@@ -254,6 +271,12 @@ def build_scenario(
             },
         )
 
+    # Sort by ``timestamp`` alone — disjoint per-symbol offsets make
+    # this a **globally** strictly monotonic order. The validator's
+    # P&L simulator calls ``np.searchsorted`` on the flat timestamp
+    # column and rejects non-monotonic input, so this invariant is
+    # the contract that lets the pooled panel feed the D5 validator
+    # without per-symbol filtering.
     bars_df = pl.DataFrame(
         bars_rows,
         schema={
@@ -261,7 +284,7 @@ def build_scenario(
             "symbol": pl.Utf8,
             "close": pl.Float64,
         },
-    ).sort(["symbol", "timestamp"])
+    ).sort("timestamp")
 
     # 2. Build the pooled signals frame (all bars) ---------------------
     signals_rows_ts: list[datetime] = []

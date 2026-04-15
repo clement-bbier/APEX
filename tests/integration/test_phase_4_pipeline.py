@@ -444,69 +444,35 @@ def test_phase_4_pipeline_end_to_end(git_repo: Path) -> None:
     )
 
     # -- 4.5 D5 gates (G1 - G7) ----------------------------------------
+    #
+    # The validator's P&L simulator (used by the G3 DSR gate) calls
+    # ``np.searchsorted`` on a flat ``timestamp`` column and rejects
+    # non-monotonic input. The scenario fixture satisfies that
+    # contract at the **pooled** level by placing each symbol on a
+    # disjoint hourly block past ``_BAR_ANCHOR`` (see
+    # ``phase_4_synthetic.py`` module docstring and audit §4), so
+    # ``scenario.bars`` is globally strictly monotonic in
+    # ``timestamp`` and every ``(t0, t1)`` pair lives on exactly
+    # one symbol's sub-range.
+    #
+    # Feeding the validator the pooled training / tuning results,
+    # the full 4-symbol feature matrix and the full pooled bar panel
+    # gives D5 the ~376-event universe it needs for statistical
+    # stability — a single-symbol slice (~94 events) starves the
+    # 6-outer / 4-inner nested CPCV and collapses the per-fold AUC
+    # variance (G1 / G2) far below the ADR-0005 thresholds.
     validator = MetaLabelerValidator(
         cpcv=outer_cpcv,
         cost_scenario=CostScenario.REALISTIC,
         seed=DEFAULT_SEED,
     )
-    # Bars for the P&L simulator: union timestamps. The simulator wants
-    # every (symbol, t0|t1) to exist; ``scenario.bars`` covers both.
-    # The validator's internal lookup is per-symbol-agnostic — it does
-    # ``searchsorted`` on the flat ``timestamp`` column — so we need a
-    # frame sorted by ``timestamp`` alone with unique timestamps per
-    # event. Our scenario's event grid is already unique per
-    # (symbol, timestamp), so filtering to one symbol guarantees
-    # a strictly monotonic ``timestamp`` column for the P&L simulator.
-    bars_for_pnl_symbol = SCENARIO_SYMBOLS[0]
-    bars_for_pnl = scenario.bars_per_symbol[bars_for_pnl_symbol]
-
-    # The validator expects bars that cover every t0/t1. We filter the
-    # scenario to a per-symbol subset of events in the same way below
-    # when computing Sharpe so the validator and the §8 assertion
-    # agree on which event set they see.
-    # (The validator's contract permits a superset of events; here we
-    # supply the full pooled scenario by rebuilding per-symbol bars for
-    # each event's symbol. Easiest: use the single-symbol slice for
-    # the validator and audit on the full pooled set separately.)
-    per_symbol_mask = np.asarray(
-        [s == bars_for_pnl_symbol for s in scenario.labels["symbol"].to_list()],
-        dtype=bool,
-    )
-    single_symbol_features = type(scenario.feature_set)(
-        X=scenario.feature_set.X[per_symbol_mask],
-        feature_names=scenario.feature_set.feature_names,
-        t0=scenario.feature_set.t0[per_symbol_mask],
-        t1=scenario.feature_set.t1[per_symbol_mask],
-    )
-    single_symbol_y = scenario.y[per_symbol_mask]
-    single_symbol_w = scenario.sample_weights[per_symbol_mask]
-
-    # Re-run the 4.3/4.4 pass on the single-symbol slice so the
-    # validator consumes matching training / tuning / features / y.
-    baseline_single = BaselineMetaLabeler(cpcv=outer_cpcv, seed=DEFAULT_SEED)
-    training_result_single = baseline_single.train(
-        features=single_symbol_features,
-        y=single_symbol_y,
-        sample_weights=single_symbol_w,
-    )
-    tuner_single = NestedCPCVTuner(
-        search_space=REDUCED_TUNING_SEARCH_SPACE,
-        outer_cpcv=outer_cpcv,
-        inner_cpcv=inner_cpcv,
-        seed=DEFAULT_SEED,
-    )
-    tuning_result_single = tuner_single.tune(
-        features=single_symbol_features,
-        y=single_symbol_y,
-        sample_weights=single_symbol_w,
-    )
     report = validator.validate(
-        training_result=training_result_single,
-        tuning_result=tuning_result_single,
-        features=single_symbol_features,
-        y=single_symbol_y,
-        sample_weights=single_symbol_w,
-        bars_for_pnl=bars_for_pnl,
+        training_result=training_result,
+        tuning_result=tuning_result,
+        features=scenario.feature_set,
+        y=scenario.y,
+        sample_weights=scenario.sample_weights,
+        bars_for_pnl=scenario.bars,
     )
 
     # Audit §8 assertion 2 --------------------------------------------

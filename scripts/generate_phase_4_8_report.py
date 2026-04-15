@@ -4,8 +4,10 @@ Composition-gate mirror of the integration test. The pipeline:
 
 1. Build the deterministic synthetic scenario via
    :func:`tests.integration.fixtures.phase_4_synthetic.build_scenario`
-   (4 symbols, 500 hourly bars/symbol, 3 Phase-3 signals with known
-   latent-alpha coefficients, ~376 Triple-Barrier events pooled).
+   (4 symbols, 500 hourly bars/symbol on disjoint time blocks so the
+   pooled panel is globally time-monotonic, 3 Phase-3 signals with
+   known latent-alpha coefficients, ~376 Triple-Barrier events
+   pooled).
 2. Run the 4.3 ``BaselineMetaLabeler`` + 4.4 ``NestedCPCVTuner`` on
    the pooled feature matrix using the reduced 2×2×2 grid.
 3. Run the 4.5 ``MetaLabelerValidator`` on the first-symbol slice
@@ -382,42 +384,22 @@ def main() -> None:
     )
     tuning_result = tuner.tune(scenario.feature_set, scenario.y, scenario.sample_weights)
 
-    # Single-symbol validation slice.
-    bars_for_pnl_symbol = SCENARIO_SYMBOLS[0]
-    mask = np.asarray(
-        [s == bars_for_pnl_symbol for s in scenario.labels["symbol"].to_list()],
-        dtype=bool,
-    )
-    from features.meta_labeler.feature_builder import MetaLabelerFeatureSet
-
-    ss_features = MetaLabelerFeatureSet(
-        X=scenario.feature_set.X[mask],
-        feature_names=scenario.feature_set.feature_names,
-        t0=scenario.feature_set.t0[mask],
-        t1=scenario.feature_set.t1[mask],
-    )
-    ss_y = scenario.y[mask]
-    ss_w = scenario.sample_weights[mask]
-
-    baseline_ss = BaselineMetaLabeler(cpcv=outer_cpcv, seed=seed)
-    training_result_ss = baseline_ss.train(ss_features, ss_y, ss_w)
-    tuner_ss = NestedCPCVTuner(
-        search_space=REDUCED_TUNING_SEARCH_SPACE,
-        outer_cpcv=outer_cpcv,
-        inner_cpcv=inner_cpcv,
-        seed=seed,
-    )
-    tuning_result_ss = tuner_ss.tune(ss_features, ss_y, ss_w)
+    # Pooled D5 validation. ``scenario.bars`` is globally strictly
+    # monotonic in ``timestamp`` thanks to the disjoint-block layout
+    # documented in ``tests/integration/fixtures/phase_4_synthetic``
+    # — which is what lets the flat-timestamp ``searchsorted`` in
+    # the Phase 4.5 P&L simulator consume the pooled 4-symbol panel
+    # directly, with no single-symbol filtering required.
     validator = MetaLabelerValidator(
         cpcv=outer_cpcv, cost_scenario=CostScenario.REALISTIC, seed=seed
     )
     report = validator.validate(
-        training_result=training_result_ss,
-        tuning_result=tuning_result_ss,
-        features=ss_features,
-        y=ss_y,
-        sample_weights=ss_w,
-        bars_for_pnl=scenario.bars_per_symbol[bars_for_pnl_symbol],
+        training_result=training_result,
+        tuning_result=tuning_result,
+        features=scenario.feature_set,
+        y=scenario.y,
+        sample_weights=scenario.sample_weights,
+        bars_for_pnl=scenario.bars,
     )
 
     # Fusion.

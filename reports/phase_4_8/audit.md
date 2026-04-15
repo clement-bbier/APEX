@@ -62,10 +62,21 @@ Mirrors PHASE_4_SPEC §3.8 "Scenario specification":
 - **4 symbols**: `AAPL`, `MSFT` (equities) and `BTCUSDT`, `ETHUSDT`
   (crypto). Labels are pooled across symbols — CPCV partitions
   labels, not bars.
-- **500 bars per symbol** = 2000 total. Hourly grid anchored at
-  `2025-01-01T00:00:00Z`. First 30 bars of each symbol are reserved
-  as the Triple-Barrier volatility warmup (``vol_lookback = 20`` by
-  default plus slack).
+- **500 bars per symbol** = 2000 total, placed on **disjoint hourly
+  blocks** past `_BAR_ANCHOR` = `2025-01-01T00:00:00Z`. Symbol `i`
+  in `SCENARIO_SYMBOLS` order starts at
+  `_BAR_ANCHOR + i · 500 · 1h`, so the pooled bar panel is
+  **globally** strictly monotonic in `timestamp`. This is the
+  contract the Phase 4.5 P&L simulator enforces via
+  `np.searchsorted` on a flat `timestamp` column — a same-anchor
+  4-symbol panel would produce duplicate timestamps and violate
+  it. Disjoint blocks let the validator run on the full pooled
+  event universe (~376 events) rather than a single-symbol slice
+  (~94 events); the smaller slice starves the 6-outer / 4-inner
+  nested CPCV and collapses per-fold AUC variance below the
+  ADR-0005 D5 thresholds. First 30 bars of each symbol are
+  reserved as the Triple-Barrier volatility warmup
+  (`vol_lookback = 20` + slack).
 - **Three Phase-3 signals** — `gex_signal`, `har_rv_signal`,
   `ofi_signal` — generated as independent N(0, 1) columns. These
   are the three features ADR-0005 D6 / Phase 4.3 explicitly
@@ -86,7 +97,9 @@ Mirrors PHASE_4_SPEC §3.8 "Scenario specification":
   (Float64, strictly positive). Close is a geometric walk:
   ``close_t = 100 · exp(Σ log_ret_t)``.
 - **Events**: one event every 5 bars after warmup → ~94 events
-  per symbol → ~376 events total. Long-only (ADR-0005 D1 MVP).
+  per symbol → ~376 events total, pooled into a single
+  time-monotonic stream via the disjoint-block layout above.
+  Long-only (ADR-0005 D1 MVP).
 - **Triple-Barrier config**: default ``TripleBarrierConfig`` —
   ``pt=2.0`` σ, ``sl=1.0`` σ, ``max_holding=60`` bars,
   ``vol_lookback=20``.
