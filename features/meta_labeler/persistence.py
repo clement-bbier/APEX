@@ -154,15 +154,11 @@ def save_model(
     # files in the same directory (guaranteeing same filesystem) then
     # os.replace() into the final paths. If either write fails, we
     # remove the temp files so no dangling artifact is left behind.
-    tmp_model_fd, tmp_model_str = tempfile.mkstemp(
-        suffix=_MODEL_SUFFIX, dir=output_dir
-    )
+    tmp_model_fd, tmp_model_str = tempfile.mkstemp(suffix=_MODEL_SUFFIX, dir=output_dir)
     os.close(tmp_model_fd)
     tmp_model_path = Path(tmp_model_str)
 
-    tmp_card_fd, tmp_card_str = tempfile.mkstemp(
-        suffix=_CARD_SUFFIX, dir=output_dir
-    )
+    tmp_card_fd, tmp_card_str = tempfile.mkstemp(suffix=_CARD_SUFFIX, dir=output_dir)
     os.close(tmp_card_fd)
     tmp_card_path = Path(tmp_card_str)
 
