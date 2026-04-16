@@ -281,4 +281,4 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 | #82 ARCHITECTURE.md | Sprint 6 | PR PENDING |
 | #83 ACADEMIC_REFERENCES.md | Sprint 6 | PR PENDING |
 | #84 ONBOARDING.md | Sprint 6 | PR PENDING |
-| #85 pre-commit hooks | Sprint 6 | PR PENDING                                               
+| #85 pre-commit hooks | Sprint 6 | PR PENDING
