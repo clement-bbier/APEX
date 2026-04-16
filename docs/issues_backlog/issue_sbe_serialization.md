@@ -27,7 +27,7 @@ Le système sérialise actuellement les ticks et les ordres en JSON (`.model_dum
 - [ ] **Profilage CPU** : Un rapport montre une réduction de plus de 80% du temps CPU alloué à la sérialisation des messages `Tick`.
 - [ ] **Stabilité GC** : Diminution drastique des pauses du Garbage Collector Python lors des tests de stress (chocs de volatilité simulés).
 - [ ] Schémas FlatBuffers/SBE versionnés et documentés.
-- [ ] Backward-compatible : les services non-migrés peuvent toujours consommer du JSON via un adapteur.
+- [ ] Backward-compatible : les services non-migrés peuvent toujours consommer du JSON via un adaptateur.
 
 ### Références
 
