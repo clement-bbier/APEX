@@ -925,13 +925,16 @@ state transition to `DEGRADED`, not silent continuation.
 
 ### 5.2 CI contract
 
-Phase 5 inherits the full CI pipeline:
+Phase 5 inherits the current CI pipeline:
 1. `quality` — ruff + mypy strict + bandit
 2. `rust` — cargo test + maturin build
-3. `unit-tests` — pytest with coverage ≥ 85%
+3. `unit-tests` — pytest with coverage ≥ 75%
 4. `integration-tests` — full pipeline with Redis
-5. `backtest-gate` — Sharpe ≥ 0.8, max DD ≤ 8%
+5. `backtest-gate` — non-blocking; Sharpe ≥ 0.5, max DD ≤ 0.12
 
+Phase 5 targets raising the unit-test coverage gate to ≥ 85% and
+tightening backtest acceptance targets to Sharpe ≥ 0.8 and max DD
+≤ 8% once the CI workflow is updated accordingly.
 Sub-phase 5.9 (Rust FFI) may add a `rust-bench` job to track
 performance regressions.
 
