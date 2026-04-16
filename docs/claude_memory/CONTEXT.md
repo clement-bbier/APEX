@@ -1,7 +1,18 @@
 # APEX Project Context Snapshot
 
-**Last updated**: 2026-04-15
-**Updated by**: Session 038 (Phase 4.8 DGP re-calibration for all D5 gates green at seed=42)
+**Last updated**: 2026-04-16
+**Updated by**: Session 038 (Phase 4.9 Closure — Phase 4 complete)
+
+---
+
+## Phase 4 — CLOSED
+
+Phase 4 (Fusion Engine + Meta-Labeler) is **complete**. All 8 sub-phases
+(4.1–4.8) merged to `main`. CI green on all 5 jobs. Closure report at
+`docs/phase_4_closure_report.md`. Phase 4 accumulated notes at
+`docs/claude_memory/PHASE_4_NOTES.md`.
+
+**Phase 5 (Live Integration) is the next phase.**
 
 ### 4.8 DGP calibration — locked
 
@@ -128,11 +139,11 @@ correlations, Sharpe comparison table). Streaming wiring into
 `services/s04_fusion_engine/` stays out of scope (Phase 5, issue
 #123).
 
-Phase 4.8 End-to-end Pipeline Test (`#132`) on branch
-`phase-4.8-e2e-pipeline-test`. PHASE_4_SPEC §3.8 composition gate:
-single integration test wiring every Phase 4 module already on
-`main` on a deterministic synthetic scenario. No new library API.
-New test assets: `tests/integration/fixtures/__init__.py`,
+Phase 4.8 End-to-end Pipeline Test merged via PR `#132` to `main`.
+PHASE_4_SPEC §3.8 composition gate: single integration test wiring
+every Phase 4 module already on `main` on a deterministic
+synthetic scenario. No new library API. New test assets:
+`tests/integration/fixtures/__init__.py`,
 `tests/integration/fixtures/phase_4_synthetic.py` (deterministic
 scenario generator — 4 symbols `AAPL / MSFT / BTCUSDT / ETHUSDT`,
 500 hourly bars each = 2000 total bars; 3 activated signals `gex /
@@ -165,15 +176,12 @@ summary, IC/IR per signal, frozen fusion weights, per-gate verdict
 table, Sharpe trio + gaps, DSR/PBO/round-trip bps, tuner
 stability_index, optional wall-clock).
 
-Remaining Phase 4 work: #133 (Closure Report), #135 (closure
-tracking).
-
 Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 (streaming calculators, Phase 5).
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 4.8 (E2E Pipeline Test — #132 on branch `phase-4.8-e2e-pipeline-test`); 4.1-4.7 merged (PRs #138/#139/#140/#141/#143/#144/#145) + #142 leakage audit |
+| Active Phase | Phase 5 (Live Integration); Phase 4 closed — all 8 sub-phases (4.1–4.8) merged via PRs #138/#139/#140/#141/#142/#143/#144/#145/#132; closure report at `docs/phase_4_closure_report.md` |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
 | Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests; +~56 Phase 4.6 (card schema + persistence round-trip) + ~30 Phase 4.7 (IC-weighted fusion) + 1 top-level + 4 fixture micro-tests Phase 4.8 (E2E pipeline composition gate) |
 | Production LOC | ~35,770 (+ ~8,271 `features/` + ~1,280 `features/meta_labeler/` + ~280 `features/fusion/` Phase 4.7) |
@@ -186,10 +194,10 @@ Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 
 ## On the horizon
 
-Phase 4 Closure Report (issue #133) — once 4.8 lands green, run
-the consolidated Phase 4 retrospective with final metrics, ADR
-acceptance record, and the hand-off note for the Phase 5 streaming
-work already scoped under issue #123.
+Phase 5 (Live Integration) — wire the meta-labeler fusion output
+into the live S02 signal pipeline (issue #123 streaming calculators),
+integrate CVD-Kyle performance improvements (issue #115), and execute
+the Phase 5 spec once scoped and accepted.
 
 ## Audit Status
 
@@ -267,11 +275,4 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 | #82 ARCHITECTURE.md | Sprint 6 | PR PENDING |
 | #83 ACADEMIC_REFERENCES.md | Sprint 6 | PR PENDING |
 | #84 ONBOARDING.md | Sprint 6 | PR PENDING |
-| #85 pre-commit hooks | Sprint 6 | PR PENDING |
-| #86 stale agent prompts | Sprint 6 | PR PENDING |
-
-## Branch Status
-
-- `main` is clean, all tests passing (Sprint 5 merged via PR #105)
-- `sprint6/meta-governance` — PR pending (#81-#86)
-- Follow-up issue #102 created for backtest-gate continue-on-error removal
+| #85 pre-commit hooks | Sprint 6 | PR PENDING
