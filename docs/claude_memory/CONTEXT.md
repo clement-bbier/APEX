@@ -139,11 +139,11 @@ correlations, Sharpe comparison table). Streaming wiring into
 `services/s04_fusion_engine/` stays out of scope (Phase 5, issue
 #123).
 
-Phase 4.8 End-to-end Pipeline Test (`#132`) on branch
-`phase-4.8-e2e-pipeline-test`. PHASE_4_SPEC §3.8 composition gate:
-single integration test wiring every Phase 4 module already on
-`main` on a deterministic synthetic scenario. No new library API.
-New test assets: `tests/integration/fixtures/__init__.py`,
+Phase 4.8 End-to-end Pipeline Test merged via PR `#132` to `main`.
+PHASE_4_SPEC §3.8 composition gate: single integration test wiring
+every Phase 4 module already on `main` on a deterministic
+synthetic scenario. No new library API. New test assets:
+`tests/integration/fixtures/__init__.py`,
 `tests/integration/fixtures/phase_4_synthetic.py` (deterministic
 scenario generator — 4 symbols `AAPL / MSFT / BTCUSDT / ETHUSDT`,
 500 hourly bars each = 2000 total bars; 3 activated signals `gex /
