@@ -176,15 +176,12 @@ summary, IC/IR per signal, frozen fusion weights, per-gate verdict
 table, Sharpe trio + gaps, DSR/PBO/round-trip bps, tuner
 stability_index, optional wall-clock).
 
-Remaining Phase 4 work: #133 (Closure Report), #135 (closure
-tracking).
-
 Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 (streaming calculators, Phase 5).
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 4.8 (E2E Pipeline Test — #132 on branch `phase-4.8-e2e-pipeline-test`); 4.1-4.7 merged (PRs #138/#139/#140/#141/#143/#144/#145) + #142 leakage audit |
+| Active Phase | Phase 5 (Live Integration); Phase 4 closed — all 8 sub-phases (4.1–4.8) merged via PRs #138/#139/#140/#141/#142/#143/#144/#145/#132; closure report at `docs/phase_4_closure_report.md` |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
 | Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests; +~56 Phase 4.6 (card schema + persistence round-trip) + ~30 Phase 4.7 (IC-weighted fusion) + 1 top-level + 4 fixture micro-tests Phase 4.8 (E2E pipeline composition gate) |
 | Production LOC | ~35,770 (+ ~8,271 `features/` + ~1,280 `features/meta_labeler/` + ~280 `features/fusion/` Phase 4.7) |
@@ -197,10 +194,10 @@ Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 
 ## On the horizon
 
-Phase 4 Closure Report (issue #133) — once 4.8 lands green, run
-the consolidated Phase 4 retrospective with final metrics, ADR
-acceptance record, and the hand-off note for the Phase 5 streaming
-work already scoped under issue #123.
+Phase 5 (Live Integration) — wire the meta-labeler fusion output
+into the live S02 signal pipeline (issue #123 streaming calculators),
+integrate CVD-Kyle performance improvements (issue #115), and execute
+the Phase 5 spec once scoped and accepted.
 
 ## Audit Status
 
