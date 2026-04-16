@@ -1,7 +1,7 @@
 # APEX Project Context Snapshot
 
 **Last updated**: 2026-04-16
-**Updated by**: Session 038 (Phase 4.9 Closure — Phase 4 complete)
+**Updated by**: Session 039 (Phase 5 Design-Gate + Phase 4 Closure)
 
 ---
 
@@ -12,7 +12,10 @@ Phase 4 (Fusion Engine + Meta-Labeler) is **complete**. All 8 sub-phases
 `docs/phase_4_closure_report.md`. Phase 4 accumulated notes at
 `docs/claude_memory/PHASE_4_NOTES.md`.
 
-**Phase 5 (Live Integration) is the next phase.**
+**Phase 5 (Live Integration & Infrastructure Hardening) is the next phase.**
+Design-gate PR proposed. Spec at `docs/phases/PHASE_5_SPEC.md`.
+9 sub-phases across 3 tracks: A (Safety + Live), B (Infrastructure),
+C (Intelligence + Performance). DMA Research (#154) deferred to Phase 6.
 
 ### 4.8 DGP calibration — locked
 
@@ -194,10 +197,13 @@ Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 
 ## On the horizon
 
-Phase 5 (Live Integration) — wire the meta-labeler fusion output
-into the live S02 signal pipeline (issue #123 streaming calculators),
-integrate CVD-Kyle performance improvements (issue #115), and execute
-the Phase 5 spec once scoped and accepted.
+Phase 5 (Live Integration & Infrastructure Hardening) — spec at
+`docs/phases/PHASE_5_SPEC.md`. 9 sub-phases:
+- 5.1 Fail-Closed (#148), 5.2 Event Sourcing (#149),
+  5.3 Streaming Inference (#123), 5.4 Short-Side + Regime Fusion,
+  5.5 Drift Monitoring, 5.6 ZMQ P2P (#150), 5.7 SBE (#151),
+  5.8 Alt Data NLP (#153), 5.9 Rust FFI (#152).
+Phase 6 backlog: DMA Research (#154), Rust monolith, Aeron, auto-retrain.
 
 ## Audit Status
 
