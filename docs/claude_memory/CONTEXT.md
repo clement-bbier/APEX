@@ -1,7 +1,18 @@
 # APEX Project Context Snapshot
 
-**Last updated**: 2026-04-15
-**Updated by**: Session 038 (Phase 4.8 DGP re-calibration for all D5 gates green at seed=42)
+**Last updated**: 2026-04-16
+**Updated by**: Session 039 (Phase 4.9 Closure — Phase 4 complete)
+
+---
+
+## Phase 4 — CLOSED
+
+Phase 4 (Fusion Engine + Meta-Labeler) is **complete**. All 8 sub-phases
+(4.1–4.8) merged to `main`. CI green on all 5 jobs. Closure report at
+`docs/phase_4_closure_report.md`. Phase 4 accumulated notes at
+`docs/claude_memory/PHASE_4_NOTES.md`.
+
+**Phase 5 (Live Integration) is the next phase.**
 
 ### 4.8 DGP calibration — locked
 
@@ -267,11 +278,4 @@ Spec document: `docs/phases/PHASE_3_SPEC.md`
 | #82 ARCHITECTURE.md | Sprint 6 | PR PENDING |
 | #83 ACADEMIC_REFERENCES.md | Sprint 6 | PR PENDING |
 | #84 ONBOARDING.md | Sprint 6 | PR PENDING |
-| #85 pre-commit hooks | Sprint 6 | PR PENDING |
-| #86 stale agent prompts | Sprint 6 | PR PENDING |
-
-## Branch Status
-
-- `main` is clean, all tests passing (Sprint 5 merged via PR #105)
-- `sprint6/meta-governance` — PR pending (#81-#86)
-- Follow-up issue #102 created for backtest-gate continue-on-error removal
+| #85 pre-commit hooks | Sprint 6 | PR PENDING
