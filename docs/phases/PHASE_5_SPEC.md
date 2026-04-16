@@ -3,7 +3,8 @@
 **Status**: Design-gate proposed — 2026-04-16
 **Related ADRs**: ADR-0002 (Quant Methodology Charter), ADR-0005
 (Meta-Labeling and Fusion Methodology), ADR-0001 (ZMQ Broker
-Topology — superseded by 5.6).
+Topology — planned supersession in 5.6, pending a new ADR or explicit
+ADR-0001 status update).
 **Branch**: `design-gate/phase-5`
 **Predecessor**: Phase 4 (closed via PR #147).
 **Successor**: Phase 6 (Alpha Generation — DMA, advanced
