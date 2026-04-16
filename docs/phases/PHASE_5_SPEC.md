@@ -301,11 +301,20 @@ tests/integration/
 ```
 
 ### Algorithm notes
-- S02 streaming adapter: wraps each Phase 3
-  `FeatureCalculator.compute()` in a stateful rolling-window context.
-  On each tick, the adapter pushes the new bar into the window and
-  calls `.compute()` on the truncated window. Target: < 1ms per
-  calculator per tick.
+- S02 streaming adapter: wraps each Phase 3 calculator in a stateful
+  rolling-window context, but **must not** recompute full-window
+  `FeatureCalculator.compute()` on every tick as the primary live path.
+  Phase 5 shall define an incremental interface (for example,
+  `compute_incremental(new_bar, evicted_bar | None)`) for calculators
+  whose rolling statistics can be updated in O(1) or amortized O(1)
+  time. On each tick, the adapter pushes the new bar into the window,
+  updates internal state, and emits only the newly derived feature
+  values for that tick. Existing batch `.compute()` remains supported
+  as a compatibility fallback **only** for calculators that do not yet
+  have an incremental implementation; any such fallback must document
+  bounded window size and benchmark evidence that it still satisfies
+  the latency budget. Target: < 1ms per calculator per tick, with the
+  full signal → fusion → bet-size path meeting the Phase 5 P99 SLO.
 - S04 loads the `.joblib` model + `.json` model card at startup.
   Card schema validation is mandatory — if the card fails validation,
   S04 refuses to start (fail-loud, no silent fallback to the old
