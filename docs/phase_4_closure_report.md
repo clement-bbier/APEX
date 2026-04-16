@@ -15,9 +15,10 @@ D5), model persistence with schema-v1 model card, IC-weighted fusion
 engine, and a deterministic end-to-end integration test composing all
 sub-phases on a synthetic AR(1) scenario.
 
-Final outcome: **all 7 ADR-0005 D5 deployment gates pass** on the
-canonical synthetic scenario (seed = 42), with G7 (RF minus LogReg)
-treated as diagnostic-only on the linear DGP (see §3 for rationale).
+Final outcome: **6/7 ADR-0005 D5 deployment gates pass** on the
+canonical synthetic scenario (seed = 42); G7 (RF minus LogReg) is
+diagnostic-only on the linear DGP and below threshold by design
+(see §3 for rationale).
 
 Phase 5 (Live Integration) can start once this closure PR is merged.
 
