@@ -2168,7 +2168,7 @@ reuse-only).
 
 - Commit, push, let CI run.
 - Once CI green, close #132 via PR merge.
-f=(5, 80))` — 2-trial grid.
+- 2-trial grid: `f=(5, 80)`.
   Deterministic foil: `leaf=80` collapses the RF to AUC≈0.5 on 336
   events so PBO = 0/15 and G4 holds deterministically.
 - `tests/integration/test_phase_4_pipeline.py`:
