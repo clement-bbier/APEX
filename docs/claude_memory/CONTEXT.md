@@ -23,7 +23,7 @@ as part of Batch A of the post-audit execution.
 ## Phase 5 — RE-SEQUENCED (2026-04-17)
 
 Per [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md),
-Phase 5 scope reduced from 9 sub-phases to 5 remaining. Ordering:
+Phase 5 scope reduced from 9 sub-phases to 6 remaining. Ordering:
 
 ```
 5.1 Fail-Closed Pre-Trade Risk Controls          ✅ DONE (PR #177)
