@@ -493,7 +493,15 @@ class SystemRiskMonitor:
             # (ConnectionError, TimeoutError, or unknown) → UNAVAILABLE + reject.
             redis_reachable = False
             new_state = SystemRiskState.UNAVAILABLE
-            if _redis_exceptions is not None and isinstance(exc, _redis_exceptions.TimeoutError):
+            # _redis_exceptions is typed as ModuleType | None — use getattr+cast so
+            # mypy --strict accepts the dynamic isinstance-target lookup.
+            redis_timeout_error = cast(
+                "type[BaseException] | None",
+                getattr(_redis_exceptions, "TimeoutError", None)
+                if _redis_exceptions is not None
+                else None,
+            )
+            if redis_timeout_error is not None and isinstance(exc, redis_timeout_error):
                 cause = SystemRiskStateCause.REDIS_TIMEOUT
             else:
                 cause = SystemRiskStateCause.REDIS_CONNECTION_ERROR
@@ -502,7 +510,7 @@ class SystemRiskMonitor:
                 new_state = SystemRiskState.DEGRADED
                 cause = SystemRiskStateCause.HEARTBEAT_STALE
             else:
-                payload = raw.decode() if isinstance(raw, bytes | bytearray) else str(raw)
+                payload = raw.decode() if isinstance(raw, (bytes, bytearray)) else str(raw)
                 try:
                     written_at = datetime.fromisoformat(payload)
                 except ValueError:
@@ -576,9 +584,7 @@ class SystemRiskMonitor:
             previous_state=previous.value,
             new_state=new_state.value,
             redis_reachable=redis_reachable,
-            heartbeat_age_seconds=(
-                heartbeat_age_seconds if math.isfinite(heartbeat_age_seconds) else None
-            ),
+            heartbeat_age_seconds=age_for_model,
             cause=cause.value,
             timestamp_utc=event.timestamp_utc.isoformat(),
         )

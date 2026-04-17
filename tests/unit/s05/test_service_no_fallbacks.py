@@ -121,11 +121,19 @@ def test_sd3_no_safe_helper_defined_in_service() -> None:
 
     source = inspect.getsource(svc_mod)
     tree = ast.parse(source)
+    all_funcs: list[str] = []
     offenders: list[str] = []
     for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            all_funcs.append(node.name)
             if node.name.startswith("_safe"):
                 offenders.append(node.name)
+    # Sanity: confirm the AST walk actually ran. Without this check, a silent
+    # TypeError inside the loop (e.g. the earlier PEP-604 bug) would make the
+    # SD-3 guarantee cosmetic — the test would pass with zero inspections.
+    assert len(all_funcs) > 0, (
+        "AST walk found zero function definitions; the test is not actually scanning."
+    )
     assert offenders == [], (
         f"ADR-0006 §D4 violation: found helper(s) matching ``_safe*`` in "
         f"services/s05_risk_manager/service.py: {offenders}"

@@ -130,7 +130,7 @@ A new topic constant `Topics.RISK_SYSTEM_STATE_CHANGE = "risk.system.state_chang
 added to `core/topics.py`. `SystemRiskMonitor` publishes a transition event on this
 topic each time the state changes (e.g. `HEALTHY → DEGRADED`). The payload is a frozen
 Pydantic model `SystemRiskStateChange` with fields
-`{previous, current, reason, timestamp_utc, redis_reachable}`. S10 dashboard consumes
+`{previous_state, new_state, heartbeat_age_seconds, cause, timestamp_utc, redis_reachable}`. S10 dashboard consumes
 this topic for operator visibility per spec §3.1.
 
 The naming follows the existing dot-separated functional convention (`risk.approved`,
