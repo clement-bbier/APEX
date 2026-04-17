@@ -100,7 +100,6 @@ class RiskDecisionBuilder:
                     ttl=REDIS_RISK_DECISION_TTL,
                 ),
                 self._state.lpush(REDIS_DECISION_HISTORY_KEY, data),
-                return_exceptions=True,
             )
             await self._state.ltrim(REDIS_DECISION_HISTORY_KEY, 0, REDIS_DECISION_HISTORY_MAX - 1)
         except Exception as exc:
