@@ -1,6 +1,6 @@
 # PHASE 5 — Live Integration & Infrastructure Hardening — Specification
 
-**Status**: v1 — PARTIAL SUPERSESSION pending PHASE_5_SPEC_v2.md.
+**Status**: v1 — PARTIALLY SUPERSEDED pending PHASE_5_SPEC_v2.md.
 Design-gate merged 2026-04-16 (PR #155). Sub-phase 5.1 Fail-Closed
 merged 2026-04-17 (PR #177; issue #148 closed). Sub-phases 5.6 (ZMQ
 P2P), 5.7 (SBE/FlatBuffers), and 5.9 (Rust FFI Hot Path) are
