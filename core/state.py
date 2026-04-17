@@ -6,20 +6,35 @@ All operations are async using redis[asyncio].
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
+import math
 import types
 from collections.abc import Awaitable
-from typing import Any, cast
+from datetime import UTC, datetime
+from enum import StrEnum
+from typing import TYPE_CHECKING, Any, Final, cast
+
+from pydantic import BaseModel, ConfigDict, Field
 
 aioredis: types.ModuleType | None
+_redis_exceptions: types.ModuleType | None
 try:
     aioredis = importlib.import_module("redis.asyncio")
+    _redis_exceptions = importlib.import_module("redis.exceptions")
 except ModuleNotFoundError:
     aioredis = None
+    _redis_exceptions = None
 
 from core.config import get_settings  # noqa: E402
 from core.logger import get_logger  # noqa: E402
+from core.topics import Topics  # noqa: E402
+
+if TYPE_CHECKING:
+    from redis.asyncio import Redis
+
+    from core.bus import MessageBus
 
 logger = get_logger("core.state")
 
@@ -337,3 +352,249 @@ class StateStore:
         """
         r = self._ensure_connected()
         return int(await cast(Awaitable[int], r.incr(key, amount=amount)))
+
+
+# ── Fail-Closed Pre-Trade Risk Controls (ADR-0006) ────────────────────────────
+
+REDIS_HEARTBEAT_KEY: Final[str] = "risk:heartbeat"
+REDIS_SYSTEM_STATE_KEY: Final[str] = "risk:system:state"
+HEARTBEAT_TTL_SECONDS: Final[int] = 5
+HEARTBEAT_REFRESH_SECONDS: Final[float] = 2.0
+
+
+class SystemRiskState(StrEnum):
+    """System-wide risk state driving S05's fail-closed pre-trade guard.
+
+    See ADR-0006 §D1. The three states differ only in observability; both
+    non-HEALTHY states reject 100 % of orders. There is no partial-trading
+    middle ground (ADR-0006 §D7).
+    """
+
+    HEALTHY = "healthy"
+    DEGRADED = "degraded"
+    UNAVAILABLE = "unavailable"
+
+
+class SystemRiskStateCause(StrEnum):
+    """Short machine-readable cause codes for SystemRiskState transitions.
+
+    See ADR-0006 §D8. Emitted on the ``risk.system.state_change`` ZMQ
+    topic and in the ``structlog.critical`` transition event.
+    """
+
+    HEARTBEAT_STALE = "heartbeat_stale"
+    REDIS_CONNECTION_ERROR = "redis_connection_error"
+    REDIS_TIMEOUT = "redis_timeout"
+    RECOVERY = "recovery"
+
+
+class SystemRiskStateChange(BaseModel):
+    """Frozen envelope for a SystemRiskState transition.
+
+    Published on ``Topics.RISK_SYSTEM_STATE_CHANGE`` by
+    :class:`SystemRiskMonitor` whenever the observed state changes.
+    See ADR-0006 §D5 and §D8 for the field contract.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    previous_state: SystemRiskState
+    new_state: SystemRiskState
+    redis_reachable: bool
+    heartbeat_age_seconds: float = Field(
+        ...,
+        description="Wall-clock age of last observed heartbeat; -1.0 if never written",
+    )
+    cause: SystemRiskStateCause
+    timestamp_utc: datetime = Field(default_factory=lambda: datetime.now(UTC))
+
+
+class SystemRiskMonitor:
+    """Owns the SystemRiskState machine for S05's fail-closed guard.
+
+    Two paths (ADR-0006 §D2):
+
+    - :meth:`write_heartbeat` is called periodically (2 s) by S05's
+      background task (:meth:`run_heartbeat_loop`). It refreshes
+      ``risk:heartbeat`` with TTL 5 s.
+    - :meth:`current_state` is called synchronously by
+      :class:`services.s05_risk_manager.fail_closed.FailClosedGuard` on
+      every ``OrderCandidate``. It reads the heartbeat directly, maps the
+      result to a :class:`SystemRiskState`, and publishes a transition
+      event on :attr:`Topics.RISK_SYSTEM_STATE_CHANGE` if the state has
+      changed since the previous observation.
+
+    See ADR-0006 for the full contract. The monitor owns no background
+    tasks itself — the caller (S05 service) is expected to spawn
+    :meth:`run_heartbeat_loop` as a task and cancel it at shutdown.
+
+    Args:
+        redis: Async Redis client (``redis.asyncio.Redis``).
+        bus: Message bus used to publish state-change events.
+    """
+
+    def __init__(self, redis: Redis, bus: MessageBus) -> None:
+        self._redis = redis
+        self._bus = bus
+        self._last_observed: SystemRiskState | None = None
+
+    async def write_heartbeat(self) -> None:
+        """Refresh ``risk:heartbeat`` with TTL 5 s.
+
+        Called eagerly once at startup (before S05 subscribes to
+        ``ORDER_CANDIDATE``) and then periodically by
+        :meth:`run_heartbeat_loop`. Exceptions are logged but do not
+        propagate: if Redis is unreachable the key simply expires and the
+        next foreground :meth:`current_state` observes ``UNAVAILABLE``.
+        """
+        try:
+            now_iso = datetime.now(UTC).isoformat()
+            await self._redis.set(REDIS_HEARTBEAT_KEY, now_iso, ex=HEARTBEAT_TTL_SECONDS)
+        except Exception as exc:
+            # Broad catch is intentional: the fail-closed contract requires that
+            # heartbeat failure propagates to the foreground reader via key
+            # expiry, not via a raised exception on the background task.
+            logger.warning("heartbeat_write_failed", error=str(exc))
+
+    async def run_heartbeat_loop(self, interval: float = HEARTBEAT_REFRESH_SECONDS) -> None:
+        """Periodically refresh the heartbeat.
+
+        Runs until cancelled. Exceptions from
+        :meth:`write_heartbeat` are already logged and swallowed there;
+        the loop itself only propagates :class:`asyncio.CancelledError`.
+
+        Args:
+            interval: Seconds between heartbeat refreshes. Must be shorter
+                than :data:`HEARTBEAT_TTL_SECONDS`. Default: 2 s.
+        """
+        while True:
+            await self.write_heartbeat()
+            await asyncio.sleep(interval)
+
+    async def current_state(self) -> tuple[SystemRiskState, float, bool]:
+        """Synchronous per-order check. Publishes transitions on state change.
+
+        Latency budget: < 1 ms (single Redis ``GET``). See ADR-0006 §D3.
+
+        Returns:
+            ``(state, heartbeat_age_seconds, redis_reachable)``.
+            ``heartbeat_age_seconds`` is ``math.inf`` if the key is
+            absent or the payload is unparseable; always finite when the
+            state is ``HEALTHY``.
+        """
+        redis_reachable = True
+        heartbeat_age = math.inf
+        cause = SystemRiskStateCause.HEARTBEAT_STALE
+
+        try:
+            raw = await self._redis.get(REDIS_HEARTBEAT_KEY)
+        except Exception as exc:
+            # Broad catch is intentional: any failure to read the heartbeat
+            # (ConnectionError, TimeoutError, or unknown) → UNAVAILABLE + reject.
+            redis_reachable = False
+            new_state = SystemRiskState.UNAVAILABLE
+            # _redis_exceptions is typed as ModuleType | None — use getattr+cast so
+            # mypy --strict accepts the dynamic isinstance-target lookup.
+            redis_timeout_error = cast(
+                "type[BaseException] | None",
+                getattr(_redis_exceptions, "TimeoutError", None)
+                if _redis_exceptions is not None
+                else None,
+            )
+            if redis_timeout_error is not None and isinstance(exc, redis_timeout_error):
+                cause = SystemRiskStateCause.REDIS_TIMEOUT
+            else:
+                cause = SystemRiskStateCause.REDIS_CONNECTION_ERROR
+        else:
+            if raw is None:
+                new_state = SystemRiskState.DEGRADED
+                cause = SystemRiskStateCause.HEARTBEAT_STALE
+            else:
+                payload = raw.decode() if isinstance(raw, (bytes, bytearray)) else str(raw)
+                try:
+                    written_at = datetime.fromisoformat(payload)
+                except ValueError:
+                    new_state = SystemRiskState.DEGRADED
+                    cause = SystemRiskStateCause.HEARTBEAT_STALE
+                else:
+                    if written_at.tzinfo is None:
+                        # Fail-closed on tz-naive heartbeats: the age computation
+                        # below would raise, and silently treating a naive local
+                        # time as UTC is an attack surface (clock skew).
+                        new_state = SystemRiskState.DEGRADED
+                        cause = SystemRiskStateCause.HEARTBEAT_STALE
+                    else:
+                        heartbeat_age = (datetime.now(UTC) - written_at).total_seconds()
+                        # Fail-closed at the boundary (>=) and on negative ages.
+                        # Negative age = future-dated heartbeat (clock skew or
+                        # adversarial write) → treat as stale, not fresh.
+                        if heartbeat_age < 0 or heartbeat_age >= HEARTBEAT_TTL_SECONDS:
+                            new_state = SystemRiskState.DEGRADED
+                            cause = SystemRiskStateCause.HEARTBEAT_STALE
+                        else:
+                            new_state = SystemRiskState.HEALTHY
+                            cause = SystemRiskStateCause.RECOVERY
+
+        previous = self._last_observed
+        self._last_observed = new_state
+
+        if previous is not None and previous != new_state:
+            await self._publish_transition(
+                previous=previous,
+                new_state=new_state,
+                redis_reachable=redis_reachable,
+                heartbeat_age_seconds=heartbeat_age,
+                cause=cause,
+            )
+
+        if redis_reachable:
+            try:
+                await self._redis.set(
+                    REDIS_SYSTEM_STATE_KEY,
+                    new_state.value,
+                    ex=HEARTBEAT_TTL_SECONDS,
+                )
+            except Exception as exc:
+                # Best-effort observability persistence — the foreground read
+                # is authoritative; a write failure here is debug-level noise.
+                logger.debug("system_state_persist_failed", error=str(exc))
+
+        return new_state, heartbeat_age, redis_reachable
+
+    async def _publish_transition(
+        self,
+        *,
+        previous: SystemRiskState,
+        new_state: SystemRiskState,
+        redis_reachable: bool,
+        heartbeat_age_seconds: float,
+        cause: SystemRiskStateCause,
+    ) -> None:
+        """Emit the critical log + publish the ZMQ envelope for a transition."""
+        age_for_model = heartbeat_age_seconds if math.isfinite(heartbeat_age_seconds) else -1.0
+        event = SystemRiskStateChange(
+            previous_state=previous,
+            new_state=new_state,
+            redis_reachable=redis_reachable,
+            heartbeat_age_seconds=age_for_model,
+            cause=cause,
+        )
+        logger.critical(
+            "risk_system_state_change",
+            previous_state=previous.value,
+            new_state=new_state.value,
+            redis_reachable=redis_reachable,
+            heartbeat_age_seconds=age_for_model,
+            cause=cause.value,
+            timestamp_utc=event.timestamp_utc.isoformat(),
+        )
+        try:
+            await self._bus.publish(
+                Topics.RISK_SYSTEM_STATE_CHANGE,
+                event.model_dump(mode="json"),
+            )
+        except Exception as exc:
+            # Publish failure must not block rejection — the authoritative
+            # rejection path is the critical structlog above; the ZMQ
+            # envelope is a dashboard observability channel.
+            logger.error("state_change_publish_failed", error=str(exc))

@@ -21,8 +21,10 @@ from hypothesis import strategies as st
 
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
+from core.state import SystemRiskMonitor
 from services.s05_risk_manager.cb_event_guard import CBEventGuard
 from services.s05_risk_manager.circuit_breaker import CircuitBreaker
+from services.s05_risk_manager.fail_closed import FailClosedGuard
 from services.s05_risk_manager.meta_label_gate import MetaLabelGate
 from services.s05_risk_manager.models import (
     REDIS_CB_KEY,
@@ -74,8 +76,30 @@ def _make_service(redis: fakeredis.aioredis.FakeRedis) -> RiskManagerService:
     svc._cb_guard = CBEventGuard(redis)
     svc._circuit_breaker = CircuitBreaker(redis)
     svc._meta_gate = MetaLabelGate(redis)
+    svc._monitor = SystemRiskMonitor(redis, svc.bus)
+    svc._fail_closed = FailClosedGuard(svc._monitor)
+    svc._risk_heartbeat_task = None  # tests exercise write_heartbeat directly
 
     return svc
+
+
+async def _seed_context(redis: fakeredis.aioredis.FakeRedis) -> None:
+    """Seed minimal pre-trade context for the fail-closed-guarded chain.
+
+    Writes all 8 keys required by `_load_context_parallel` plus a fresh
+    risk:heartbeat so FailClosedGuard observes HEALTHY. Tests that want to
+    exercise a specific blocked path override specific keys after calling
+    this helper.
+    """
+    await redis.set("portfolio:capital", json.dumps({"available": 100000}))
+    await redis.set("pnl:daily", "0")
+    await redis.set("pnl:intraday_30m", "0")
+    await redis.set("macro:vix_current", "20.0")
+    await redis.set("macro:vix_1h_ago", "20.0")
+    await redis.set("portfolio:positions", "[]")
+    await redis.set("correlation:matrix", "{}")
+    await redis.set("session:current", json.dumps("us_normal"))
+    await redis.set("risk:heartbeat", datetime.now(UTC).isoformat(), ex=5)
 
 
 def _order(
@@ -112,6 +136,7 @@ def _order(
 async def test_full_chain_valid_order_approved() -> None:
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     # Set high meta-confidence
     await redis.set("meta_label:latest:AAPL", "0.90")
     decision = await svc.process_order_candidate(_order(kelly=0.25))
@@ -124,6 +149,7 @@ async def test_chain_blocked_step1_cb_event() -> None:
     """STEP 1: CB event 30min away -> CB_EVENT_BLOCK."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     event_time = datetime.now(UTC) + timedelta(minutes=30)
     await redis.set("macro:cb_events", json.dumps([event_time.isoformat()]))
     decision = await svc.process_order_candidate(_order())
@@ -136,6 +162,7 @@ async def test_chain_blocked_step2_circuit_breaker() -> None:
     """STEP 2: Circuit breaker OPEN -> CIRCUIT_BREAKER_OPEN."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     snap = CircuitBreakerSnapshot(
         state=CircuitBreakerState.OPEN,
         tripped_at=datetime.now(UTC),
@@ -153,6 +180,7 @@ async def test_chain_blocked_step3_meta_confidence() -> None:
     """STEP 3: meta_confidence=0.51 -> META_LABEL_CONFIDENCE_TOO_LOW."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.51")
     decision = await svc.process_order_candidate(_order())
     assert not decision.approved
@@ -164,6 +192,7 @@ async def test_chain_blocked_step4_no_stop_loss() -> None:
     """STEP 4: LONG with SL above entry -> NO_STOP_LOSS."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     order = _order(entry="150", sl="152")  # SL above entry for LONG
     decision = await svc.process_order_candidate(order)
@@ -176,6 +205,7 @@ async def test_chain_blocked_step4_min_rr() -> None:
     """STEP 4: RR = 1.0 < 1.5 -> MIN_RR_NOT_MET."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     # entry=150, sl=148 (dist=2), tp_scalp=152 (dist=2) -> RR = 1.0 < 1.5
     order = _order(entry="150", sl="148", tp_scalp="152")
@@ -189,6 +219,7 @@ async def test_chain_blocked_step4_max_risk() -> None:
     """STEP 4: monetary risk > 0.5% of capital -> MAX_RISK_PER_TRADE."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     # Set capital = 100k, size = 2.0 (large), SL dist = 2 -> risk = 4 > 500
     # Actually: risk = |150-148| * size >= capital * 0.005 = 500 when size >= 250
@@ -219,6 +250,7 @@ async def test_chain_blocked_step4_max_size() -> None:
     """STEP 4: position notional > 10% of capital -> MAX_SIZE_EXCEEDED."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     # capital=100k, size=1, entry=15000 -> notional=15000 > 10000.
     # SL very tight (dist=1) so risk=1*1=1 < 500 (max_risk passes).
@@ -248,6 +280,7 @@ async def test_chain_blocked_step5_max_positions() -> None:
     """STEP 5: 6 open positions -> MAX_POSITIONS_EXCEEDED."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     positions = [
         {"symbol": f"SYM{i}", "size": "1", "entry_price": "100", "asset_class": "equity"}
@@ -264,6 +297,7 @@ async def test_kelly_modulated_by_confidence_0_75() -> None:
     """kelly_final = kelly_raw x weight(0.75) = kelly_raw x 0.5 (+-0.001)."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.75")
     kelly_raw = 0.40
     decision = await svc.process_order_candidate(_order(kelly=kelly_raw))
@@ -276,6 +310,7 @@ async def test_post_event_scalp_size_halved() -> None:
     """In post-event scalp window: final_size = base_size x 0.50."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     # Place event 7min in the past (inside 15min post-event scalp window)
     past_event = datetime.now(UTC) - timedelta(minutes=7)
@@ -293,6 +328,7 @@ async def test_audit_written_to_redis() -> None:
     """Approved decision must be written to risk:audit:{order_id}."""
     redis = _make_redis()
     svc = _make_service(redis)
+    await _seed_context(redis)
     await redis.set("meta_label:latest:AAPL", "0.90")
     order = _order()
     decision = await svc.process_order_candidate(order)

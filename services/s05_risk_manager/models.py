@@ -53,6 +53,11 @@ class BlockReason(StrEnum):
     HIGH_CORRELATION = "high_correlation"
     META_LABEL_CONFIDENCE_TOO_LOW = "meta_label_confidence_too_low"
     KELLY_FRACTION_TOO_SMALL = "kelly_fraction_too_small"
+    # Fail-closed pre-trade guard (ADR-0006 §D6). Emitted for BOTH DEGRADED
+    # and UNAVAILABLE system states; the SystemRiskState distinction lives
+    # in the structured log + risk.system.state_change topic, not in the
+    # per-order canonical reason code (single stable rejection enum).
+    SYSTEM_UNAVAILABLE = "system_unavailable"
 
 
 class RuleResult(BaseModel):
