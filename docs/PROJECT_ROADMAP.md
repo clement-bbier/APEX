@@ -233,8 +233,8 @@ These are non-negotiable. Enforced on every commit via CI.
 | Phase 2 | DONE | 12/12 (2.1–2.12) | 1,283 | 2026-04-11 |
 | Phase 3 | DONE | 13/13 (Feature Validation Harness) | ~1,600 | 2026-04-14 (PR #124) |
 | Phase 4 (Meta-Labeler + IC Fusion) | DONE | 8/8 (4.1–4.8) | 1,833 | 2026-04-16 (PR #147) |
-| Phase 5 (Live Integration) | **IN PROGRESS** | 1/5 — 5.1 DONE (PR #177, `1b7c3b5`). Remaining: 5.2, 5.3, 5.5, 5.4, 5.8, 5.10 per STRATEGIC_AUDIT_2026-04-17 re-sequencing. | 2,259 (1 xfailed) | 2026-04-17 |
-| Phase 7.5 (new) | BACKLOG | 3 deferred sub-phases (5.6 ZMQ P2P / 5.7 SBE / 5.9 Rust FFI). Revisit only if live-trading benchmarks justify. | — | — |
+| Phase 5 (Live Integration) | **IN PROGRESS** | 1/7 critical-path sub-phases merged — 5.1 DONE (PR #177, `1b7c3b5`). Remaining critical path: 5.2, 5.3, 5.5, 5.4, 5.8, 5.10 per STRATEGIC_AUDIT_2026-04-17 re-sequencing. | 2,259 (1 xfailed) | 2026-04-17 |
+| Phase 7.5 (new) | BACKLOG | 3 deferred non-critical-path sub-phases (5.6 ZMQ P2P / 5.7 SBE / 5.9 Rust FFI). Revisit only if live-trading benchmarks justify. | — | — |
 | Phase 6 | PENDING | DMA research, advanced regime-switching, multi-asset expansion. | — | — |
 | Phase 7 | PENDING (paper trading) | — | — | — |
 | Phase 8 | PENDING (live trading) | — | — | — |
