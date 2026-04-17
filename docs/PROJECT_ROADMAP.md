@@ -1196,7 +1196,7 @@ intervention.
 | Status | **BACKLOG** (revisit only if live benchmarks justify) |
 | Source | [STRATEGIC_AUDIT_2026-04-17](audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md) §4.2 |
 | Content | Sub-phases formerly 5.6, 5.7, 5.9 — ZMQ P2P bus, SBE/FlatBuffers, Rust FFI hot path |
-| Spec | [`docs/phases/PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md`](phases/) (to be authored in Batch C) |
+| Spec | `docs/phases/PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md` (to be authored in Batch C) |
 
 #### Rationale (Principles 1, 3, 7)
 
