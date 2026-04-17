@@ -16,7 +16,7 @@
 >
 > - **Phase 4** = Meta-Labeler + IC-weighted Fusion (NOT “Regime Detector + Capital Allocator”). CLOSED 2026-04-16 via PR #147. See [`docs/phase_4_closure_report.md`](phase_4_closure_report.md).
 > - **Phase 5** = Live Integration & Infrastructure Hardening (NOT “Backtesting Engine”). In progress; 5.1 Fail-Closed DONE. See [`docs/phases/PHASE_5_SPEC.md`](phases/PHASE_5_SPEC.md) and (when published) PHASE_5_SPEC_v2.md.
-> - **Phase 7.5** = new Infrastructure Hardening backlog for deferred 5.6 / 5.7 / 5.9 work. See [`docs/phases/PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md`](phases/) (to be published in Batch C of the post-audit execution).
+> - **Phase 7.5** = new Infrastructure Hardening backlog for deferred 5.6 / 5.7 / 5.9 work. See [`docs/phases/PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md`](phases/PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md) (to be published in Batch C of the post-audit execution).
 >
 > Section 4 (Current State) reflects the actual executed state. The Phase 4 and Phase 5
 > blocks under Section 5 are annotated with supersession notices but preserved as
