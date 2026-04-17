@@ -982,3 +982,59 @@ alongside deletion of the now-redundant prototype.
 - [`docs/adr/ADR-0005-meta-labeling-fusion-methodology.md`](../adr/ADR-0005-meta-labeling-fusion-methodology.md) D2
 - [`docs/phases/PHASE_4_SPEC.md`](../phases/PHASE_4_SPEC.md) §3.2
 - LdP (2018) §§4.4-4.5 and Table 4.1
+
+
+---
+
+## 2026-04-17 — Phase 5.1 Fail-Closed Pre-Trade Risk Controls
+
+**Scope**: Sub-phase 5.1 of Phase 5. Issue #148. PR #177 (merged 2026-04-17, main at `1b7c3b5`). ADR-0006 ACCEPTED.
+
+**Decision**: Transition S05 Risk Manager from the Phase 1/2 Fail-Open posture (`_safe()` heuristic defaults on Redis failure) to **Fail-Closed**: any non-`HEALTHY` `SystemRiskState` rejects 100% of incoming `OrderCandidate` in O(1) with `BlockReason.SYSTEM_UNAVAILABLE`. Three-state machine `HEALTHY | DEGRADED | UNAVAILABLE`, heartbeat TTL 5 s in Redis key `risk:heartbeat`, transition envelope published on `Topics.RISK_SYSTEM_STATE_CHANGE`.
+
+**Why now**: SEC Rule 15c3-5 + Knight Capital 2012 post-mortem. The Phase 1/2 fallback values (capital = 100 000, positions = [], correlation = {}) were a latent production-kill risk: a transient Redis outage could authorize unbounded position sizing. No live trading can begin without this.
+
+**Rationale**: Chosen over three alternatives:
+1. Keep Fail-Open with wider monitoring alerts — rejected: SEC 15c3-5 is non-negotiable.
+2. Partial degradation (allow small orders during DEGRADED) — rejected per ADR-0006 §D7: no safe way to define "small" without a working risk model.
+3. Event sourcing + in-memory state (Phase 5.2) instead — rejected as sequencing: event sourcing is harder and depends on a safety foundation.
+
+**Consequences**:
+- S05 loses the mock-comfort of default values. Tests now seed Redis with fakeredis (see `tests/unit/s05/test_service_no_fallbacks.py`, `tests/unit/s05/test_risk_chain.py`).
+- `FailClosedGuard` sits as STEP 0 of the risk chain. Observability dashboard (S10) subscribed to `risk.system.state_change` in PR #178 (Batch A of the post-audit execution).
+- The 8 pre-trade context keys are now **hard prerequisites** — confirmed orphan reads in
+  [`docs/audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md`](../audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md). Resolving those writers is part of Phase 5.2 scope (PHASE_5_SPEC_v2).
+
+**Residual debt**:
+- `services/s05_risk_manager/service.py` reached 530 LOC; SOLID-S decomposition deferred to Batch D of the post-audit execution (`RiskChainOrchestrator` + `ContextLoader` + `RiskDecisionBuilder`).
+- Heartbeat-TTL empirical calibration after 30 days of paper trading (issue #176).
+
+**References**:
+- [`docs/adr/ADR-0006-fail-closed-risk-controls.md`](../adr/ADR-0006-fail-closed-risk-controls.md)
+- [`core/state.py`](../../core/state.py) §SystemRiskMonitor (lines 365–600)
+- [`services/s05_risk_manager/fail_closed.py`](../../services/s05_risk_manager/fail_closed.py)
+- SEC Rule 15c3-5; Knight Capital 2012 post-mortem.
+
+
+---
+
+## 2026-04-17 — Phase 5 Re-Sequencing (STRATEGIC_AUDIT_2026-04-17)
+
+**Scope**: Strategic audit reviewing PHASE_5_SPEC v1 (9 sub-phases) against the operator's constraints and the 7 guiding principles.
+
+**Decision**: Drop sub-phases **5.6 (ZMQ P2P bus)**, **5.7 (SBE/FlatBuffers)**, and **5.9 (Rust FFI hot path)** from Phase 5. Move to a new **Phase 7.5 Infrastructure Hardening** backlog, revisited only if live-trading benchmarks prove they are bottlenecks. Re-sequence remaining sub-phases as **5.1 (DONE) → 5.2 → 5.3 → 5.5 → 5.4 → 5.8 → 5.10**. Substitute the proprietary `WorldMonitorConnector` in 5.8 with **GDELT 2.0 + FinBERT** (Principle 3).
+
+**Why**:
+- **Principle 1** (cash generation): the three dropped sub-phases were ~4–10 weeks of work that solve HFT-scale problems not yet measurable in a no-live-pipeline system.
+- **Principle 3** (acknowledged constraints): solo operator on one host; a SPOF-argument broker replacement does not buy resilience. Rust FFI for hot paths has no current bottleneck to prove.
+- **Principle 7** (AQR senior-quant tie-breaker): ship alpha first, optimize transport layer second.
+
+**Consequences**:
+- Phase 5 critical path shortens by ~6–10 weeks.
+- PHASE_5_SPEC v1 marked as partial supersession; PHASE_5_SPEC_v2.md to be published in Batch C.
+- Three backlog MDs marked DEFERRED; three GitHub issues (#150/#151/#152) to be closed in Batch E.
+- 5.5 (drift monitoring) promoted ahead of 5.4 (short-side) so the safety instrumentation exists before the alpha extension.
+
+**References**:
+- [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md)
+- [`docs/audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md`](../audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md)

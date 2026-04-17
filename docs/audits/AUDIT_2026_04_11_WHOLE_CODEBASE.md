@@ -1,3 +1,16 @@
+> **⚠️ PARTIALLY SUPERSEDED — 2026-04-17**
+>
+> This audit predates Phase 5.1 (Fail-Closed Pre-Trade Risk, merged 2026-04-17 via PR #177 / ADR-0006) and the
+> [STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md](STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md).
+>
+> **Resolved by Phase 5.1 implementation (superseded findings):**
+> - **Finding A-7** (S05 `StateStore` abstraction leak via `_ensure_connected()`) — fixed by `services/s05_risk_manager/fail_closed.py` + `SystemRiskMonitor` / `FailClosedGuard` pattern.
+> - **Finding A-8** (duplicated `_build_blocked` pattern) — partially refactored during the 5.1 chain rewrite; residual SOLID-S debt on `service.py` (530 LOC) is tracked for resolution in Batch D of the post-audit execution.
+>
+> **Other findings below remain valid** unless explicitly marked otherwise; reconcile against the 2026-04-17 strategic audit before acting on any remaining P1/P2 items.
+
+---
+
 # APEX Whole-Codebase Architecture & Quality Audit
 
 **Date**: 2026-04-11

@@ -6,8 +6,22 @@
 |---|---|
 | Maintainer | Clement Barbier |
 | Created | 2026-04-10 |
-| Last updated | 2026-04-11 |
+| Last updated | 2026-04-17 |
 | Update frequency | After each sub-phase merge |
+
+> **⚠️ PHASE-NUMBERING DRIFT NOTICE (2026-04-17)**
+>
+> This roadmap’s original (2026-04-10) Phase 4+ plan was **superseded by actual execution**.
+> The executed sequence is:
+>
+> - **Phase 4** = Meta-Labeler + IC-weighted Fusion (NOT “Regime Detector + Capital Allocator”). CLOSED 2026-04-16 via PR #147. See [`docs/phase_4_closure_report.md`](phase_4_closure_report.md).
+> - **Phase 5** = Live Integration & Infrastructure Hardening (NOT “Backtesting Engine”). In progress; 5.1 Fail-Closed DONE. See [`docs/phases/PHASE_5_SPEC.md`](phases/PHASE_5_SPEC.md) and (when published) PHASE_5_SPEC_v2.md.
+> - **Phase 7.5** = new Infrastructure Hardening backlog for deferred 5.6 / 5.7 / 5.9 work. See [`docs/phases/PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md`](phases/) (to be published in Batch C of the post-audit execution).
+>
+> Section 4 (Current State) reflects the actual executed state. The Phase 4 and Phase 5
+> blocks under Section 5 are annotated with supersession notices but preserved as
+> historical design record. Canonical current state: [`docs/claude_memory/CONTEXT.md`](claude_memory/CONTEXT.md)
+> and [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md).
 
 ---
 
@@ -209,26 +223,50 @@ These are non-negotiable. Enforced on every commit via CI.
 
 ## 4. Current State (Snapshot)
 
-*Last updated: 2026-04-11 (post Phase 3 design gate)*
+*Last updated: 2026-04-17 (post Phase 5.1 Fail-Closed merge, PR #177, main at `1b7c3b5`).*
 
-### Phase summary
+### Phase summary (actual execution)
 
-| Phase | Status | Sub-phases merged | Tests | Last merge date |
+| Phase (executed) | Status | Sub-phases | Tests | Last merge |
 |---|---|---|---|---|
-| Phase 1 | DONE | All (ADR-0002 + quant metrics + validation) | ~400 | 2026-04-10 |
-| Phase 2 | **DONE** | All 12 (2.1–2.12) | 1,283 | 2026-04-11 |
-| Phase 3 | **DESIGN COMPLETE** | 0/13 (spec ready) | — | — |
-| Phase 4 | PENDING | — | — | — |
-| Phase 5 | PENDING | — | — | — |
-| Phase 6 | PENDING | — | — | — |
-| Phase 7 | PENDING | — | — | — |
-| Phase 8 | PENDING | — | — | — |
-| Phase 9 | PENDING | — | — | — |
-| Phase 10 | PENDING | — | — | — |
-| Phase 11 | PENDING | — | — | — |
-| Phase 12 | PENDING | — | — | — |
+| Phase 1 | DONE | ADR-0002 + quant metrics + validation | ~400 | 2026-04-10 |
+| Phase 2 | DONE | 12/12 (2.1–2.12) | 1,283 | 2026-04-11 |
+| Phase 3 | DONE | 13/13 (Feature Validation Harness) | ~1,600 | 2026-04-14 (PR #124) |
+| Phase 4 (Meta-Labeler + IC Fusion) | DONE | 8/8 (4.1–4.8) | 1,833 | 2026-04-16 (PR #147) |
+| Phase 5 (Live Integration) | **IN PROGRESS** | 1/5 — 5.1 DONE (PR #177, `1b7c3b5`). Remaining: 5.2, 5.3, 5.5, 5.4, 5.8, 5.10 per STRATEGIC_AUDIT_2026-04-17 re-sequencing. | 2,259 (1 xfailed) | 2026-04-17 |
+| Phase 7.5 (new) | BACKLOG | 3 deferred sub-phases (5.6 ZMQ P2P / 5.7 SBE / 5.9 Rust FFI). Revisit only if live-trading benchmarks justify. | — | — |
+| Phase 6 | PENDING | DMA research, advanced regime-switching, multi-asset expansion. | — | — |
+| Phase 7 | PENDING (paper trading) | — | — | — |
+| Phase 8 | PENDING (live trading) | — | — | — |
+| Phases 9–12 | PENDING | Backlog-tagged GitHub issues track these. | — | — |
 
-**Estimated overall completion: ~20-25% of total project scope.**
+**Estimated overall completion: ~60% of research+infrastructure scope; 0% of live capital deployment.**
+
+### Phase 5 — re-sequenced critical path (2026-04-17)
+
+Per [STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md](audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md) §6:
+
+```
+5.1 Fail-Closed Pre-Trade Risk Controls          ✅ DONE (PR #177)
+     ↓
+5.2 Event Sourcing / In-Memory State             NEXT
+     ↓
+5.3 Streaming Inference Wiring
+     ↓
+5.5 Drift Monitoring & Feedback Loop             (reordered ahead of 5.4)
+     ↓
+5.4 Short-Side Meta-Labeler + Regime Fusion
+     ↓
+5.8 Geopolitical NLP Overlay (GDELT 2.0 + FinBERT substitute)
+     ↓
+5.10 Phase 5 Closure Report
+     → Phase 7 Paper Trading
+```
+
+**Dropped from Phase 5 scope** (moved to Phase 7.5 Infrastructure Hardening backlog):
+- 5.6 ZMQ Peer-to-Peer Bus — premature institutional mimicry at solo-operator scale.
+- 5.7 SBE / FlatBuffers Serialization — JSON overhead is not the bottleneck at mid-frequency cadence.
+- 5.9 Rust FFI Hot Path Migration — defer until live benchmarks prove Python is the bottleneck.
 
 ### Whole-codebase audit (2026-04-11)
 
@@ -577,7 +615,12 @@ See `docs/phases/PHASE_3_SPEC.md` Section 11 for complete bibliography (60 refer
 
 ---
 
-### Phase 4 — Regime Detector + Capital Allocator
+### Phase 4 — Regime Detector + Capital Allocator (SUPERSEDED DESIGN)
+
+> **⚠️ SUPERSEDED 2026-04-17.** The actual executed Phase 4 was **Meta-Labeler + IC-weighted Fusion**
+> (8 sub-phases, closed 2026-04-16 via PR #147). See [`docs/phase_4_closure_report.md`](phase_4_closure_report.md)
+> and [`docs/phases/PHASE_4_SPEC.md`](phases/PHASE_4_SPEC.md) for the canonical record. The content below is
+> preserved as historical design record only.
 
 | Field | Value |
 |---|---|
@@ -650,7 +693,51 @@ accordingly. This is the core adaptive intelligence of the system.
 
 ---
 
-### Phase 5 — Backtesting Engine (Institutional Grade)
+### Phase 5 — Live Integration & Infrastructure Hardening (CANONICAL 2026-04-17)
+
+> The original (2026-04-10) Phase 5 proposal — *Backtesting Engine (Institutional Grade)* —
+> was **superseded** when a full backtesting harness was delivered piecemeal across Phases 3 and 4
+> (CPCV, DSR/PBO/PSR, Almgren-Chriss, walk-forward). The canonical Phase 5 is Live Integration
+> & Infrastructure Hardening; see [`docs/phases/PHASE_5_SPEC.md`](phases/PHASE_5_SPEC.md) and
+> (when published) PHASE_5_SPEC_v2.md. The summary table below reflects the re-sequenced post-audit scope.
+
+| Field | Value |
+|---|---|
+| Status | **IN PROGRESS** (1/5 sub-phases merged) |
+| Services concerned | `s05_risk_manager`, `s02_signal_engine`, `s04_fusion_engine`, `s09_feedback_loop`, `s08_macro_intelligence`, `core/` |
+| Duration estimate | ~13 weeks (post-audit re-scope) |
+| Dependencies | Phase 4 merged (meta-labeler + fusion artifacts available) |
+| Spec | [`docs/phases/PHASE_5_SPEC.md`](phases/PHASE_5_SPEC.md) v1 (PARTIAL SUPERSESSION); v2 under authoring in Batch C |
+| Audit | [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md) |
+
+#### Re-sequenced sub-phases (post-audit)
+
+| Sub-phase | Title | Status | Source of truth |
+|---|---|---|---|
+| 5.1 | Fail-Closed Pre-Trade Risk Controls | ✅ DONE (PR #177, 2026-04-17) | ADR-0006 |
+| 5.2 | Event Sourcing / In-Memory State | NEXT | PHASE_5_SPEC_v2.md §3.2 (Batch C) |
+| 5.3 | Streaming Inference Wiring | PENDING | PHASE_5_SPEC_v2.md §3.3 |
+| 5.5 | Drift Monitoring & Feedback Loop | PENDING (promoted ahead of 5.4) | PHASE_5_SPEC_v2.md §3.5 |
+| 5.4 | Short-Side Meta-Labeler + Regime Fusion | PENDING | PHASE_5_SPEC_v2.md §3.4 |
+| 5.8 | Geopolitical NLP Overlay (GDELT 2.0 + FinBERT) | PENDING | PHASE_5_SPEC_v2.md §3.8 |
+| 5.10 | Phase 5 Closure Report | PENDING | PHASE_5_SPEC_v2.md §3.10 |
+
+#### Dropped from Phase 5 scope (moved to Phase 7.5)
+
+| Former sub-phase | Title | New home |
+|---|---|---|
+| 5.6 | ZMQ Peer-to-Peer Bus | Phase 7.5 Infrastructure Hardening |
+| 5.7 | SBE / FlatBuffers Serialization | Phase 7.5 Infrastructure Hardening |
+| 5.9 | Rust FFI Hot Path Migration | Phase 7.5 Infrastructure Hardening |
+
+Rationale: Principles 1, 3, 7 — see audit §4.2.
+
+### Phase 5 (ORIGINAL 2026-04-10 DESIGN — SUPERSEDED)
+
+> **⚠️ SUPERSEDED 2026-04-17.** The below is the 2026-04-10 planning artifact for a
+> backtesting-engine sub-phase sequence. Retained for audit-trail purposes; do not act on it.
+
+#### Phase 5 (legacy) — Backtesting Engine (Institutional Grade)
 
 | Field | Value |
 |---|---|
@@ -1102,6 +1189,25 @@ intervention.
 
 ---
 
+### Phase 7.5 — Infrastructure Hardening (NEW 2026-04-17, BACKLOG)
+
+| Field | Value |
+|---|---|
+| Status | **BACKLOG** (revisit only if live benchmarks justify) |
+| Source | [STRATEGIC_AUDIT_2026-04-17](audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md) §4.2 |
+| Content | Sub-phases formerly 5.6, 5.7, 5.9 — ZMQ P2P bus, SBE/FlatBuffers, Rust FFI hot path |
+| Spec | [`docs/phases/PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md`](phases/) (to be authored in Batch C) |
+
+#### Rationale (Principles 1, 3, 7)
+
+Solo operator with ten containers on one host has no SPOF isolation win from P2P bus,
+no GC-pressure problem at mid-frequency cadence, and no measurable Python hot-path bottleneck
+without a live pipeline. These three sub-phases represent ~4–10 weeks of institutional
+mimicry that would delay live PnL without alpha benefit. Re-evaluate only with Phase 8
+benchmark data demonstrating a real bottleneck.
+
+---
+
 ## 6. Planning Methodology
 
 ### Rolling wave planning
@@ -1437,3 +1543,4 @@ in future phases if they provide demonstrable alpha after Phase 3 validation:
 | 2026-04-11 | 1.1 | Section 4 updated with audit #55 results. Risks R13-R16 added. | Claude Code (audit #55) |
 | 2026-04-11 | 1.2 | Section 12 (Governance & Methodology) added from meta-governance audit #59. | Claude Code (audit #59) |
 | 2026-04-11 | 1.3 | Sprint 1 docs refresh: Phase 2 sub-phases 2.7-2.12 DONE, open questions resolved, Appendix A data coverage updated, ADR index expanded (ADR-0004 to ADR-0015), risks R17-R19 added, governance P0 items closed. Refs #67 #79. | Claude Code (Sprint 1) |
+| 2026-04-17 | 2.0 | Strategic audit 2026-04-17 — Phase 5 scope reduced from 9 to 5 sub-phases and re-sequenced (5.1 DONE → 5.2 → 5.3 → 5.5 → 5.4 → 5.8 → 5.10). Sub-phases 5.6 / 5.7 / 5.9 moved to new Phase 7.5 Infrastructure Hardening backlog. Section 4 (Current State) rewritten to reflect actual executed phase numbering (Phase 4 = Meta-Labeler + Fusion; Phase 5 = Live Integration). Phase-numbering drift notice added to document header. See [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md). | Claude Opus 4.7 (post-audit Batch B) |

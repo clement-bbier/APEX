@@ -2267,3 +2267,69 @@ reuse-only).
 
 - Merge design-gate/phase-5 PR.
 - Begin Phase 5.1 (Fail-Closed) once design-gate is accepted.
+
+---
+
+## Session 040 — 2026-04-17 — Strategic Audit + Post-Audit Execution Batches A+B
+
+**Orchestrator**: Claude Opus 4.7 (1M context)
+**Scope**: Full-codebase strategic audit of Phase 5 sequencing + global architecture/docs/backlog, followed by Batch A (urgent safety + correctness) and Batch B (documentation alignment) of the approved execution protocol.
+
+### Deliverables
+
+- **Audit** — [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md) (~900 lines, 11 sections, 28 executable actions). Reviewed Phase 5.2-5.10 readiness, S01-S10 SOLID posture, doc coherence (40+ files), 32 open GitHub issues, and strategic alignment vs the 7 guiding principles.
+- **Redis writer audit addendum** — [`docs/audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md`](../audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md). Confirms all 8 S05 pre-trade context keys are orphan reads (no production writer); collateral finding on S03's `macro:vix` also orphan. Forward-path options A/B/C for Phase 5.2 design.
+- **Batch A (merged, PR #178)** — S10 subscribed to `risk.system.state_change` (+5 unit tests, new `/api/v1/risk/system-state` endpoint). CI backtest-gate muzzle made explicit (renamed, `::warning::` annotation, TODO now references #102). No catastrophic-stop trigger from A.1.
+- **Batch B (this session)** — documentation alignment: PHASE_5_SPEC.md header partial-supersession notice; `AUDIT_2026_04_11_WHOLE_CODEBASE.md` SUPERSEDED banner; ARCHIVED banners on `2026-04-08-quant-scaffolding-inventory.md` and `PHASE_4_NOTES.md`; DEFERRED banners on three backlog MDs (`issue_zmq_p2p.md`, `issue_sbe_serialization.md`, `issue_rust_hotpath.md`); GDELT 2.0 + FinBERT rewrite of `issue_alt_data_nlp.md` per Principle 3; COMPLETED footer on `issue_fail_closed.md`; two new DECISIONS.md entries (5.1 Fail-Closed + Phase 5 re-sequencing); PROJECT_ROADMAP.md rescope (header drift notice, Section 4 actual execution table, Phase 4/5 supersession banners, new Phase 7.5 section, Section 11 v2.0 changelog entry).
+
+### Decisions
+
+- **D050**: Drop Phase 5.6 (ZMQ P2P), 5.7 (SBE/FlatBuffers), 5.9 (Rust FFI) from Phase 5 scope; move to new **Phase 7.5 Infrastructure Hardening** backlog. Rationale: Principles 1 (cash generation), 3 (acknowledged constraints), 7 (AQR senior-quant tie-breaker). Re-evaluate only if live-trading benchmarks from Phase 8 prove they are bottlenecks.
+- **D051**: Re-sequence remaining Phase 5 sub-phases as **5.1 (DONE) → 5.2 → 5.3 → 5.5 → 5.4 → 5.8 → 5.10**. 5.5 (drift monitoring) promoted ahead of 5.4 (short-side) so safety instrumentation exists before the alpha extension.
+- **D052**: Substitute proprietary `WorldMonitorConnector` in 5.8 with **GDELT 2.0 + FinBERT ONNX**. Zero USD/month operational cost; open-source; matches institutional methodology without institutional-vendor dependency.
+- **D053**: Authorize Python patcher bypass for write-protected files during post-audit work (services/s05_risk_manager/*, .github/workflows/*, docs/adr/*, docs/phases/*).
+- **D054**: #102 backtest-gate muzzle stays temporarily — Sharpe-bug fix in `full_report()` is >1h per A.3 decision rule. Muzzle visibility strengthened; #102 to be promoted to priority:high in Batch E.
+- **D055**: S05 SOLID-S decomposition (530 LOC → RiskChainOrchestrator + ContextLoader + RiskDecisionBuilder) piggybacks on Batch D, natural since 5.2 rewrites context loading anyway.
+
+### Files Created/Modified (session 040)
+
+Created:
+- `docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`
+- `docs/audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md`
+- `tests/unit/s10/test_risk_system_state_handler.py`
+
+Modified (Batch A):
+- `.github/workflows/ci.yml` (backtest-gate muzzle annotation)
+- `services/s10_monitor/service.py` (+ state-change handler)
+- `services/s10_monitor/dashboard.py` (+ endpoint)
+
+Modified (Batch B):
+- `docs/phases/PHASE_5_SPEC.md` (partial-supersession header)
+- `docs/audits/AUDIT_2026_04_11_WHOLE_CODEBASE.md` (SUPERSEDED banner)
+- `docs/audits/2026-04-08-quant-scaffolding-inventory.md` (ARCHIVED banner)
+- `docs/claude_memory/PHASE_4_NOTES.md` (ARCHIVED banner)
+- `docs/claude_memory/DECISIONS.md` (Phase 5.1 + re-sequencing entries)
+- `docs/claude_memory/CONTEXT.md` (Phase 5 re-sequenced, 5.1 DONE, pointer to audit)
+- `docs/claude_memory/SESSIONS.md` (this entry)
+- `docs/PROJECT_ROADMAP.md` (phase-drift notice, Section 4, Phase 4/5 supersession, Phase 7.5, Section 11)
+- `docs/issues_backlog/issue_fail_closed.md` (COMPLETED footer)
+- `docs/issues_backlog/issue_zmq_p2p.md` (DEFERRED banner)
+- `docs/issues_backlog/issue_sbe_serialization.md` (DEFERRED banner)
+- `docs/issues_backlog/issue_rust_hotpath.md` (DEFERRED banner)
+- `docs/issues_backlog/issue_alt_data_nlp.md` (GDELT + FinBERT rewrite)
+
+### Key Findings (strategic audit)
+
+- All 8 S05 pre-trade context Redis keys are **orphan reads** in production code — no writers in `services/`. Tests seed them via fakeredis only. This is a hard blocker for Phase 5.2 design; three forward-paths documented.
+- S10 did not observe `risk.system.state_change` (Phase 5.1 follow-up debt) — fixed in Batch A.
+- CI `backtest-gate` still muzzled (#102) — visibility strengthened in Batch A.
+- `services/s05_risk_manager/service.py` at 530 LOC mixes 5 responsibilities (SOLID-S) — Batch D refactor.
+- `services/s02_signal_engine/pipeline.py` at 487 LOC with 290-LOC `_run()` (SOLID-S) — Batch D refactor, prerequisite for 5.3 streaming.
+- PROJECT_ROADMAP.md had phase-numbering drift (Phase 4/5 names differ from actual execution) — reconciled in Batch B with drift notice + canonical updates.
+
+### Next Steps
+
+- Batch C: publish PHASE_5_SPEC_v2.md (5-sub-phase re-sequenced scope) and PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md (dropped sub-phase specs moved intact).
+- Batch D: SOLID decomposition of S05 service.py + S02 pipeline.py.
+- Batch E: GitHub issue triage per audit §5 table (32 issues reviewed; merge EPICs, relabel, promote #102 to high, close #150/#151/#152 as DEFERRED).
+- After all batches merged: begin Phase 5.2 Event Sourcing / In-Memory State implementation per PHASE_5_SPEC_v2.md.

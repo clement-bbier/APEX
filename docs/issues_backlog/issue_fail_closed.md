@@ -34,3 +34,23 @@ Actuellement, le Risk Manager (S05) utilise une méthode asynchrone de repli (`_
 - SEC Rule 15c3-5 (Market Access Rule)
 - Knight Capital Group post-mortem (2012)
 - CLAUDE.md §2 : « Risk Manager (S05) is a VETO — it cannot be bypassed under any circumstance »
+
+
+---
+
+### ✅ COMPLETED — 2026-04-17
+
+Implemented in **Phase 5.1** via **PR #177** (commit `1b7c3b5`).
+Issue **#148 CLOSED** 2026-04-17T12:35:20Z.
+Architecture Decision: **ADR-0006 Fail-Closed Pre-Trade Risk Controls** (ACCEPTED 2026-04-17).
+
+Deliverables:
+- `core/state.py` — `SystemRiskState`, `SystemRiskStateCause`, `SystemRiskStateChange`, `SystemRiskMonitor`.
+- `services/s05_risk_manager/fail_closed.py` — `FailClosedGuard` (STEP 0 of risk chain).
+- `core/topics.py:48` — `RISK_SYSTEM_STATE_CHANGE = "risk.system.state_change"`.
+- 43+ tests added under `tests/unit/s05/` and `tests/integration/`.
+- S10 dashboard observability wired in Batch A of the post-audit execution (PR #178).
+
+See also:
+- [`docs/adr/ADR-0006-fail-closed-risk-controls.md`](../adr/ADR-0006-fail-closed-risk-controls.md)
+- [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md)

@@ -1,3 +1,10 @@
+> **📦 ARCHIVED — 2026-04-17**
+>
+> Phase 4 working notes. Superseded by [`docs/phase_4_closure_report.md`](../phase_4_closure_report.md),
+> which is the canonical post-merge record. Kept for audit-trail purposes only.
+
+---
+
 # Phase 4 Notes — Fusion Engine + Meta-Labeler
 
 Accumulated notes from sub-phases 4.1–4.8 and the Phase 4 closure.

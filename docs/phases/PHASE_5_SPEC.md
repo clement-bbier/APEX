@@ -1,11 +1,23 @@
 # PHASE 5 — Live Integration & Infrastructure Hardening — Specification
 
-**Status**: Design-gate proposed — 2026-04-16
+**Status**: v1 — PARTIAL SUPERSESSION pending PHASE_5_SPEC_v2.md.
+Design-gate merged 2026-04-16 (PR #155). Sub-phase 5.1 Fail-Closed
+merged 2026-04-17 (PR #177; issue #148 closed). Sub-phases 5.6 (ZMQ
+P2P), 5.7 (SBE/FlatBuffers), and 5.9 (Rust FFI Hot Path) are
+**dropped from Phase 5 scope** and moved to a new Phase 7.5
+Infrastructure Hardening backlog per
+[`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md).
+Remaining sub-phases re-sequenced as 5.1 (DONE) → 5.2 → 5.3 → 5.5 →
+5.4 → 5.8 → 5.10. **REVISION NOTE**: This v1 document stays as the
+historical design record for the 9-sub-phase proposal; the canonical
+active spec is PHASE_5_SPEC_v2.md (to be published in Batch C of the
+post-audit execution).
+
 **Related ADRs**: ADR-0002 (Quant Methodology Charter), ADR-0005
-(Meta-Labeling and Fusion Methodology), ADR-0001 (ZMQ Broker
-Topology — planned supersession in 5.6, pending a new ADR or explicit
-ADR-0001 status update).
-**Branch**: `design-gate/phase-5`
+(Meta-Labeling and Fusion Methodology), ADR-0006 (Fail-Closed
+Pre-Trade Risk Controls — accepted 2026-04-17), ADR-0001 (ZMQ Broker
+Topology — remains ACCEPTED; §3.6 supersession deferred to Phase 7.5).
+**Branch**: `design-gate/phase-5` (merged).
 **Predecessor**: Phase 4 (closed via PR #147).
 **Successor**: Phase 6 (Alpha Generation — DMA, advanced
 regime-switching, multi-asset expansion).
