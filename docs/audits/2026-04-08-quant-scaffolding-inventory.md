@@ -1,3 +1,11 @@
+> **📦 ARCHIVED — 2026-04-17**
+>
+> Historical Phase 3 scaffolding snapshot (2026-04-08). The definitive post-merge record is
+> [`docs/phase_3_closure_report.md`](../phase_3_closure_report.md); reconcile against that
+> report before citing anything here. Kept for audit-trail purposes only.
+
+---
+
 # Quant Scaffolding Inventory — Audit vs ADR-0002
 
 - **Date:** 2026-04-08

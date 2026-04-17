@@ -1,7 +1,55 @@
 # APEX Project Context Snapshot
 
-**Last updated**: 2026-04-16
-**Updated by**: Session 039 (Phase 5 Design-Gate + Phase 4 Closure)
+**Last updated**: 2026-04-17
+**Updated by**: Session 040 (Strategic Audit + Post-Audit Batches A+B)
+**Main commit**: `1b7c3b5` pre-batch-A, `f4fd79d` post-Batch-A merge (PR #178).
+
+---
+
+## Phase 5.1 — CLOSED (2026-04-17)
+
+Phase 5.1 Fail-Closed Pre-Trade Risk Controls **merged** via PR #177.
+GitHub issue #148 CLOSED 2026-04-17T12:35:20Z.
+Canonical decision record: [`docs/adr/ADR-0006-fail-closed-risk-controls.md`](../adr/ADR-0006-fail-closed-risk-controls.md).
+Deliverables: `SystemRiskState` / `SystemRiskStateCause` / `SystemRiskStateChange` / `SystemRiskMonitor` in
+`core/state.py:365-600`; `FailClosedGuard` at `services/s05_risk_manager/fail_closed.py`;
+`Topics.RISK_SYSTEM_STATE_CHANGE` constant at `core/topics.py:48`; 43+ new tests.
+
+Follow-up S10 observability (subscribe + persist + alert on `risk.system.state_change`) merged via PR #178
+as part of Batch A of the post-audit execution.
+
+---
+
+## Phase 5 — RE-SEQUENCED (2026-04-17)
+
+Per [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md),
+Phase 5 scope reduced from 9 sub-phases to 6 remaining. Ordering:
+
+```
+5.1 Fail-Closed Pre-Trade Risk Controls          ✅ DONE (PR #177)
+  ↓
+5.2 Event Sourcing / In-Memory State             NEXT
+  ↓
+5.3 Streaming Inference Wiring
+  ↓
+5.5 Drift Monitoring & Feedback Loop             (reordered ahead of 5.4)
+  ↓
+5.4 Short-Side Meta-Labeler + Regime Fusion
+  ↓
+5.8 Geopolitical NLP Overlay (GDELT 2.0 + FinBERT substitute)
+  ↓
+5.10 Phase 5 Closure Report
+  → Phase 7 Paper Trading
+```
+
+**Dropped from Phase 5** and moved to new **Phase 7.5 Infrastructure Hardening** backlog:
+- 5.6 ZMQ Peer-to-Peer Bus — premature at solo-operator scale.
+- 5.7 SBE / FlatBuffers Serialization — not the bottleneck at mid-frequency cadence.
+- 5.9 Rust FFI Hot Path Migration — defer until live benchmarks prove Python too slow.
+
+**Hard prerequisite for 5.2**: 8 S05 pre-trade context Redis keys are orphan reads in production code
+(confirmed in [`docs/audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md`](../audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md)).
+PHASE_5_SPEC_v2.md §3.2 (authored in Batch C) addresses writer strategy.
 
 ---
 
@@ -10,12 +58,7 @@
 Phase 4 (Fusion Engine + Meta-Labeler) is **complete**. All 8 sub-phases
 (4.1–4.8) merged to `main`. CI green on all 5 jobs. Closure report at
 `docs/phase_4_closure_report.md`. Phase 4 accumulated notes at
-`docs/claude_memory/PHASE_4_NOTES.md`.
-
-**Phase 5 (Live Integration & Infrastructure Hardening) is the next phase.**
-Design-gate PR proposed. Spec at `docs/phases/PHASE_5_SPEC.md`.
-9 sub-phases across 3 tracks: A (Safety + Live), B (Infrastructure),
-C (Intelligence + Performance). DMA Research (#154) deferred to Phase 6.
+`docs/claude_memory/PHASE_4_NOTES.md` (now ARCHIVED).
 
 ### 4.8 DGP calibration — locked
 
@@ -184,9 +227,9 @@ Technical debt tracked: `#115` (CVD-Kyle perf, Phase 5), `#123`
 
 | Metric | Value |
 |---|---|
-| Active Phase | Phase 5 (Live Integration); Phase 4 closed — all 8 sub-phases (4.1–4.8) merged via PRs #138/#139/#140/#141/#142/#143/#144/#145/#132; closure report at `docs/phase_4_closure_report.md` |
+| Active Phase | Phase 5 (Live Integration) — 5.1 DONE (PR #177); remaining 5.2/5.3/5.5/5.4/5.8/5.10 re-sequenced per STRATEGIC_AUDIT_2026-04-17. 5.6/5.7/5.9 moved to Phase 7.5 backlog. |
 | Previous Phase | Phase 3 — Feature Validation Harness (DONE, 13/13 sub-phases) |
-| Total tests | 1,833 unit (1 xfailed latency) + 1 new Phase 3 integration test + existing integration tests; +~56 Phase 4.6 (card schema + persistence round-trip) + ~30 Phase 4.7 (IC-weighted fusion) + 1 top-level + 4 fixture micro-tests Phase 4.8 (E2E pipeline composition gate) |
+| Total tests | 2,259 unit (1 xfailed OFI latency) as of Batch A merge (PR #178); +5 new Phase 5.1 S10 observability tests; full Phase 4 contributions preserved. |
 | Production LOC | ~35,770 (+ ~8,271 `features/` + ~1,280 `features/meta_labeler/` + ~280 `features/fusion/` Phase 4.7) |
 | Test LOC | ~22,700 (+ ~10,532 `tests/unit/features/` + ~1,360 `tests/unit/features/meta_labeler/` + ~515 `tests/unit/features/fusion/` Phase 4.7) |
 | mypy strict | 0 errors |

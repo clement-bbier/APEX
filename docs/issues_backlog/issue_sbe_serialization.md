@@ -1,3 +1,15 @@
+> **⚠️ DEFERRED — 2026-04-17**
+>
+> Moved **out of Phase 5** and into the new **Phase 7.5 Infrastructure Hardening backlog**
+> per [STRATEGIC_AUDIT_2026-04-17](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md) §4.2.
+>
+> **Rationale (Principle 1, 3, 7).** SBE / FlatBuffers zero-copy serialization (sub-phase 5.7) was premature for a solo operator running ten
+> containers on a single host with no live trading yet. It solves a latency / SPOF / HFT-scale
+> problem the operator does not have today. Revisit **only if** live-trading benchmarks from
+> Phase 8 prove this is a production bottleneck.
+
+---
+
 ## [PERFORMANCE] Couche de Sérialisation — Migration JSON vers Zero-Copy Binary (SBE)
 
 **Priorité** : MOYENNE (Optimisation CPU et Garbage Collection)
