@@ -572,7 +572,11 @@ class DashboardServer:
             S10, or ``{"state": "unknown"}`` if none has been recorded since
             the dashboard started.
             """
-            raw = await state.get("risk:system:state_change:latest")
+            from services.s10_monitor.service import (
+                REDIS_RISK_SYSTEM_STATE_LATEST_KEY,
+            )
+
+            raw = await state.get(REDIS_RISK_SYSTEM_STATE_LATEST_KEY)
             if isinstance(raw, dict):
                 return raw
             return {"state": "unknown"}
