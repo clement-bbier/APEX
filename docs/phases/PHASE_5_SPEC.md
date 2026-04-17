@@ -1,6 +1,24 @@
+> **⚠️ SUPERSEDED — 2026-04-17**
+>
+> This v1 specification (9 sub-phases, three tracks) is superseded by
+> [`PHASE_5_SPEC_v2.md`](PHASE_5_SPEC_v2.md), which is the canonical source of truth
+> for Phase 5 as of 2026-04-17.
+>
+> **v2 differences**:
+> - Sub-phases 5.6 (ZMQ P2P), 5.7 (SBE/FlatBuffers), 5.9 (Rust FFI) are **dropped** from Phase 5
+>   and moved to [`PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md`](PHASE_7_5_INFRASTRUCTURE_HARDENING_BACKLOG.md).
+> - Remaining sub-phases re-sequenced: **5.1 (DONE) → 5.2 → 5.3 → 5.5 → 5.4 → 5.8 → 5.10**.
+> - Sub-phase 5.8 substitutes GDELT 2.0 + FinBERT for the proprietary WorldMonitor gRPC feed.
+> - Sub-phase 5.2 expanded to include **producer writers** for the eight orphan-read S05 context keys.
+>
+> **Rationale**: see [`STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md).
+> This v1 document is preserved as historical design record; do not act on it.
+
+---
+
 # PHASE 5 — Live Integration & Infrastructure Hardening — Specification
 
-**Status**: v1 — PARTIALLY SUPERSEDED pending PHASE_5_SPEC_v2.md.
+**Status**: v1 — SUPERSEDED by [`PHASE_5_SPEC_v2.md`](PHASE_5_SPEC_v2.md).
 Design-gate merged 2026-04-16 (PR #155). Sub-phase 5.1 Fail-Closed
 merged 2026-04-17 (PR #177; issue #148 closed). Sub-phases 5.6 (ZMQ
 P2P), 5.7 (SBE/FlatBuffers), and 5.9 (Rust FFI Hot Path) are
@@ -10,8 +28,7 @@ Infrastructure Hardening backlog per
 Remaining sub-phases re-sequenced as 5.1 (DONE) → 5.2 → 5.3 → 5.5 →
 5.4 → 5.8 → 5.10. **REVISION NOTE**: This v1 document stays as the
 historical design record for the 9-sub-phase proposal; the canonical
-active spec is PHASE_5_SPEC_v2.md (to be published in Batch C of the
-post-audit execution).
+active spec is [`PHASE_5_SPEC_v2.md`](PHASE_5_SPEC_v2.md).
 
 **Related ADRs**: ADR-0002 (Quant Methodology Charter), ADR-0005
 (Meta-Labeling and Fusion Methodology), ADR-0006 (Fail-Closed
