@@ -146,7 +146,11 @@ class MonitorService(BaseService):
                 ttl=REDIS_RISK_SYSTEM_STATE_LATEST_TTL_SECONDS,
             )
         except Exception as exc:
-            logger.error("risk_state_change_persist_failed", error=str(exc))
+            logger.error(
+                "risk_state_change_persist_failed",
+                error=str(exc),
+                exc_info=exc,
+            )
 
         new_state = str(data.get("new_state", "")).lower()
         previous_state = str(data.get("previous_state", "")).lower()
