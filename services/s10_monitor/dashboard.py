@@ -564,6 +564,23 @@ class DashboardServer:
 
             return await get_risk_status(state)
 
+        @app.get("/api/v1/risk/system-state")
+        async def risk_system_state() -> dict[str, Any]:
+            """Latest SystemRiskState transition (ADR-0006 observability).
+
+            Returns the last ``risk.system.state_change`` event observed by
+            S10, or ``{"state": "unknown"}`` if none has been recorded since
+            the dashboard started.
+            """
+            from services.s10_monitor.service import (
+                REDIS_RISK_SYSTEM_STATE_LATEST_KEY,
+            )
+
+            raw = await state.get(REDIS_RISK_SYSTEM_STATE_LATEST_KEY)
+            if isinstance(raw, dict):
+                return raw
+            return {"state": "unknown"}
+
         @app.post("/api/v1/circuit-breaker/reset")
         async def cb_reset(x_confirm: str | None = None) -> dict[str, Any]:
             from services.s10_monitor.command_api import reset_circuit_breaker
