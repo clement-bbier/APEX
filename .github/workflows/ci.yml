@@ -119,9 +119,15 @@ jobs:
         run: docker compose -f docker/docker-compose.test.yml down -v
 
   backtest-gate:
+    # MUZZLED GATE — see issue #102 + STRATEGIC_AUDIT_2026-04-17 Tech Finding 3.
+    # Non-blocking pending fix of the Sharpe calculation in
+    # backtesting/metrics.py::full_report() (issue #102, promoted to
+    # priority:high). When #102 merges, remove continue-on-error below AND
+    # raise thresholds to CLAUDE.md §6 targets (Sharpe >= 0.8, max_dd <= 0.08).
+    name: "backtest-gate (MUZZLED — see issue #102)"
     needs: [unit-tests]
     runs-on: ubuntu-latest
-    continue-on-error: true  # TODO(APEX-METRICS-V2): re-enable as blocking once full_report() Sharpe bug is fixed
+    continue-on-error: true  # TODO(#102): re-enable as blocking once full_report() Sharpe bug is fixed
     steps:
       - uses: actions/checkout@v5
         with:
@@ -132,13 +138,16 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt
+      - name: Announce muzzled-gate status
+        run: |
+          echo "::warning title=Backtest gate muzzled::backtest-gate is running with continue-on-error=true pending issue #102 (full_report Sharpe bug). Failures here do NOT block merges. Fix #102 to promote this to a blocking gate."
       - name: Generate fixture
         run: python scripts/generate_test_fixtures.py
       - name: Backtest regression gate
         env:
-          # TODO: Align with CLAUDE.md targets (Sharpe >= 0.8, DD <= 0.08) in Phase 5
-          # Current thresholds reflect scaffolding-era data. Raise after Phase 3
-          # feature validation completes.
+          # TODO(#102): Align with CLAUDE.md targets (Sharpe >= 0.8, DD <= 0.08)
+          # after full_report() Sharpe bug is fixed. Current thresholds reflect
+          # scaffolding-era fixture data.
           BACKTEST_MIN_SHARPE: "0.5"
           BACKTEST_MAX_DD: "0.12"
         run: |

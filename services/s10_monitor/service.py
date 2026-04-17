@@ -8,12 +8,16 @@ from typing import Any
 from core.base_service import BaseService
 from core.config import get_settings
 from core.logger import get_logger
+from core.topics import Topics
 from services.s10_monitor.alert_engine import AlertEngine
 from services.s10_monitor.dashboard import DashboardServer
 from services.s10_monitor.health_checker import HealthChecker
 from services.s10_monitor.pnl_tracker import PnLTracker
 
 logger = get_logger("s10_monitor")
+
+REDIS_RISK_SYSTEM_STATE_LATEST_KEY = "risk:system:state_change:latest"
+REDIS_RISK_SYSTEM_STATE_LATEST_TTL_SECONDS = 300
 
 
 class MonitorService(BaseService):
@@ -32,6 +36,7 @@ class MonitorService(BaseService):
         self._dashboard: DashboardServer | None = None
         self._signal_count = 0
         self._order_count = 0
+        self._last_risk_system_state: dict[str, Any] | None = None
 
     async def on_message(self, topic: str, data: dict[str, Any]) -> None:
         """Route incoming ZMQ messages to appropriate handlers.
@@ -54,6 +59,9 @@ class MonitorService(BaseService):
 
         elif topic == "regime.update":
             await self.state.set("regime:current", data, ttl=120)
+
+        elif topic == Topics.RISK_SYSTEM_STATE_CHANGE:
+            await self._handle_risk_system_state_change(data)
 
         elif topic.startswith("tick."):
             pass  # High-volume: only log anomalies
@@ -120,6 +128,40 @@ class MonitorService(BaseService):
                 logger.error("Periodic check error", error=str(exc))
 
             await asyncio.sleep(15)
+
+    async def _handle_risk_system_state_change(self, data: dict[str, Any]) -> None:
+        """Persist + alert on SystemRiskState transitions (ADR-0006 observability).
+
+        Listening to :attr:`Topics.RISK_SYSTEM_STATE_CHANGE` closes the Phase 5.1
+        dashboard-observability gap identified by STRATEGIC_AUDIT_2026-04-17.
+
+        Args:
+            data: Deserialized :class:`SystemRiskStateChange` envelope.
+        """
+        self._last_risk_system_state = data
+        try:
+            await self.state.set(
+                REDIS_RISK_SYSTEM_STATE_LATEST_KEY,
+                data,
+                ttl=REDIS_RISK_SYSTEM_STATE_LATEST_TTL_SECONDS,
+            )
+        except Exception as exc:
+            logger.error("risk_state_change_persist_failed", error=str(exc))
+
+        new_state = str(data.get("new_state", "")).lower()
+        previous_state = str(data.get("previous_state", "")).lower()
+        cause = str(data.get("cause", "unknown"))
+        logger.warning(
+            "risk_system_state_change_observed",
+            previous_state=previous_state,
+            new_state=new_state,
+            cause=cause,
+        )
+        if new_state and new_state != "healthy":
+            self._alert.alert(
+                "CRITICAL",
+                f"Risk system state {previous_state!s} -> {new_state!s} ({cause})",
+            )
 
 
 if __name__ == "__main__":
