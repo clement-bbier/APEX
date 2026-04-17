@@ -11,7 +11,7 @@
 
 ## 1. Scope summary
 
-Phase 5 bridges the gap between Phase 4's offline ML pipeline and a paper-trading-ready live system. Five remaining sub-phases on a single strict sequence, one dropped category (infrastructure hardening moved to Phase 7.5).
+Phase 5 bridges the gap between Phase 4's offline ML pipeline and a paper-trading-ready live system. Seven sub-phases on a single strict sequence, one dropped category (infrastructure hardening moved to Phase 7.5).
 
 | Sub-phase | Title | Status |
 |---|---|---|
