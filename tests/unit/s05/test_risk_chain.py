@@ -99,9 +99,7 @@ async def _seed_context(redis: fakeredis.aioredis.FakeRedis) -> None:
     await redis.set("portfolio:positions", "[]")
     await redis.set("correlation:matrix", "{}")
     await redis.set("session:current", json.dumps("us_normal"))
-    await redis.set(
-        "risk:heartbeat", datetime.now(UTC).isoformat(), ex=5
-    )
+    await redis.set("risk:heartbeat", datetime.now(UTC).isoformat(), ex=5)
 
 
 def _order(
