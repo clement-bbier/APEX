@@ -509,13 +509,23 @@ class SystemRiskMonitor:
                     new_state = SystemRiskState.DEGRADED
                     cause = SystemRiskStateCause.HEARTBEAT_STALE
                 else:
-                    heartbeat_age = (datetime.now(UTC) - written_at).total_seconds()
-                    if heartbeat_age > HEARTBEAT_TTL_SECONDS:
+                    if written_at.tzinfo is None:
+                        # Fail-closed on tz-naive heartbeats: the age computation
+                        # below would raise, and silently treating a naive local
+                        # time as UTC is an attack surface (clock skew).
                         new_state = SystemRiskState.DEGRADED
                         cause = SystemRiskStateCause.HEARTBEAT_STALE
                     else:
-                        new_state = SystemRiskState.HEALTHY
-                        cause = SystemRiskStateCause.RECOVERY
+                        heartbeat_age = (datetime.now(UTC) - written_at).total_seconds()
+                        # Fail-closed at the boundary (>=) and on negative ages.
+                        # Negative age = future-dated heartbeat (clock skew or
+                        # adversarial write) → treat as stale, not fresh.
+                        if heartbeat_age < 0 or heartbeat_age >= HEARTBEAT_TTL_SECONDS:
+                            new_state = SystemRiskState.DEGRADED
+                            cause = SystemRiskStateCause.HEARTBEAT_STALE
+                        else:
+                            new_state = SystemRiskState.HEALTHY
+                            cause = SystemRiskStateCause.RECOVERY
 
         previous = self._last_observed
         self._last_observed = new_state
