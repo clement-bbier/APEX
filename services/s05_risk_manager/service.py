@@ -147,10 +147,14 @@ class RiskManagerService(BaseService):
         cbg = getattr(self, "_cb_guard", None)
         cb = getattr(self, "_circuit_breaker", None)
         mg = getattr(self, "_meta_gate", None)
-        assert fc is not None, "FailClosedGuard not initialised"
-        assert cbg is not None, "CBEventGuard not initialised"
-        assert cb is not None, "CircuitBreaker not initialised"
-        assert mg is not None, "MetaLabelGate not initialised"
+        if fc is None:
+            raise RuntimeError("FailClosedGuard not initialised")
+        if cbg is None:
+            raise RuntimeError("CBEventGuard not initialised")
+        if cb is None:
+            raise RuntimeError("CircuitBreaker not initialised")
+        if mg is None:
+            raise RuntimeError("MetaLabelGate not initialised")
         loader = getattr(self, "_context_loader", None)
         if loader is None:
             loader = ContextLoader(self.state)
