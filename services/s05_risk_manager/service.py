@@ -420,7 +420,7 @@ class RiskManagerService(BaseService):
         )
         results = await asyncio.gather(*(self.state.get(k) for k in keys))
 
-        def _require(name: str, value: Any | None) -> Any:
+        def _require(name: str, value: Any | None) -> Any:  # noqa: ANN401
             if value is None:
                 raise RuntimeError(f"required pre-trade context key missing or None: {name}")
             return value
