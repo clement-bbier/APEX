@@ -10,7 +10,6 @@ the :class:`chain_orchestrator.RiskChainOrchestrator`.
 from __future__ import annotations
 
 import asyncio
-import json
 from decimal import Decimal
 from typing import Any
 
@@ -92,11 +91,11 @@ class RiskDecisionBuilder:
     async def audit(self, decision: RiskDecision) -> None:
         """Write decision to Redis audit trail (key + history list)."""
         try:
-            data = decision.model_dump_json()
+            data = decision.model_dump(mode="json")
             await asyncio.gather(
                 self._state.set(
                     f"risk:audit:{decision.order_id}",
-                    json.loads(data),
+                    data,
                     ttl=REDIS_RISK_DECISION_TTL,
                 ),
                 self._state.lpush(REDIS_DECISION_HISTORY_KEY, data),

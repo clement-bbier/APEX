@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from core.logger import get_logger
 from core.models.order import OrderCandidate
@@ -54,9 +54,6 @@ from services.s05_risk_manager.position_rules import (
     check_min_rr,
     check_stop_loss_present,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = get_logger("s05_risk_manager.chain_orchestrator")
 
