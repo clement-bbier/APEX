@@ -44,6 +44,8 @@ class Topics:
     RISK_BLOCKED: str = "risk.blocked"  # RiskDecision published (approved=False)
     RISK_CB_TRIPPED: str = "risk.cb.tripped"  # Circuit breaker state change notification
     RISK_AUDIT: str = "risk.audit"  # Full audit stream (all decisions)
+    # Fail-closed guard transitions (ADR-0006)
+    RISK_SYSTEM_STATE_CHANGE: str = "risk.system.state_change"
 
     # ── Service health (all services → supervisor) ────────────────────────────
     SERVICE_HEALTH: str = "service.health"  # e.g. service.health.s01_data_ingestion
