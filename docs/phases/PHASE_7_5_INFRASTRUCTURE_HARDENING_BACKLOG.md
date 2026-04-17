@@ -144,7 +144,7 @@ tests/integration/
 - CME Group infrastructure whitepapers.
 - Real Logic Aeron (https://github.com/real-logic/aeron).
 - CLAUDE.md §2: "ZMQ topics are defined in core/topics.py."
-- ADR-0001 (superseded by this sub-phase).
+- ADR-0001 (remains ACCEPTED today; would be superseded only if this sub-phase is revived and implemented).
 - GitHub issue #150.
 
 ---
