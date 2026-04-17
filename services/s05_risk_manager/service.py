@@ -21,6 +21,7 @@ import asyncio
 import json
 import time
 import uuid as _uuid
+from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
 
@@ -28,6 +29,7 @@ from core.base_service import BaseService
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from core.models.tick import Session
+from core.state import SystemRiskMonitor
 from core.topics import Topics
 from services.s05_risk_manager.cb_event_guard import CBEventGuard
 from services.s05_risk_manager.circuit_breaker import CircuitBreaker
@@ -37,6 +39,7 @@ from services.s05_risk_manager.exposure_monitor import (
     check_per_class_exposure,
     check_total_exposure,
 )
+from services.s05_risk_manager.fail_closed import FailClosedGuard
 from services.s05_risk_manager.meta_label_gate import MetaLabelGate
 from services.s05_risk_manager.models import (
     CB_SCALP_SIZE_MULTIPLIER,
@@ -68,20 +71,34 @@ class RiskManagerService(BaseService):
         self._cb_guard: CBEventGuard | None = None
         self._circuit_breaker: CircuitBreaker | None = None
         self._meta_gate: MetaLabelGate | None = None
+        self._monitor: SystemRiskMonitor | None = None
+        self._fail_closed: FailClosedGuard | None = None
+        self._risk_heartbeat_task: asyncio.Task[None] | None = None
 
     async def on_start(self) -> None:
-        """Initialize Redis-backed components after state is connected."""
+        """Initialize Redis-backed components after state is connected.
+
+        The fail-closed guard and its heartbeat refresher are initialized
+        eagerly (ADR-0006 §D2 + Consequences): the first heartbeat lands on
+        Redis *before* :meth:`run` subscribes to ``ORDER_CANDIDATE``, so the
+        very first incoming order observes ``HEALTHY`` (or the correctly
+        reported ``DEGRADED`` / ``UNAVAILABLE`` if Redis is already sick).
+        """
         redis = self.state.client
         self._cb_guard = CBEventGuard(redis)
         self._circuit_breaker = CircuitBreaker(redis)
         self._meta_gate = MetaLabelGate(redis)
+        self._monitor = SystemRiskMonitor(redis, self.bus)
+        self._fail_closed = FailClosedGuard(self._monitor)
+        # ADR-0006 §D2 Consequences: eager heartbeat BEFORE subscribe.
+        await self._monitor.write_heartbeat()
+        self._risk_heartbeat_task = asyncio.create_task(self._monitor.run_heartbeat_loop())
         snap = await self._circuit_breaker.get_snapshot()
         self.logger.info(
             "risk_manager_started",
             cb_state=snap.state.value,
             daily_pnl=str(snap.daily_pnl),
         )
-        await self._benchmark_latency()
 
     def get_subscribe_topics(self) -> list[str]:
         return [Topics.ORDER_CANDIDATE]
@@ -102,6 +119,18 @@ class RiskManagerService(BaseService):
             self.logger.info("risk_manager_subscribe_cancelled")
             raise
 
+    async def stop(self) -> None:
+        """Cancel the fail-closed heartbeat loop, then delegate to BaseService."""
+        task = self._risk_heartbeat_task
+        if task is not None:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            self._risk_heartbeat_task = None
+        await super().stop()
+
     async def on_message(self, topic: str, data: dict[str, Any]) -> None:
         """Process an incoming order candidate."""
         try:
@@ -118,17 +147,65 @@ class RiskManagerService(BaseService):
             self.logger.error("on_message_error", topic=topic, error=str(exc))
 
     async def process_order_candidate(self, candidate: OrderCandidate) -> RiskDecision:
-        """Run the full 5-step chain and return a RiskDecision."""
+        """Run the full chain and return a RiskDecision.
+
+        STEP 0 is the fail-closed guard (ADR-0006 §D3): it runs BEFORE the
+        context load so a missing ``risk:heartbeat`` rejects the order in
+        O(1) without attempting any further Redis reads. If the guard
+        passes but the context load itself fails (a key-level freshness
+        issue not yet reflected in the heartbeat), the order is also
+        rejected with ``BlockReason.SYSTEM_UNAVAILABLE`` per ADR §D4.
+        """
         assert self._cb_guard is not None
         assert self._circuit_breaker is not None
         assert self._meta_gate is not None
+        assert self._fail_closed is not None
 
-        ctx = await self._load_context_parallel(candidate.symbol)
         rule_results: list[RuleResult] = []
         rationale: list[str] = []
         kelly_raw = candidate.kelly_fraction
         meta_confidence: float = 0.52
         kelly_final: float = kelly_raw
+
+        # STEP 0: Fail-Closed Guard (ADR-0006 §D3) — BEFORE any context load.
+        state, r0 = await self._fail_closed.check(candidate.order_id, candidate.symbol)
+        rule_results.append(r0)
+        rationale.append(r0.reason)
+        if not r0.passed:
+            return await self._build_blocked(
+                candidate, rule_results, rationale, r0.block_reason, kelly_raw, meta_confidence
+            )
+
+        # Context load — any failure rejects with SYSTEM_UNAVAILABLE (ADR-0006 §D4).
+        try:
+            ctx = await self._load_context_parallel(candidate.symbol)
+        except Exception as exc:
+            self.logger.critical(
+                "risk_system_unavailable_rejection",
+                rejection_reason=BlockReason.SYSTEM_UNAVAILABLE.value,
+                state=state.value,
+                order_id=candidate.order_id,
+                symbol=candidate.symbol,
+                timestamp_utc=datetime.now(UTC).isoformat(),
+                error=str(exc),
+                phase="context_load",
+            )
+            r_load = RuleResult.fail(
+                rule_name="context_load",
+                block_reason=BlockReason.SYSTEM_UNAVAILABLE,
+                reason=f"context load failed: {exc}",
+                error=str(exc),
+            )
+            rule_results.append(r_load)
+            rationale.append(r_load.reason)
+            return await self._build_blocked(
+                candidate,
+                rule_results,
+                rationale,
+                r_load.block_reason,
+                kelly_raw,
+                meta_confidence,
+            )
 
         # STEP 1: CB Event Guard
         r1 = await self._cb_guard.check()
@@ -322,67 +399,80 @@ class RiskManagerService(BaseService):
             self.logger.error("audit_write_failed", error=str(exc))
 
     async def _load_context_parallel(self, symbol: str) -> dict[str, Any]:
-        """Batch all Redis reads in parallel before the chain starts."""
-        try:
-            results = await asyncio.gather(
-                self.state.get("portfolio:capital"),
-                self.state.get("pnl:daily"),
-                self.state.get("pnl:intraday_30m"),
-                self.state.get("macro:vix_current"),
-                self.state.get("macro:vix_1h_ago"),
-                self.state.get("portfolio:positions"),
-                self.state.get("correlation:matrix"),
-                self.state.get("session:current"),
-                return_exceptions=True,
-            )
-        except Exception:
-            results = [None] * 8
+        """Batch all Redis reads in parallel before the chain starts.
 
-        def _safe(v: Any, default: Any = None) -> Any:  # noqa: ANN401
-            return v if not isinstance(v, Exception) and v is not None else default
-
-        cap_raw = _safe(results[0], {})
-        capital = Decimal(
-            str(
-                cap_raw.get("available", 100_000)
-                if isinstance(cap_raw, dict)
-                else (cap_raw or 100_000)
-            )
+        Fail-loud per ADR-0006 §D4: if any required key is missing, ``None``,
+        or malformed, the call raises :class:`RuntimeError`. No ``_safe()``
+        helper, no heuristic defaults. :meth:`process_order_candidate`
+        converts any raise here into a ``BlockReason.SYSTEM_UNAVAILABLE``
+        rejection. The :class:`FailClosedGuard` (STEP 0) is expected to
+        intercept system-level unavailability upstream of this method.
+        """
+        keys = (
+            "portfolio:capital",
+            "pnl:daily",
+            "pnl:intraday_30m",
+            "macro:vix_current",
+            "macro:vix_1h_ago",
+            "portfolio:positions",
+            "correlation:matrix",
+            "session:current",
         )
-        daily_pnl = Decimal(str(_safe(results[1], 0)))
-        intraday_30m = Decimal(str(_safe(results[2], 0)))
-        vix_current = float(_safe(results[3], 20.0))
-        vix_1h_ago = float(_safe(results[4], 20.0))
+        results = await asyncio.gather(*(self.state.get(k) for k in keys))
 
-        raw_pos = _safe(results[5], [])
+        def _require(name: str, value: Any | None) -> Any:
+            if value is None:
+                raise RuntimeError(f"required pre-trade context key missing or None: {name}")
+            return value
+
+        cap_raw = _require("portfolio:capital", results[0])
+        if not isinstance(cap_raw, dict) or "available" not in cap_raw:
+            raise RuntimeError(f"portfolio:capital malformed: {cap_raw!r}")
+        capital = Decimal(str(cap_raw["available"]))
+
+        daily_pnl = Decimal(str(_require("pnl:daily", results[1])))
+        intraday_30m = Decimal(str(_require("pnl:intraday_30m", results[2])))
+        vix_current = float(_require("macro:vix_current", results[3]))
+        vix_1h_ago = float(_require("macro:vix_1h_ago", results[4]))
+
+        raw_pos = _require("portfolio:positions", results[5])
+        if not isinstance(raw_pos, list):
+            raise RuntimeError(
+                f"portfolio:positions malformed: expected list, got {type(raw_pos).__name__}"
+            )
         positions: list[Position] = []
-        if isinstance(raw_pos, list):
-            for p in raw_pos:
-                try:
-                    positions.append(Position.model_validate(p))
-                except Exception as exc:
-                    self.logger.debug("position_decode_failed", error=str(exc))
+        for p in raw_pos:
+            try:
+                positions.append(Position.model_validate(p))
+            except Exception as exc:
+                # Per-element parse failure is not fatal (broker feeds may
+                # include unknown-type entries); log and skip.
+                self.logger.debug("position_decode_failed", error=str(exc))
 
-        corr_raw = _safe(results[6], {})
+        corr_raw = _require("correlation:matrix", results[6])
+        if not isinstance(corr_raw, dict):
+            raise RuntimeError(
+                f"correlation:matrix malformed: expected dict, got {type(corr_raw).__name__}"
+            )
         corr: dict[tuple[str, str], float] = {}
-        if isinstance(corr_raw, dict):
-            for k, v in corr_raw.items():
-                try:
-                    parts = str(k).split(":")
-                    if len(parts) == 2:
-                        corr[(parts[0], parts[1])] = float(v)
-                except Exception as exc:
-                    self.logger.debug(
-                        "correlation_decode_failed",
-                        key=str(k),
-                        error=str(exc),
-                    )
+        for k, v in corr_raw.items():
+            parts = str(k).split(":")
+            if len(parts) != 2:
+                continue
+            try:
+                corr[(parts[0], parts[1])] = float(v)
+            except (ValueError, TypeError) as exc:
+                self.logger.debug(
+                    "correlation_decode_failed",
+                    key=str(k),
+                    error=str(exc),
+                )
 
-        session_raw = _safe(results[7], "us_normal")
+        session_raw = _require("session:current", results[7])
         try:
             session: Session = Session(str(session_raw))
-        except ValueError:
-            session = Session.US_NORMAL
+        except ValueError as exc:
+            raise RuntimeError(f"session:current invalid value: {session_raw!r}") from exc
 
         return {
             "capital": capital,
