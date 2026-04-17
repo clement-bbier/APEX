@@ -45,19 +45,20 @@ class MonitorService(BaseService):
             topic: ZMQ topic string.
             data: Deserialized message payload.
         """
-        if topic.startswith("service.health."):
-            service_id = topic[len("service.health.") :]
+        _health_prefix = f"{Topics.SERVICE_HEALTH}."
+        if topic.startswith(_health_prefix):
+            service_id = topic[len(_health_prefix) :]
             ts = data.get("timestamp_ms", 0)
             self._health.record_heartbeat(service_id, ts)
 
-        elif topic == "order.filled":
+        elif topic == Topics.ORDER_FILLED:
             self._order_count += 1
             logger.info("Order filled", order_id=data.get("order_id"), symbol=data.get("symbol"))
 
-        elif topic == "order.candidate":
+        elif topic == Topics.ORDER_CANDIDATE:
             self._signal_count += 1
 
-        elif topic == "regime.update":
+        elif topic == Topics.REGIME_UPDATE:
             await self.state.set("regime:current", data, ttl=120)
 
         elif topic == Topics.RISK_SYSTEM_STATE_CHANGE:
