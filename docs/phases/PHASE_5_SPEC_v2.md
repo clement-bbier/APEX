@@ -120,7 +120,7 @@ Eliminate the eight-key Redis batch-read from S05's hot path. Replace with an ev
 
 **OUT (deferred):**
 
-- Correlation matrix writer — 5.5 or Phase 6 (see §3.2 scope IN bullet 1.7).
+- Correlation matrix writer — 5.5 or Phase 6 (see §3.2 Producers list, `correlation:matrix` item).
 - Rust rewrite of S05 — Phase 7.5 (deferred from v1 §3.9).
 - Persistent event-log replay — Phase 6.
 
