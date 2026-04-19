@@ -5,6 +5,30 @@
 
 ---
 
+> **STATUS: CURRENT-STATE ARCHITECTURE** (as of 2026-04-19)
+>
+> This document describes the **current** technical architecture of the APEX codebase in its present S01-S10 topology. It is the source of truth for code that exists today on disk.
+>
+> **Target-state architecture is defined in [docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md](docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md)** (Charter v1.0, ratified 2026-04-18).
+>
+> Key deltas current → target:
+>
+> | Current (this document) | Target (Charter) |
+> |---|---|
+> | 10 services numbered S01–S10 | Services classified by domain: `data/`, `signal/`, `portfolio/`, `execution/`, `research/`, `ops/`, `strategies/` (Charter §5.4) |
+> | Single-strategy signal path in S02 | Multi-strategy microservices under `services/strategies/` (Charter §5.1); legacy S02 wrapped as `LegacyConfluenceStrategy` |
+> | No capital allocator (Fusion Engine does per-signal fusion only) | New `services/portfolio/strategy_allocator/` microservice (Charter §5.2, §6) |
+> | No panel builder (strategies subscribe directly to tick topics) | New `services/data/panels/` microservice; all strategies consume panels (Charter §5.3) |
+> | Pydantic models without `strategy_id` | `strategy_id` added to `Signal`, `OrderCandidate`, `ApprovedOrder`, `ExecutedOrder`, `TradeRecord` (Charter §5.5) |
+> | 6-step VETO chain in S05 | 7-step Chain of Responsibility (Charter §8.2) |
+> | Global Redis keys (`kelly:{symbol}`, `trades:all`, etc.) | Per-strategy partitioning (`kelly:{strategy_id}:{symbol}`, `trades:{strategy_id}:all`) for strategy-specific keys (Charter §5.5) |
+>
+> **This document remains binding for current code** until the multi-strat infrastructure lift (Phases A-B-C-D from MULTI_STRAT_READINESS_AUDIT_2026-04-18.md §6, scheduled in Document 3) progressively updates the codebase. Each phase of the lift will update this MANIFEST.md in the same PR as the code change, so current-state and code remain aligned.
+>
+> Migration tracking: [docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md](docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) (pending authoring as Document 3).
+
+---
+
 ## Table of Contents
 
 1. [Vision & Philosophy](#1-vision--philosophy)

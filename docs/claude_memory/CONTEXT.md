@@ -6,6 +6,51 @@
 
 ---
 
+> **⚠️ REQUIRED FIRST-READ FOR EVERY SESSION** (as of 2026-04-18)
+>
+> Before reading anything else in this repository, every Claude Code agent MUST read:
+>
+>     docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md
+>
+> This is the **constitutional document** of the APEX Multi-Strategy Platform (v1.0, ratified 2026-04-18). It defines the vision, the seven binding principles, the target architecture, the six boot strategies, the capital allocation framework, the strategy lifecycle, the defense-in-depth model, and the governance rules. Every design, implementation, or deployment decision must be defensible under the Charter's principles.
+>
+> This CONTEXT.md file complements the Charter by providing session-continuity operational context (what was done recently, what is in flight, where the main branch currently stands).
+
+---
+
+## Charter Ratification (2026-04-18)
+
+The APEX Multi-Strat Platform Charter v1.0 was ratified on 2026-04-18 via PR #184 (branch `docs/strategy-charter-document-1`, merged to main after 4 review corrections applied in a follow-up commit).
+
+**Charter decisions (Q1–Q8 from the CIO interview) that bind all future work:**
+
+- **Q1 — Strategy isolation**: Each strategy is a complete microservice under `services/strategies/<name>/`. Not a plug-in. Crash isolation is absolute. (Charter §5.1)
+- **Q2 — Capital allocator**: Dedicated microservice at `services/portfolio/strategy_allocator/`. Distinct from Fusion Engine and Risk Manager. (Charter §5.2)
+- **Q3 — Panel builder**: New microservice at `services/data/panels/`. All strategies consume panels, not raw ticks. (Charter §5.3)
+- **Topology**: Classification by domain. No more S01-S10. Folders: `data/`, `signal/`, `portfolio/`, `execution/`, `research/`, `ops/`, `strategies/`. (Charter §5.4)
+- **Q4 — Capital allocation**: Phase 1 Risk Parity pure (months 0-12); Phase 2 Risk Parity + Sharpe overlay ±20% (months 12+). (Charter §6)
+- **Q5 — Deployment cadence**: Trigger-based, not calendar-based. Four gates (Backtest → Paper → Live Micro → Live Full). Six boot strategies in fixed order: Crypto Momentum, Trend Following, Mean Rev Equities, VRP, Macro Carry, News-driven. (Charter §7, §4)
+- **Q6 — Circuit breakers**: Two-tier. Soft per-strategy (Kelly×0.5 at 8% DD/24h, etc.). Hard global (halt all at 12% portfolio DD/24h). (Charter §8.1)
+- **Q7 — VETO hierarchy**: 7-step Chain of Responsibility. STEP 0-2 and 7 GLOBAL; STEP 3-6 PER-STRATEGY. (Charter §8.2)
+- **Q8 — Budgets**: 3 categories (Low Vol / Medium Vol / High Vol) with per-category DD/Sharpe/leverage limits. Tolerant decommissioning (9 months Sharpe<0 → review mode). (Charter §9)
+
+**Immediate implications for any code produced from this point forward:**
+
+1. New services go directly in target topology (`services/<domain>/<service>/`), not in S11-S20 numbering.
+2. When extending existing S01-S10 services, new Pydantic contracts include `strategy_id: str = "default"` per Charter §5.5.
+3. The multi-strat infrastructure lift (Phases A, B, C, D — see MULTI_STRAT_READINESS_AUDIT_2026-04-18.md §6) is the first scheduled work item after this Charter ratification. Document 3 will sequence it.
+4. Per-strategy Redis keys: `kelly:{strategy_id}:{symbol}`, `trades:{strategy_id}:all`, `pnl:{strategy_id}:daily`. Portfolio-level keys remain global: `portfolio:capital`, `risk:heartbeat`, `correlation:matrix`.
+5. New ZMQ topic factory: `Topics.signal_for(strategy_id, symbol)` producing `signal.technical.{strategy_id}.{symbol}`.
+
+**Documents 2 and 3 are queued for authoring** (sequential missions, Charter-dependent):
+
+- Document 2: `docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md` — operational playbook for the four gates.
+- Document 3: `docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md` — time-ordered execution plan replacing PHASE_5_SPEC_v2.md.
+
+Until Document 3 is ratified, in-flight Phase 5 work continues per PHASE_5_SPEC_v2.md with the explicit understanding that the multi-strat infrastructure lift is prepended as an early phase.
+
+---
+
 ## Phase 5.1 — CLOSED (2026-04-17)
 
 Phase 5.1 Fail-Closed Pre-Trade Risk Controls **merged** via PR #177.

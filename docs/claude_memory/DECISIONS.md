@@ -1038,3 +1038,46 @@ alongside deletion of the now-redundant prototype.
 **References**:
 - [`docs/audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md`](../audits/STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md)
 - [`docs/audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md`](../audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md)
+
+---
+
+## 2026-04-18 — APEX Multi-Strat Charter v1.0 ratified (PR #184)
+
+**Decision**: Adopt the APEX Multi-Strat Platform Charter as the binding constitutional document for the next 12–24 months of development.
+
+**File**: [`docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md`](../strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md) (v1.0)
+
+**PR**: #184 (merged 2026-04-18)
+
+**Eight binding decisions (Q1–Q8 from the structured CIO interview)**:
+
+1. Microservices per strategy at `services/strategies/<name>/` (+20% ops overhead accepted)
+2. Dedicated `services/portfolio/strategy_allocator/` microservice (distinct from fusion and risk)
+3. Disciplined `services/data/panels/` microservice (all strategies consume panels)
+4. Capital allocation: Phase 1 Risk Parity pure; Phase 2 Risk Parity + Sharpe overlay ±20%
+5. Trigger-based four-gate lifecycle with 6 boot strategies in fixed deployment order
+6. Two-tier circuit breakers (soft per-strategy + hard global portfolio)
+7. Seven-step VETO Chain of Responsibility (STEP 0-2 and 7 GLOBAL; STEP 3-6 PER-STRATEGY)
+8. Three budget categories (Low/Medium/High Vol) with tolerant decommissioning (9M Sharpe<0 → review)
+
+**Topology**: Classification by domain (`data/`, `signal/`, `portfolio/`, `execution/`, `research/`, `ops/`, `strategies/`) — abandonment of linear S01–S10 numbering in favor of institutional folder structure. Refactor scheduled in Document 3.
+
+**Benchmarks** (3-level ladder):
+- Level 1 Survival: Return >15%, Sharpe >1.0, DD <15% simultaneously
+- Level 2 Legitimacy: Alpha >10% vs BTC+ETH+SPY, Beta <0.5, Sharpe >1.5
+- Level 3 Institutional: Sharpe >2.0 rolling 12M, DD <10%, cross-strategy correlation <0.3
+
+**Participants**:
+- CIO: Clement Barbier (ratifier)
+- Head of Strategy Research: Claude Opus 4.7 (claude.ai interview conductor + Charter drafter prompter)
+- Head of Architecture Review: Claude Opus 4.7 (Multi-Strat Readiness Audit 2026-04-18)
+- Implementation Lead: Claude Code (Charter authored on branch `docs/strategy-charter-document-1`)
+
+**Immediate downstream actions**:
+
+1. Document 2 (STRATEGY_DEVELOPMENT_LIFECYCLE.md) — queued, authoring begins next.
+2. Document 3 (PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) — queued after Document 2 ratifies.
+3. Documentation sync PR (this mission) — adds STATUS banners to pre-Charter docs.
+4. Multi-Strat Infrastructure Lift (Phases A-B-C-D) — scheduled in Document 3, begins after Doc 3 ratification.
+
+**Review cadence**: Charter reviewed semi-annually (per Charter §9.6). Emergency review triggered by 3+ decommissionings in 12M, 3+ hard CB trips in 12M, or Charter fundamentally blocking a desired strategy deployment.

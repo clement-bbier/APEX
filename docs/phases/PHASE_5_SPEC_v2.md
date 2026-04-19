@@ -9,6 +9,22 @@
 
 ---
 
+> **STATUS: ACTIVE (pre-Charter alignment)** (as of 2026-04-19)
+>
+> This document is the **current** Phase 5 execution specification. It governs in-flight work (5.1 DONE; 5.2, 5.3, 5.5, 5.4, 5.8, 5.10 pending).
+>
+> **The APEX Multi-Strat Charter v1.0 was ratified on 2026-04-18** ([docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md](../strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md)). It introduces multi-strategy architectural requirements that will be encoded in a **Phase 5 v3** specification (`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`, pending authoring as Document 3 of the Charter family).
+>
+> Until Document 3 is ratified:
+> - Work scoped in this PHASE_5_SPEC_v2.md that has been started (5.2 Event Sourcing, etc.) continues per its current specification.
+> - New work items not yet started should consult the Charter (§5, §6, §7, §8) for architectural target before implementation begins.
+> - The Charter REPLACES or EXTENDS the following items (to be rescheduled in Document 3):
+>   - The strict 5.2 → 5.3 → 5.5 → 5.4 → 5.8 → 5.10 sequence remains **mostly valid** for their operational content, but a **Multi-Strat Infrastructure Lift** (Phases A-B-C-D, ~5-8 weeks) is prepended to address the P0 gaps identified in [MULTI_STRAT_READINESS_AUDIT_2026-04-18.md](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) §6.
+>
+> Document 3 (Phase 5 v3) will formalize the reordering and the infrastructure-lift phases. Until then, this v2 spec remains operational.
+
+---
+
 ## 1. Scope summary
 
 Phase 5 bridges the gap between Phase 4's offline ML pipeline and a paper-trading-ready live system. Seven sub-phases on a single strict sequence, one dropped category (infrastructure hardening moved to Phase 7.5).

@@ -2333,3 +2333,36 @@ Modified (Batch B):
 - Batch D: SOLID decomposition of S05 service.py + S02 pipeline.py.
 - Batch E: GitHub issue triage per audit §5 table (32 issues reviewed; merge EPICs, relabel, promote #102 to high, close #150/#151/#152 as DEFERRED).
 - After all batches merged: begin Phase 5.2 Event Sourcing / In-Memory State implementation per PHASE_5_SPEC_v2.md.
+
+---
+
+## Session 041 — APEX Multi-Strat Charter ratified (2026-04-18)
+
+**Outcome**: Charter v1.0 (Document 1 of 3) authored, reviewed, 4 corrections applied, merged via PR #184.
+
+**Key activities**:
+
+1. Structured 1-hour CIO interview (2026-04-18) with Claude Opus 4.7 as Head of Strategy Research. Produced the eight binding architectural decisions Q1–Q8 that anchor the multi-strat platform.
+2. Multi-Strat Readiness Audit (2026-04-18) by Claude Opus 4.7 as Head of Architecture Review, providing factual grounding (service inventory, contract surface, ABC inventory, SOLID scorecard, P0/P1/P2 gap list) for the Charter.
+3. Charter draft produced by Claude Code on branch `docs/strategy-charter-document-1` (commit 5a3d41a). 1,732 lines across 15 sections. Zero code or existing-doc modifications.
+4. Joint review (CIO + Head of Strategy Research) identified 4 targeted corrections: (a) §1.5 timeline realism (0-6 → 0-9 months etc.), (b) §4.3 GEX honesty (Phase 2 optional with cost disclosure), (c) §5.9 startup order domain clustering, (d) §14.2 changelog date alignment.
+5. Corrections applied in follow-up commit on same branch. PR #184 re-reviewed, CI green, merged.
+6. Documentation sync PR (this session) adds STATUS banners to pre-Charter docs and records the ratification in DECISIONS.md and CONTEXT.md.
+
+**Work queued**:
+
+- Document 2 (STRATEGY_DEVELOPMENT_LIFECYCLE.md) authoring — next mission for Claude Opus 4.7 + Claude Code.
+- Document 3 (PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) — after Doc 2.
+- Multi-Strat Infrastructure Lift Phases A, B, C, D — scheduled in Doc 3, begins after Doc 3 ratification.
+- In-flight CI backtest-gate fix on branch `fix/ci-backtest-gate-sharpe` — independent track, unrelated to Charter.
+
+**Key files affected**:
+- docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md (created, v1.0)
+- CLAUDE.md (STATUS banner added)
+- MANIFEST.md (STATUS banner added)
+- docs/PROJECT_ROADMAP.md (STATUS banner added)
+- docs/phases/PHASE_5_SPEC_v2.md (STATUS banner added)
+- docs/claude_memory/CONTEXT.md (STATUS banner + Charter section added)
+- docs/claude_memory/DECISIONS.md (Charter ratification entry added)
+- docs/claude_memory/SESSIONS.md (this entry)
+- docs/adr/ADR-0001 through ADR-0006 (one-line Charter cross-reference)
