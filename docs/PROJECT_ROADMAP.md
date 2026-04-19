@@ -6,7 +6,7 @@
 |---|---|
 | Maintainer | Clement Barbier |
 | Created | 2026-04-10 |
-| Last updated | 2026-04-17 |
+| Last substantive update | 2026-04-17 |
 | Update frequency | After each sub-phase merge |
 
 ---

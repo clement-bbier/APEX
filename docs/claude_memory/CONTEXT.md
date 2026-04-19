@@ -40,7 +40,7 @@ The APEX Multi-Strat Platform Charter v1.0 was ratified on 2026-04-18 via PR #18
 2. When extending existing S01-S10 services, new Pydantic contracts include `strategy_id: str = "default"` per Charter §5.5.
 3. The multi-strat infrastructure lift (Phases A, B, C, D — see MULTI_STRAT_READINESS_AUDIT_2026-04-18.md §6) is the first scheduled work item after this Charter ratification. Document 3 will sequence it.
 4. Per-strategy Redis keys: `kelly:{strategy_id}:{symbol}`, `trades:{strategy_id}:all`, `pnl:{strategy_id}:daily`. Portfolio-level keys remain global: `portfolio:capital`, `risk:heartbeat`, `correlation:matrix`.
-5. New ZMQ topic factory: `Topics.signal_for(strategy_id, symbol)` producing `signal.technical.{strategy_id}.{symbol}`.
+5. ZMQ topic factory `Topics.signal_for(strategy_id, symbol)` → `signal.technical.{strategy_id}.{symbol}` — **planned, not yet implemented in core/topics.py**. Until added (Phase A of multi-strat lift), agents use the current `Topics.signal(symbol)` factory and attach `strategy_id` at the message producer level.
 
 **Documents 2 and 3 are queued for authoring** (sequential missions, Charter-dependent):
 
