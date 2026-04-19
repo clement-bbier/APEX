@@ -6,8 +6,20 @@
 |---|---|
 | Maintainer | Clement Barbier |
 | Created | 2026-04-10 |
-| Last updated | 2026-04-17 |
+| Last substantive update | 2026-04-17 |
 | Update frequency | After each sub-phase merge |
+
+---
+
+> **STATUS: PRE-CHARTER ROADMAP** (last substantive update before Charter v1.0)
+>
+> This document captures the roadmap as it existed **before** the ratification of the APEX Multi-Strat Charter v1.0 on 2026-04-18. It remains useful as historical context and for understanding the current state of phase-level planning.
+>
+> **The authoritative forward-looking roadmap is being rewritten as Document 3 of the Charter family**: `docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md` (pending authoring). Once Document 3 is ratified, it supersedes this document.
+>
+> Current phase specification remains [PHASE_5_SPEC_v2.md](phases/PHASE_5_SPEC_v2.md) until Document 3 supersedes it.
+>
+> **For strategic direction**, read the Charter first: [docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md](strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md).
 
 > **⚠️ PHASE-NUMBERING DRIFT NOTICE (2026-04-17)**
 >

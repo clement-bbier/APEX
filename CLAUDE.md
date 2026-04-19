@@ -5,6 +5,30 @@ It defines non-negotiable constraints for all development work on this project.
 
 ---
 
+> **STATUS: CURRENT-STATE CONVENTIONS** (as of 2026-04-19)
+>
+> This document describes the **current** development conventions for the APEX codebase in its present S01-S10 topology. It remains the binding reference for all code produced today.
+>
+> **Target-state architecture is defined in [docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md](docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md)** (Charter v1.0, ratified 2026-04-18).
+>
+> Specifically:
+> - The target service topology is **classification by domain** (`services/data/`, `services/signal/`, `services/portfolio/`, `services/execution/`, `services/research/`, `services/ops/`, `services/strategies/`) — see Charter §5.4.
+> - Strategies are **microservices** under `services/strategies/<strategy_name>/` — see Charter §5.1.
+> - A new service **`services/portfolio/strategy_allocator/`** sits between signal generation and risk VETO — see Charter §5.2.
+> - A new service **`services/data/panels/`** aggregates multi-asset snapshots consumed by all strategies — see Charter §5.3.
+> - Every order-path Pydantic model gains a **`strategy_id`** field (default `"default"` for backward compatibility) — see Charter §5.5.
+> - The VETO chain is **7 steps** (was 6 under fail-closed ADR-0006) — see Charter §8.2.
+>
+> **For every new file or service created by a Claude Code agent:**
+> - If the target-state location is already specified in the Charter, create the file directly in the target location (e.g., `services/strategies/crypto_momentum/service.py`, NOT `services/s11_crypto_momentum/service.py`).
+> - If adding functionality to an existing S01-S10 service, continue using the current path (e.g., `services/s05_risk_manager/` stays until the refactor) but ensure that new contracts (Pydantic models, ZMQ topics, Redis keys) include `strategy_id` where the Charter requires it, and reference the Charter section that motivates the change.
+>
+> Migration from current topology to target topology is scheduled in **Document 3 (PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md, pending authoring)**.
+>
+> **Binding precedence**: When CLAUDE.md and the Charter conflict, the Charter prevails for architectural decisions; CLAUDE.md prevails for code-convention rules (forbidden patterns, mandatory types, testing gates). No conflict is expected in practice because they operate on different levels.
+
+---
+
 ## 1. What this system is
 
 APEX is an autonomous quantitative trading engine targeting maximum alpha generation

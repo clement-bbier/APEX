@@ -1,5 +1,7 @@
 # ADR-0003: Universal Data Schema Design Decisions
 
+> *Note (2026-04-18): This ADR continues to govern its respective subsystem. See [APEX Multi-Strat Charter](../strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md) §12.4 for the inventory of existing and anticipated ADRs in the multi-strat context.*
+
 **Status:** Accepted
 **Date:** 2026-04-10
 **Context:** Phase 2.1 — Universal Data Infrastructure
