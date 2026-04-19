@@ -1248,7 +1248,7 @@ The strategy microservice's pod-health is observed continuously:
 - Memory growth stable (no leaks)
 - CPU usage within budget (per-pod CPU target: < 50% of allocated cores at 1-minute average)
 
-A single pod crash during paper does **not** automatically fail Gate 3 — but the cause is investigated, fixed, and the paper period restarts (the 8-week clock resets) per Charter §7.3 ("zero pod crash" criterion). If three or more crashes occur within the paper period, the strategy returns to Gate 2 for stability hardening.
+A single pod crash during paper does **not** automatically fail Gate 3 — but the cause is investigated, fixed, and the paper period restarts (the 8-week clock resets) per Charter §7.3 ("zero pod crash" criterion). The reset is explicit: the 8-week clock restarts from the day of the crash post-fix; the "zero pod crash" criterion in §5.3 measures zero crashes during the **final valid 8-week window**, not zero crashes across all paper attempts. Upstream resets are permitted. However, **three resets within the same paper trading attempt** (i.e., three crashes triggering three clock resets) is itself a stability failure — the strategy returns to Gate 2 for stability hardening, with a documented root-cause analysis required in the Gate 2 re-entry PR.
 
 ### 5.3 Deliverables required for Gate 3 PASS
 
@@ -1260,7 +1260,7 @@ All criteria from Charter §7.3 must be satisfied simultaneously across the pape
 | Paper Sharpe | **> 0.8** over the full paper period | `full_report` over paper trade list |
 | Paper max DD | **< 10%** | `full_report["max_drawdown"]` |
 | Win rate consistent with backtest | **±10%** vs backtest baseline | Drift detector baseline vs paper actual |
-| Pod crashes | **Zero** during the period | Pod health log; no container restarts; no heartbeat misses > 60s |
+| Pod crashes | **Zero** during the period | Pod health log; no container restarts during the final valid 8-week window (upstream resets permitted per §5.2.4, limit 3); no heartbeat misses > 60s |
 | Observability | **Green** | All dashboard panels functional, no alerting anomalies, drift baseline captured |
 
 #### 5.3.1 Paper Sharpe note
@@ -1764,6 +1764,46 @@ The semi-annual review is documented as a formal session entry in `docs/claude_m
 
 This section operationalizes Charter §8.1.1. For each soft CB trigger, it specifies what happens mechanically, what the operator checks, and the recovery protocol.
 
+### 8.0 StrategyHealthCheck state machine (canonical specification)
+
+The `StrategyHealthCheck` is STEP 3 of the VETO chain (Charter §8.2). Per-strategy, it tracks the strategy's operational state. Every `OrderCandidate` from a strategy passes through STEP 3, which consults the strategy's current state and either ALLOWS the candidate forward to STEP 4 or REJECTS with a `BlockReason`.
+
+This subsection defines the canonical state machine that all strategy microservices inherit. Implementation lives at `services/portfolio/risk_manager/strategy_health_check.py` (post-multi-strat-lift Phase B; until then, the state is tracked in Redis keys `strategy_health:<strategy_id>:state`).
+
+**States** (enum):
+
+| State | Semantics | STEP 3 behavior |
+|---|---|---|
+| `HEALTHY` | Normal operation; Kelly at nominal value | ALLOW |
+| `DD_KELLY_ADJUSTED` | Kelly reduced (× 0.5 per §8.1, or × 0.75 per §8.4); strategy continues trading at adjusted sizing | ALLOW (downstream sizing applies the adjustment) |
+| `PAUSED_24H` | 24-hour pause active per §8.2 (DD > 12% / 24h); orders blocked; existing positions managed | REJECT with `BlockReason.STRATEGY_PAUSED`, until `pause_until` timestamp elapses |
+| `PAUSED_OPERATIONAL` | Pod crash or heartbeat miss per §8.5; orders blocked; requires manual clear | REJECT with `BlockReason.STRATEGY_OPERATIONAL_HALT`, until manual state clear |
+| `REVIEW_MODE` | DD > 15% / 72h per §8.3, or Rule #1/#2 per §10.1/§10.2; allocator floors at 5%; 90-day CIO decision window active | ALLOW (strategy continues to trade at floored allocation) |
+| `DECOMMISSIONED` | Terminal state; strategy no longer active per §10 | REJECT with `BlockReason.STRATEGY_DECOMMISSIONED` permanently |
+
+**Allowed transitions**:
+
+| From | To | Trigger | Authority |
+|---|---|---|---|
+| `HEALTHY` | `DD_KELLY_ADJUSTED` | §8.1 (DD 8%/24h) or §8.4 (win rate) | Automatic |
+| `HEALTHY` | `PAUSED_24H` | §8.2 (DD 12%/24h) | Automatic |
+| `HEALTHY` | `PAUSED_OPERATIONAL` | §8.5 (crash or heartbeat > 60s) | Automatic |
+| `HEALTHY` | `REVIEW_MODE` | §8.3 (DD 15%/72h), or §10.1/§10.2 (Rules #1/#2) | Automatic |
+| `DD_KELLY_ADJUSTED` | `HEALTHY` | §8.1.3 recovery (clean 24h window) | Manual (CIO) |
+| `DD_KELLY_ADJUSTED` | `PAUSED_24H` | Further DD to 12% within 24h | Automatic |
+| `DD_KELLY_ADJUSTED` | `REVIEW_MODE` | Further DD to 15% / 72h | Automatic |
+| `PAUSED_24H` | `HEALTHY` or `DD_KELLY_ADJUSTED` | `pause_until` elapsed + manual review | Manual (CIO) |
+| `PAUSED_24H` | `PAUSED_24H` (extended) | CIO extends per §8.2.2 | Manual (CIO) |
+| `PAUSED_24H` | `REVIEW_MODE` | CIO escalation per §8.2.2 | Manual (CIO) |
+| `PAUSED_OPERATIONAL` | `HEALTHY` | §8.5.2 manual recovery | Manual (CIO) |
+| `REVIEW_MODE` | `HEALTHY` | §8.3.3 CIO clear within 90 days | Manual (CIO) |
+| `REVIEW_MODE` | `DECOMMISSIONED` | §8.3.4 90-day deadline elapse, OR CIO decommission before deadline per §10.3 | Automatic (at deadline) OR Manual (CIO) |
+| `HEALTHY` or any non-terminal | `DECOMMISSIONED` | Rules #4/#5 auto-triggers (§10.4/§10.5) OR Rule #6 CIO discretionary (§10.6) | Automatic OR Manual (CIO) |
+
+**Persistence**: Each strategy's current state is persisted in Redis at `strategy_health:<strategy_id>:state`; transitions are logged to structlog with event `strategy_health.transition` carrying `{from, to, trigger, timestamp}`. The dashboard subscribes and surfaces current state per strategy.
+
+**Implementation note**: Until the multi-strat infrastructure lift Phase B lands `services/portfolio/risk_manager/strategy_health_check.py`, the state machine is implemented inside the current `services/s05_risk_manager/chain_orchestrator.py` STEP 3 handler; the Redis key namespace is already established (per Charter §5.5 per-strategy partitioning).
+
 ### 8.1 Strategy DD > 8% / 24h → Kelly × 0.5
 
 #### 8.1.1 Mechanical sequence
@@ -2219,8 +2259,10 @@ This is the canonical checklist for all decommissioning paths (Rules #1/#2 → #
 
 #### 10.4.1 Trigger detection
 
-- The feedback loop tracks each strategy's peak-equity since inception (its lifetime cumulative PnL high).
-- If current equity drops below 80% of inception-peak, the trigger fires.
+- The feedback loop tracks each strategy's **running peak equity** since inception: `running_peak[t] = max(equity[0..t])`.
+- The current drawdown from running peak is computed continuously: `dd_running[t] = (running_peak[t] - equity[t]) / running_peak[t]`.
+- If `dd_running[t] >= 0.20` (equivalently, `equity[t] / running_peak[t] <= 0.80`), the trigger fires.
+- **Note**: this is NOT measured against inception equity; it is measured against the rolling maximum. A strategy that starts at $100k, rises to $150k, then drops to $120k registers an immediate 20% trigger (150 → 120 = -20%) even though equity remains above $100k inception.
 
 #### 10.4.2 Auto-decommission semantics
 
@@ -2540,7 +2582,7 @@ This section operationalizes Charter §13.7. Each role's lifecycle responsibilit
 
 - Tune strategy parameters during live operation (Gate 2 ratifies parameters; mid-life tuning requires re-entry to Gate 2).
 - Override the allocator's Risk Parity weights (allocator output is binding; overrides happen only via Charter amendment).
-- Override decommissioning Rules #1–#5 (mechanical rules cannot be discretionary-blocked; Rule #6 provides the discretionary path *toward* decommission, not *against* it).
+- Override **auto-decommission** Rules #3, #4, #5 (Rules #3/#4/#5 are mechanical auto-triggers and cannot be blocked by CIO discretion; they execute the decommission regardless of CIO preference). Rules #1 and #2 route the strategy to `review_mode` (not direct decommission); the CIO retains discretion to clear `review_mode` at any point during the 90-day window per §8.3.3, which effectively blocks the decommission path if the CIO so chooses. Rule #6 provides the CIO's discretionary decommission path; its counterpart (discretionary **anti-decommission**) does not exist for Rules #3/#4/#5.
 - Skip stages in the four-gate lifecycle (every candidate transits all four gates per Charter §11.5).
 
 ### 14.2 Head of Strategy Research (Claude Opus 4.7, claude.ai)
