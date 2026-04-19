@@ -134,9 +134,9 @@ APEX does not claim equivalence with these firms. It claims to inherit their **s
 
 The Charter binds the platform to three measurable outcomes, aligned with the three-level benchmark ladder formalized in §10:
 
-1. **Months 0–6 — Survival.** Deploy the infrastructure lift, achieve the Survival benchmark (net annualized return > 15%, Sharpe > 1.0, max DD < 15%, simultaneously) on the first boot strategy in paper trading. Avoid catastrophic engineering mistakes.
-2. **Months 6–12 — Legitimacy.** Live-micro deploy the first two strategies. Achieve the Legitimacy benchmark (alpha > 10% annualized vs equal-weight BTC+ETH+SPY, beta < 0.5, Sharpe > 1.5). Prove that the multi-strategy architecture generates measurable value beyond passive exposure.
-3. **Months 12–24 — Institutional.** Live-trade at least three uncorrelated strategies under the Risk-Parity-plus-Sharpe-overlay allocator. Achieve the Institutional benchmark (net Sharpe > 2.0 over rolling 12 months, max DD < 10%, cross-strategy correlation < 0.3). Establish platform credibility such that the sixth boot strategy and any new candidates slot in without rework.
+1. **Months 0–9 — Survival.** Execute the multi-strat infrastructure lift, develop and validate Strategy #1 (Crypto Momentum), achieve the Survival benchmark (net annualized return > 15%, Sharpe > 1.0, max DD < 15%, simultaneously) on Strategy #1 in paper trading. Avoid catastrophic engineering mistakes.
+2. **Months 9–15 — Legitimacy.** Live-micro deploy Strategy #1; develop and deploy Strategy #2 (Trend Following multi-asset) through paper to live. Achieve the Legitimacy benchmark (alpha > 10% annualized vs equal-weight BTC+ETH+SPY, beta < 0.5, Sharpe > 1.5) on the combined live portfolio. Prove that the multi-strategy architecture generates measurable value beyond passive exposure.
+3. **Months 15–24 — Institutional.** Live-trade at least three uncorrelated strategies under the Risk-Parity-plus-Sharpe-overlay allocator. Achieve the Institutional benchmark (net Sharpe > 2.0 over rolling 12 months, max DD < 10%, cross-strategy correlation < 0.3). Establish platform credibility such that the sixth boot strategy and any new candidates slot in without rework.
 
 These outcomes are targets, not guarantees. Markets may not cooperate. The Charter's job is not to promise them but to **ensure that, if the edges are real, the platform converts them into compounding cash**, and that, if the edges are not real, the platform detects this cleanly and reallocates capital before damage compounds.
 
@@ -446,9 +446,9 @@ APEX implements a simplified single-name (not pairs-based) version: identify sho
 - VWAP deviation — `(price - vwap) / session_ATR`.
 - OFI — for entry filtration (only enter mean-reversion against imbalanced flow).
 - Realized volatility (1-day HAR-RV) — for position sizing.
-- GEX-adjusted pinning level (where available) — implemented in [features/calculators/gex.py](../../features/calculators/gex.py) — as a reinforcement signal near OpEx.
+- [Phase 2 optional] GEX-adjusted pinning level — implemented in [features/calculators/gex.py](../../features/calculators/gex.py) — as a reinforcement signal near OpEx. Requires options-chain data (CBOE DataShop ~$200/month, ORATS ~$300/month, or Polygon Options ~$199/month); NOT included in boot configuration. Strategy #3 operates at full intended edge without GEX; this feature is a Phase 2 enhancement evaluated only if live evidence shows GEX would add statistically significant alpha justifying the data subscription cost.
 
-**Data sources.** Alpaca (US equity ticks, L1 quotes, 1min bars), Yahoo (daily bars for volatility normalization), optional Polygon.io for enriched L2 (~$29-79/month, optional Phase 2 upgrade). Cost: **$0/month** at boot; upgrade to **~$50/month** for enriched L2 if Strategy #3 validates.
+**Data sources.** Alpaca (US equity ticks, L1 quotes, 1min bars), Yahoo (daily bars for volatility normalization). Optional Phase 2 upgrades: Polygon.io for enriched L2 (~$29-79/month); CBOE DataShop / ORATS / Polygon Options for GEX (~$200-300/month) — only if live validation justifies. Cost at boot: **$0/month**.
 
 **Budget inheritance.** Low Vol category: max DD 8%, min Sharpe 1.0, max leverage 1×. This is the tightest budget of the six strategies, reflecting the relatively high Sharpe expectation and low DD tolerance of a liquidity-provision strategy in liquid equities.
 
@@ -747,13 +747,13 @@ The existing `supervisor/orchestrator.py` continues to handle ordered startup an
 ```
 1.  Redis
 2.  ZMQ broker (XSUB/XPUB)
-3.  services/ops/monitor_dashboard/         (observe startup itself)
+3.  services/ops/monitor_dashboard/          (observe startup itself)
 4.  services/data/ingestion/
-5.  services/data/panels/                   (NEW)
-6.  services/signal/quant_analytics/
-7.  services/data/macro_intelligence/
-8.  services/signal/engine/                  (legacy confluence as StrategyRunner)
-9.  services/signal/regime_detector/
+5.  services/data/panels/                    (NEW)
+6.  services/data/macro_intelligence/        (data-domain cluster complete)
+7.  services/signal/quant_analytics/
+8.  services/signal/regime_detector/
+9.  services/signal/engine/                  (legacy confluence as StrategyRunner)
 10. services/signal/fusion/                  (per-strategy fusion)
 11. services/portfolio/strategy_allocator/   (NEW)
 12. services/portfolio/risk_manager/
@@ -763,6 +763,8 @@ The existing `supervisor/orchestrator.py` continues to handle ordered startup an
 16. services/strategies/trend_following/     (deploy when Strategy #2 passes Gate 2)
 …   (strategies added as they clear gates)
 ```
+
+This ordering clusters by domain: all `data/` services (steps 4–6) start consecutively before any `signal/` service, all `signal/` services (steps 7–10) complete before `portfolio/` (steps 11–12), and `execution/` (step 13) and `research/` (step 14) follow. Strategy microservices deploy last (step 15+) as each clears its gates. `ops/monitor_dashboard/` starts at step 3 to observe the rest of the startup sequence itself.
 
 Existing supervisor health-check semantics (5-second ping cadence, auto-restart, watchdog escalation) are preserved.
 
@@ -1386,10 +1388,10 @@ All three must hold simultaneously.
 
 | Month | Active strategies | Benchmark target | Allocator |
 |---|---|---|---|
-| 0–6 | 1 (Crypto Momentum paper) | Survival in paper | None (100% Strategy #1 in paper) |
-| 6–12 | 1–2 live (Crypto Momentum, Trend Following) | Survival in live micro; Legitimacy on 12M rolling | Phase 1 Risk Parity |
-| 12–18 | 3–4 live | Legitimacy; approaching Institutional | Phase 1 → Phase 2 Sharpe overlay (if data supports) |
-| 18–24 | 4–6 live | Institutional | Phase 2 Sharpe overlay; regime-conditional variants under research |
+| 0–9 | 1 (Crypto Momentum paper) | Survival in paper | None (100% Strategy #1 in paper) |
+| 9–15 | 1–2 live (Crypto Momentum, Trend Following) | Survival in live micro; Legitimacy on rolling basis | Phase 1 Risk Parity |
+| 15–20 | 3–4 live | Legitimacy; approaching Institutional | Phase 1 → Phase 2 Sharpe overlay (if data supports) |
+| 20–24 | 4–6 live | Institutional | Phase 2 Sharpe overlay; regime-conditional variants under research |
 
 These are *targets*, not *promises*. Markets will push some strategies forward faster than others; some strategies will fail Gate 2 and be returned to research. The Charter's job is to encode the framework within which the unpredictable details resolve — not to pretend the unpredictable is scheduled.
 
@@ -1647,7 +1649,7 @@ Upon merge:
 
 | Version | Date | Change |
 |---|---|---|
-| v1.0-draft | 2026-04-19 | Initial draft authored in the docs/strategy-charter-document-1 branch. Awaiting CIO review and ratification. |
+| v1.0-draft | 2026-04-18 | Initial draft authored in the docs/strategy-charter-document-1 branch, encoding Q1–Q8 decisions from the 2026-04-18 CIO interview. Awaiting CIO review and ratification. |
 
 ---
 
