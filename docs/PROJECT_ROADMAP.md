@@ -1,3 +1,13 @@
+> **⚠️ SUPERSEDED on 2026-04-20**
+>
+> This document is no longer the active source of truth. It is retained for historical reference.
+>
+> **Active replacement**: [`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`](phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md)
+>
+> Any work referencing this document should be re-anchored against the active replacement. If this file's content appears to conflict with the active replacement, the active replacement prevails.
+
+---
+
 # APEX / CashMachine — Project Roadmap
 
 **Source of truth for project state, planning, and execution.**

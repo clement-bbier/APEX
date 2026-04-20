@@ -1627,13 +1627,13 @@ Each semi-annual review produces a session entry in [`docs/claude_memory/SESSION
 
 This section contains **summaries** of the four ADRs authored alongside this Roadmap. Full authoritative content lives in standalone ADR files per Charter §12.4 commitment.
 
-**PATH NOTE — POST-MERGE MANUAL ACTION REQUIRED**: the four ADR files were authored at `docs/adr_pending_roadmap_v3/` rather than the canonical `docs/adr/` because a path-protection hook on the authoring session blocked `Write`/`Edit` operations against `docs/adr/`. On Roadmap v3.0 ratification merge, the CIO **manually moves** the four files from `docs/adr_pending_roadmap_v3/` to `docs/adr/` (simple `git mv` + commit; one-time action). After the move, Roadmap §10 and §14.2 link paths are updated in Roadmap v3.1 (non-material amendment per §15.3). See §16.1 for the post-merge checklist.
+**PATH NOTE — POST-MERGE MANUAL ACTION REQUIRED**: the four ADR files were authored at `docs/adr/` rather than the canonical `docs/adr/` because a path-protection hook on the authoring session blocked `Write`/`Edit` operations against `docs/adr/`. On Roadmap v3.0 ratification merge, the CIO **manually moves** the four files from `docs/adr/` to `docs/adr/` (simple `git mv` + commit; one-time action). After the move, Roadmap §10 and §14.2 link paths are updated in Roadmap v3.1 (non-material amendment per §15.3). See §16.1 for the post-merge checklist.
 
 Per Playbook §0.6 and Charter §12.4, ADRs prevail over the Roadmap for their technical surface. The Roadmap embeds summaries here for reference; the standalone ADR files are the authoritative source on merge (and re-move).
 
 ### 10.1 ADR-0007 — Strategy as Microservice
 
-Full content in [`docs/adr_pending_roadmap_v3/ADR-0007-strategy-as-microservice.md`](../adr_pending_roadmap_v3/ADR-0007-strategy-as-microservice.md) (→ `docs/adr/ADR-0007-strategy-as-microservice.md` post-merge move). Summary of the binding decisions:
+Full content in [`docs/adr/ADR-0007-strategy-as-microservice.md`](../adr/ADR-0007-strategy-as-microservice.md) (→ `docs/adr/ADR-0007-strategy-as-microservice.md` post-merge move). Summary of the binding decisions:
 
 - **D1**: Each strategy is a complete, isolated microservice under `services/strategies/<strategy_id>/`.
 - **D2**: `StrategyRunner` ABC lives at `services/strategies/_base.py` (Option B of §3.2.1).
@@ -1643,7 +1643,7 @@ Full content in [`docs/adr_pending_roadmap_v3/ADR-0007-strategy-as-microservice.
 
 ### 10.2 ADR-0008 — Capital Allocator Topology
 
-Full content in [`docs/adr_pending_roadmap_v3/ADR-0008-capital-allocator-topology.md`](../adr_pending_roadmap_v3/ADR-0008-capital-allocator-topology.md) (→ `docs/adr/ADR-0008-capital-allocator-topology.md` post-merge move). Summary of the binding decisions:
+Full content in [`docs/adr/ADR-0008-capital-allocator-topology.md`](../adr/ADR-0008-capital-allocator-topology.md) (→ `docs/adr/ADR-0008-capital-allocator-topology.md` post-merge move). Summary of the binding decisions:
 
 - **D1**: Allocator is a dedicated microservice at `services/portfolio/strategy_allocator/`, separate from Fusion Engine and Risk Manager.
 - **D2**: Phase 1 is diagonal-covariance Risk Parity (`w_i ∝ 1/σ_i`) per Charter §6.1; 60-day rolling sigma window; weekly Sunday-23:00-UTC rebalance.
@@ -1654,7 +1654,7 @@ Full content in [`docs/adr_pending_roadmap_v3/ADR-0008-capital-allocator-topolog
 
 ### 10.3 ADR-0009 — Panel Builder Discipline
 
-Full content in [`docs/adr_pending_roadmap_v3/ADR-0009-panel-builder-discipline.md`](../adr_pending_roadmap_v3/ADR-0009-panel-builder-discipline.md) (→ `docs/adr/ADR-0009-panel-builder-discipline.md` post-merge move). Summary of the binding decisions:
+Full content in [`docs/adr/ADR-0009-panel-builder-discipline.md`](../adr/ADR-0009-panel-builder-discipline.md) (→ `docs/adr/ADR-0009-panel-builder-discipline.md` post-merge move). Summary of the binding decisions:
 
 - **D1**: `services/data/panels/` microservice aggregates raw ticks/bars into multi-asset `PanelSnapshot` objects per universe.
 - **D2**: Every strategy consumes panels via `on_panel(PanelSnapshot)` — not raw ticks, with a transitional `on_tick` path preserved during Phase B–D overlap.
@@ -1664,7 +1664,7 @@ Full content in [`docs/adr_pending_roadmap_v3/ADR-0009-panel-builder-discipline.
 
 ### 10.4 ADR-0010 — Target Topology Reorganization
 
-Full content in [`docs/adr_pending_roadmap_v3/ADR-0010-target-topology-reorganization.md`](../adr_pending_roadmap_v3/ADR-0010-target-topology-reorganization.md) (→ `docs/adr/ADR-0010-target-topology-reorganization.md` post-merge move). Summary of the binding decisions:
+Full content in [`docs/adr/ADR-0010-target-topology-reorganization.md`](../adr/ADR-0010-target-topology-reorganization.md) (→ `docs/adr/ADR-0010-target-topology-reorganization.md` post-merge move). Summary of the binding decisions:
 
 - **D1**: Target topology is classification by domain per Charter §5.4: `services/{data,signal,portfolio,execution,research,ops,strategies}/`.
 - **D2**: Full mapping table of S01–S10 → target paths (§5.5 of this Roadmap; ADR-0010 §3).
@@ -1972,10 +1972,10 @@ Engineers opening an issue for any of these sub-phases continue to reference PHA
 - [ADR-0004](../adr/ADR-0004-feature-validation-methodology.md) — Feature Validation Methodology. Unchanged; referenced in Gate 1/2.
 - [ADR-0005](../adr/ADR-0005-meta-labeling-fusion-methodology.md) — Meta-Labeling Fusion. Unchanged; per-strategy meta-labeler cards in Phase C §4.2.2 STEP 4.
 - [ADR-0006](../adr/ADR-0006-fail-closed-risk-controls.md) — Fail-Closed Risk Controls. Unchanged; STEP 0 of the 7-step chain.
-- **ADR-0007** (§10.1) — Strategy as Microservice. **NEW**, authored here; file at `docs/adr_pending_roadmap_v3/` pending post-merge move to `docs/adr/` per §16.1.
-- **ADR-0008** (§10.2) — Capital Allocator Topology. **NEW**, authored here; file at `docs/adr_pending_roadmap_v3/` pending post-merge move to `docs/adr/` per §16.1.
-- **ADR-0009** (§10.3) — Panel Builder Discipline. **NEW**, authored here; file at `docs/adr_pending_roadmap_v3/` pending post-merge move to `docs/adr/` per §16.1.
-- **ADR-0010** (§10.4) — Target Topology Reorganization. **NEW**, authored here; file at `docs/adr_pending_roadmap_v3/` pending post-merge move to `docs/adr/` per §16.1.
+- **ADR-0007** (§10.1) — Strategy as Microservice. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
+- **ADR-0008** (§10.2) — Capital Allocator Topology. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
+- **ADR-0009** (§10.3) — Panel Builder Discipline. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
+- **ADR-0010** (§10.4) — Target Topology Reorganization. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
 
 ### 14.3 CLAUDE.md and MANIFEST.md
 
@@ -2093,19 +2093,19 @@ This Roadmap is proposed for ratification as of **2026-04-20** and expected to b
 
 After Roadmap v3.0 ratification merge, the CIO executes the following manual actions because the authoring session was blocked by a path-protection hook on `docs/adr/`:
 
-1. **Move the four ADR files from `docs/adr_pending_roadmap_v3/` to `docs/adr/`**:
+1. **Move the four ADR files from `docs/adr/` to `docs/adr/`**:
 
    ```bash
-   git mv docs/adr_pending_roadmap_v3/ADR-0007-strategy-as-microservice.md       docs/adr/ADR-0007-strategy-as-microservice.md
-   git mv docs/adr_pending_roadmap_v3/ADR-0008-capital-allocator-topology.md     docs/adr/ADR-0008-capital-allocator-topology.md
-   git mv docs/adr_pending_roadmap_v3/ADR-0009-panel-builder-discipline.md       docs/adr/ADR-0009-panel-builder-discipline.md
-   git mv docs/adr_pending_roadmap_v3/ADR-0010-target-topology-reorganization.md docs/adr/ADR-0010-target-topology-reorganization.md
-   rmdir docs/adr_pending_roadmap_v3/
+   git mv docs/adr/ADR-0007-strategy-as-microservice.md       docs/adr/ADR-0007-strategy-as-microservice.md
+   git mv docs/adr/ADR-0008-capital-allocator-topology.md     docs/adr/ADR-0008-capital-allocator-topology.md
+   git mv docs/adr/ADR-0009-panel-builder-discipline.md       docs/adr/ADR-0009-panel-builder-discipline.md
+   git mv docs/adr/ADR-0010-target-topology-reorganization.md docs/adr/ADR-0010-target-topology-reorganization.md
+   rmdir docs/adr/
    git commit -m "docs(adr): move ADR-0007/8/9/10 into canonical docs/adr/ (post Roadmap v3.0 merge)"
    git push origin main
    ```
 
-2. **Update Roadmap §10 and §14.2 link paths** (this file) to reference `docs/adr/` instead of `docs/adr_pending_roadmap_v3/`. This is a **non-material amendment** per §15.3 (link correction); no version bump required. A single follow-up PR titled `docs(phases): update Roadmap v3.0 ADR link paths after adr-directory move` suffices. The amendment is logged as a cosmetic entry in §17 Changelog.
+2. **Update Roadmap §10 and §14.2 link paths** (this file) to reference `docs/adr/` instead of `docs/adr/`. This is a **non-material amendment** per §15.3 (link correction); no version bump required. A single follow-up PR titled `docs(phases): update Roadmap v3.0 ADR link paths after adr-directory move` suffices. The amendment is logged as a cosmetic entry in §17 Changelog.
 
 3. **Remove the "PATH NOTE" and "POST-MERGE MANUAL ACTION REQUIRED" banners** from Roadmap §10 preamble, §14.2 ADR bullets, and this §16.1 subsection in the same follow-up PR. Their purpose (flagging the pending move) is extinguished once the move is done.
 
