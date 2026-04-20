@@ -181,12 +181,23 @@ class Signal(BaseModel):
     def validate_strategy_id(cls, v: str) -> str:
         """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
 
-        Empty strings, whitespace, forward/backslashes and quote characters are
-        rejected because strategy_id is interpolated into ZMQ topics
-        (`signal.technical.{strategy_id}.{symbol}` per Charter §5.5), Redis keys
-        (`kelly:{strategy_id}:{symbol}` et al. per ADR-0007 §D6) and filesystem
-        paths (`services/strategies/{strategy_id}/` per ADR-0007 §D2). Length is
-        capped at 64 to keep Redis key lengths bounded.
+        At Phase A.1, ``strategy_id`` is carried as metadata on the Signal
+        contract but the downstream consumers still use the legacy single-
+        strategy form: ZMQ publishes on ``signal.technical.{SYMBOL}``
+        (``core.topics.Topics.signal``) and Kelly stats live at
+        ``kelly:{symbol}`` / ``feedback:kelly_stats:{strategy_key}``
+        (``services/s04_fusion_engine/kelly_sizer.py``). Phase A.4 introduces
+        ``Topics.signal_for(strategy_id, symbol)`` →
+        ``signal.technical.{strategy_id}.{symbol}`` and Phase A.5+ rewrites
+        the Redis keys to ``kelly:{strategy_id}:{symbol}`` per Charter §5.5
+        and ADR-0007 §D6/D7; filesystem paths follow
+        ``services/strategies/{strategy_id}/`` per ADR-0007 §D2.
+
+        The validator enforces the structural constraints required by those
+        future consumers **now**, so no invalid identifier can enter the
+        pipeline before the downstream code flips over. Empty strings,
+        whitespace, forward/backslashes and quote characters are rejected,
+        and length is capped at 64 to keep Redis key lengths bounded.
         """
         if not v:
             raise ValueError("strategy_id must be non-empty")

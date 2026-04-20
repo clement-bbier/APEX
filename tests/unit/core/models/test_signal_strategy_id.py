@@ -14,6 +14,7 @@ Covers Phase A §2.2.1 / Charter §5.5 / ADR-0007 §D6:
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Any
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -25,7 +26,7 @@ from core.models.signal import Direction, Signal
 
 def _make_signal(**overrides: object) -> Signal:
     """Build a minimally valid long-direction Signal, with optional overrides."""
-    defaults: dict[str, object] = {
+    defaults: dict[str, Any] = {
         "signal_id": "sig-001",
         "symbol": "BTCUSDT",
         "timestamp_ms": 1_700_000_000_000,
@@ -36,7 +37,7 @@ def _make_signal(**overrides: object) -> Signal:
         "take_profit": [Decimal("105"), Decimal("110")],
     }
     defaults.update(overrides)
-    return Signal(**defaults)  # type: ignore[arg-type]
+    return Signal(**defaults)
 
 
 # ── Defaults and preservation ────────────────────────────────────────────────
@@ -69,7 +70,7 @@ class TestStrategyIdFrozen:
     def test_mutation_raises(self) -> None:
         sig = _make_signal(strategy_id="crypto_momentum")
         with pytest.raises(ValidationError):
-            sig.strategy_id = "trend_following"  # type: ignore[misc]
+            sig.__setattr__("strategy_id", "trend_following")
 
 
 # ── Validator rejection cases ────────────────────────────────────────────────
