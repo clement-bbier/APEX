@@ -1,8 +1,9 @@
-"""Tests for KellySizer.get_rolling_stats_from_redis."""
+"""Tests for KellySizer.get_rolling_stats_from_redis and dual-read get_stats."""
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from typing import Any
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -114,3 +115,96 @@ class TestKellyGetStats:
         state.get.return_value = None
         await self.sizer().get_stats(state, "AAPL")
         state.get.assert_called_with("kelly:AAPL")
+
+
+class TestKellyDualRead:
+    """Dual-read migration (Roadmap v3.0 section 2.2.5, ADR-0007 section D9).
+
+    get_stats reads kelly:{strategy_id}:{symbol} first, falls back to the
+    legacy kelly:{symbol} key on miss, and emits a structlog WARNING whenever
+    the legacy path is hit so residual dependency is observable.
+    """
+
+    def sizer(self) -> KellySizer:
+        return KellySizer()
+
+    @staticmethod
+    def _keyed_state(store: dict[str, Any]) -> AsyncMock:
+        """Build an AsyncMock StateStore backed by an in-memory dict."""
+        state = AsyncMock()
+
+        async def _get(key: str) -> Any | None:
+            return store.get(key)
+
+        state.get.side_effect = _get
+        return state
+
+    @pytest.mark.asyncio
+    async def test_new_key_hit_no_fallback(self) -> None:
+        store = {"kelly:default:BTCUSDT": {"win_rate": 0.60, "avg_rr": 2.0}}
+        state = self._keyed_state(store)
+        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+            win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
+        assert win_rate == pytest.approx(0.60)
+        assert avg_rr == pytest.approx(2.0)
+        state.get.assert_awaited_once_with("kelly:default:BTCUSDT")
+        mock_log.warning.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_legacy_key_fallback_warns(self) -> None:
+        store = {"kelly:BTCUSDT": {"win_rate": 0.55, "avg_rr": 1.8}}
+        state = self._keyed_state(store)
+        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+            win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
+        assert win_rate == pytest.approx(0.55)
+        assert avg_rr == pytest.approx(1.8)
+        assert state.get.await_count == 2
+        state.get.assert_any_await("kelly:default:BTCUSDT")
+        state.get.assert_any_await("kelly:BTCUSDT")
+        mock_log.warning.assert_called_once()
+        call_args = mock_log.warning.call_args
+        assert call_args.args[0] == "kelly_sizer.legacy_key_fallback"
+        assert call_args.kwargs["strategy_id"] == "default"
+        assert call_args.kwargs["symbol"] == "BTCUSDT"
+        assert call_args.kwargs["legacy_key"] == "kelly:BTCUSDT"
+        assert call_args.kwargs["new_key"] == "kelly:default:BTCUSDT"
+
+    @pytest.mark.asyncio
+    async def test_new_key_wins_when_both_present(self) -> None:
+        store = {
+            "kelly:default:BTCUSDT": {"win_rate": 0.65, "avg_rr": 2.5},
+            "kelly:BTCUSDT": {"win_rate": 0.40, "avg_rr": 1.2},
+        }
+        state = self._keyed_state(store)
+        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+            win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
+        assert win_rate == pytest.approx(0.65)
+        assert avg_rr == pytest.approx(2.5)
+        state.get.assert_awaited_once_with("kelly:default:BTCUSDT")
+        mock_log.warning.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_both_missing_returns_defaults(self) -> None:
+        state = self._keyed_state({})
+        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+            win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
+        assert win_rate == 0.5
+        assert avg_rr == 1.5
+        assert state.get.await_count == 2
+        mock_log.warning.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_non_default_strategy_id_fallback(self) -> None:
+        store = {"kelly:BTCUSDT": {"win_rate": 0.58, "avg_rr": 1.9}}
+        state = self._keyed_state(store)
+        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+            win_rate, avg_rr = await self.sizer().get_stats(
+                state, "BTCUSDT", strategy_id="crypto_momentum"
+            )
+        assert win_rate == pytest.approx(0.58)
+        assert avg_rr == pytest.approx(1.9)
+        state.get.assert_any_await("kelly:crypto_momentum:BTCUSDT")
+        state.get.assert_any_await("kelly:BTCUSDT")
+        mock_log.warning.assert_called_once()
+        assert mock_log.warning.call_args.kwargs["strategy_id"] == "crypto_momentum"
+        assert mock_log.warning.call_args.kwargs["new_key"] == "kelly:crypto_momentum:BTCUSDT"

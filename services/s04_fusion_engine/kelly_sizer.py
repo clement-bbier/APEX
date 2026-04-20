@@ -21,9 +21,14 @@ _logger = structlog.get_logger(__name__)
 class KellySizer:
     """Compute Kelly-optimal position sizes from live trade statistics.
 
-    Statistics are stored in Redis under the key ``kelly:{symbol}`` as a
-    JSON object with fields ``win_rate`` and ``avg_rr``.  If the key is
-    absent the safe defaults ``win_rate=0.5``, ``avg_rr=1.5`` are used.
+    Statistics are stored in Redis under the per-strategy key
+    ``kelly:{strategy_id}:{symbol}`` (primary) with a fallback read from the
+    legacy single-strategy key ``kelly:{symbol}`` during the Phase A migration
+    window (Roadmap v3.0 §2.2.5, ADR-0007 §D9). If neither key is present the
+    safe defaults ``win_rate=0.5``, ``avg_rr=1.5`` are used.
+
+    The writer-side migration (s09 FeedbackLoop) lands in a follow-up ticket;
+    this class is reader-side only.
     """
 
     # ── Statistics ────────────────────────────────────────────────────────────
@@ -72,19 +77,45 @@ class KellySizer:
         self,
         state: StateStore,
         symbol: str,
+        strategy_id: str = "default",
     ) -> tuple[float, float]:
         """Read win-rate and average risk/reward for ``symbol`` from Redis.
 
+        Dual-read during Phase A migration (Roadmap v3.0 §2.2.5, ADR-0007 §D9):
+        the per-strategy key ``kelly:{strategy_id}:{symbol}`` is tried first,
+        and on miss a fallback read against the legacy ``kelly:{symbol}`` key
+        is performed. Every legacy-path hit emits a structlog WARNING so the
+        residual dependency on the legacy key is observable. When the s09
+        writer migration lands and all legacy stats have aged out, the
+        fallback branch (and this parameter) can be removed.
+
         Args:
-            state:  Connected :class:`~core.state.StateStore` instance.
-            symbol: Uppercase trading symbol.
+            state:       Connected :class:`~core.state.StateStore` instance.
+            symbol:      Uppercase trading symbol.
+            strategy_id: Per-strategy namespace; defaults to ``"default"`` to
+                         preserve pre-migration behavior for existing callers.
 
         Returns:
             ``(win_rate, avg_rr)`` tuple.  Defaults: ``(0.5, 1.5)``.
         """
-        raw: dict[str, Any] | None = await state.get(f"kelly:{symbol}")
+        new_key = f"kelly:{strategy_id}:{symbol}"
+        legacy_key = f"kelly:{symbol}"
+
+        raw: dict[str, Any] | None = await state.get(new_key)
+
         if not isinstance(raw, dict):
-            return 0.5, 1.5
+            legacy_raw: dict[str, Any] | None = await state.get(legacy_key)
+            if not isinstance(legacy_raw, dict):
+                return 0.5, 1.5
+            _logger.warning(
+                "kelly_sizer.legacy_key_fallback",
+                strategy_id=strategy_id,
+                symbol=symbol,
+                legacy_key=legacy_key,
+                new_key=new_key,
+            )
+            raw = legacy_raw
+
         win_rate = float(raw.get("win_rate", 0.5))
         avg_rr = float(raw.get("avg_rr", 1.5))
         # Clamp to sensible ranges.
