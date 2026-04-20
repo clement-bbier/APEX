@@ -126,11 +126,12 @@ _VALID_SYM_CHARS = st.characters(
 def test_signal_for_property_prefix_and_dot_count(strategy_id: str, symbol: str) -> None:
     """Any valid (strategy_id, symbol) yields ``signal.technical.<sid>.<sym>``.
 
-    The result must start with the canonical prefix and have exactly two
-    additional dots (one between prefix and strategy_id, one between
-    strategy_id and symbol). strategy_id and symbol themselves are
-    constrained by hypothesis to alphanumerics + ``_``/``-``, so no
-    extra dots can leak in.
+    The result must start with the canonical prefix ``signal.technical.``.
+    After that prefix is removed, the remaining suffix must contain
+    exactly one dot — the separator between ``strategy_id`` and
+    ``symbol``. ``strategy_id`` and ``symbol`` themselves are constrained
+    by hypothesis to alphanumerics + ``_``/``-``, so no extra dots can
+    leak in.
     """
     topic = Topics.signal_for(strategy_id, symbol)
     assert topic.startswith("signal.technical.")

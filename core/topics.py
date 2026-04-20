@@ -3,7 +3,16 @@
 ALL ZMQ topics must be defined here.
 Services must import from this module — never hardcode topic strings.
 
-Topic convention: {category}.{subcategory}.{identifier}
+Topic convention: hierarchical, dot-delimited segments. The leading two
+segments identify the channel family (``{category}.{subcategory}``), and
+the number of trailing segments varies per channel. Examples:
+
+- 3 segments: ``tick.crypto.BTCUSDT``, ``service.health.s01_data_ingestion``,
+  ``macro.catalyst.FOMC``.
+- 3 segments (legacy, single-strategy): ``signal.technical.BTCUSDT`` —
+  emitted by the deprecated :meth:`Topics.signal` helper.
+- 4 segments (per-strategy, Phase A onwards): ``signal.technical.<strategy_id>.<symbol>``
+  — emitted by :meth:`Topics.signal_for` per Charter §5.5 and ADR-0007 §D7.
 """
 
 from __future__ import annotations
@@ -94,9 +103,10 @@ class Topics:
             Full ZMQ topic string, e.g. ``'signal.technical.BTCUSDT'``.
         """
         warnings.warn(
-            "Topics.signal(symbol) is deprecated; use "
-            "Topics.signal_for(strategy_id, symbol). Legacy caller gets "
-            "strategy_id='default' automatically post Phase B.",
+            "Topics.signal(symbol) is deprecated; migrate callers to "
+            "Topics.signal_for('default', symbol) for the legacy "
+            "single-strategy path. Scheduled for removal once Phase B "
+            "wraps the legacy flow as LegacyConfluenceStrategy.",
             DeprecationWarning,
             stacklevel=2,
         )
@@ -139,27 +149,19 @@ class Topics:
                 f"strategy_id must be a non-empty, non-whitespace string; got {strategy_id!r}"
             )
         if any(c.isspace() for c in strategy_id):
-            raise ValueError(
-                f"strategy_id must not contain whitespace; got {strategy_id!r}"
-            )
+            raise ValueError(f"strategy_id must not contain whitespace; got {strategy_id!r}")
         for forbidden in _STRATEGY_ID_FORBIDDEN_CHARS:
             if forbidden in strategy_id:
-                raise ValueError(
-                    f"strategy_id must not contain {forbidden!r}; got {strategy_id!r}"
-                )
+                raise ValueError(f"strategy_id must not contain {forbidden!r}; got {strategy_id!r}")
         if len(strategy_id) > _STRATEGY_ID_MAX_LEN:
             raise ValueError(
                 f"strategy_id length {len(strategy_id)} exceeds max "
                 f"{_STRATEGY_ID_MAX_LEN}; got {strategy_id!r}"
             )
         if not isinstance(symbol, str) or not symbol or not symbol.strip():
-            raise ValueError(
-                f"symbol must be a non-empty, non-whitespace string; got {symbol!r}"
-            )
+            raise ValueError(f"symbol must be a non-empty, non-whitespace string; got {symbol!r}")
         if any(c.isspace() for c in symbol):
-            raise ValueError(
-                f"symbol must not contain whitespace; got {symbol!r}"
-            )
+            raise ValueError(f"symbol must not contain whitespace; got {symbol!r}")
         return f"signal.technical.{strategy_id}.{symbol.upper()}"
 
     @staticmethod
