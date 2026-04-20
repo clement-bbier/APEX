@@ -8,6 +8,11 @@ Topic convention: {category}.{subcategory}.{identifier}
 
 from __future__ import annotations
 
+import warnings
+
+_STRATEGY_ID_FORBIDDEN_CHARS: tuple[str, ...] = ("/", "\\", "'", '"')
+_STRATEGY_ID_MAX_LEN: int = 64
+
 
 class Topics:
     """ZeroMQ topic string constants. Import this class; never use string literals."""
@@ -75,7 +80,12 @@ class Topics:
 
     @staticmethod
     def signal(symbol: str) -> str:
-        """Build a signal topic string.
+        """Build a legacy single-strategy signal topic string.
+
+        Deprecated since Phase A (Roadmap §2.2.2): use
+        :meth:`Topics.signal_for` so consumers can route per ``strategy_id``.
+        Retained for backward compatibility with the LegacyConfluenceStrategy
+        path until Phase B migrates it to ``signal_for("default", symbol)``.
 
         Args:
             symbol: Trading symbol (will be uppercased).
@@ -83,7 +93,74 @@ class Topics:
         Returns:
             Full ZMQ topic string, e.g. ``'signal.technical.BTCUSDT'``.
         """
+        warnings.warn(
+            "Topics.signal(symbol) is deprecated; use "
+            "Topics.signal_for(strategy_id, symbol). Legacy caller gets "
+            "strategy_id='default' automatically post Phase B.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return f"signal.technical.{symbol.upper()}"
+
+    @staticmethod
+    def signal_for(strategy_id: str, symbol: str) -> str:
+        """Build a per-strategy signal topic string.
+
+        Per Charter §5.5 and ADR-0007 §D7, every strategy publishes its
+        Signals on a dedicated ZMQ topic so downstream consumers can subscribe
+        per-strategy or broadly via the ``signal.technical.`` prefix.
+
+        Example::
+
+            Topics.signal_for('crypto_momentum', 'BTCUSDT')
+                == 'signal.technical.crypto_momentum.BTCUSDT'
+
+        Sanitization mirrors the ``Signal`` Pydantic model validator
+        (Roadmap §2.2.2): empty/whitespace identifiers, identifiers
+        containing path or quote characters, and identifiers exceeding
+        64 characters are rejected. Symbols must be non-empty and free
+        of whitespace.
+
+        Args:
+            strategy_id: Snake_case strategy identifier matching the folder
+                ``services/strategies/<strategy_id>/``. Use ``'default'`` for
+                the LegacyConfluenceStrategy path.
+            symbol: Trading symbol (will be uppercased).
+
+        Returns:
+            Full ZMQ topic string, e.g.
+            ``'signal.technical.crypto_momentum.BTCUSDT'``.
+
+        Raises:
+            ValueError: If ``strategy_id`` or ``symbol`` fails validation.
+        """
+        if not isinstance(strategy_id, str) or not strategy_id or not strategy_id.strip():
+            raise ValueError(
+                f"strategy_id must be a non-empty, non-whitespace string; got {strategy_id!r}"
+            )
+        if any(c.isspace() for c in strategy_id):
+            raise ValueError(
+                f"strategy_id must not contain whitespace; got {strategy_id!r}"
+            )
+        for forbidden in _STRATEGY_ID_FORBIDDEN_CHARS:
+            if forbidden in strategy_id:
+                raise ValueError(
+                    f"strategy_id must not contain {forbidden!r}; got {strategy_id!r}"
+                )
+        if len(strategy_id) > _STRATEGY_ID_MAX_LEN:
+            raise ValueError(
+                f"strategy_id length {len(strategy_id)} exceeds max "
+                f"{_STRATEGY_ID_MAX_LEN}; got {strategy_id!r}"
+            )
+        if not isinstance(symbol, str) or not symbol or not symbol.strip():
+            raise ValueError(
+                f"symbol must be a non-empty, non-whitespace string; got {symbol!r}"
+            )
+        if any(c.isspace() for c in symbol):
+            raise ValueError(
+                f"symbol must not contain whitespace; got {symbol!r}"
+            )
+        return f"signal.technical.{strategy_id}.{symbol.upper()}"
 
     @staticmethod
     def health(service_id: str) -> str:
