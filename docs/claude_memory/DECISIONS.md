@@ -1148,13 +1148,13 @@ The Roadmap is the time-ordered execution plan for the 24-month horizon from Cha
    - Phase D (weeks 18–28) — `services/data/panels/` publishes `PanelSnapshot` on `panel.{universe_id}`; per-strategy feedback-loop partitioning; `backtesting.portfolio_runner.run_portfolio` with `by_strategy_breakdown` + cross-strategy correlation.
    - Phase D.5 (weeks 26–28) — physical topology migration from `services/s01-s10/` to `services/{data,signal,portfolio,execution,research,ops,strategies}/` via 7 staged PRs with `sys.modules`-aliasing import shims; individually revertible.
 
-2. **Six boot strategies' indicative timelines** (§6–§8):
-   - Strategy #1 Crypto Momentum: Gate 1 W10 → Live Full W37 (~month 8.5).
-   - Strategy #2 Trend Following: Gate 1 W24 → Live Full W53 (~month 12).
-   - Strategy #3 Mean Rev Equities: Gate 1 W46 → Live Full W79 (~month 18).
-   - Strategy #4 VRP: Gate 1 W58 → Live Full W95 (~month 22).
-   - Strategy #5 Macro Carry: Gate 1 W72 → Live Full W107 (~month 25).
-   - Strategy #6 News-driven: Gate 1 W86 → Live Full W125 (~month 29, beyond 24-month horizon; Roadmap v4.0 rescopes).
+2. **Six boot strategies' indicative lifecycle ranges** (§6–§8):
+   - Strategy #1 Crypto Momentum: Lifecycle Weeks 10-36 → Live Full W37 (~month 8.5).
+   - Strategy #2 Trend Following: Lifecycle Weeks 20-50 → Live Full W53 (~month 12).
+   - Strategy #3 Mean Rev Equities: Lifecycle Weeks 40-70.
+   - Strategy #4 VRP: Weeks 52-86.
+   - Strategy #5 Macro Carry: Weeks 64-100.
+   - Strategy #6 News-driven: Weeks 76-120 (Live Full beyond 24-month horizon; Roadmap v4.0 rescopes).
 
 3. **Portfolio-level benchmarks calendar-mapped** (§9):
    - Survival (Charter §10.1) candidate at month 9 — Strategy #1 Live Full.
@@ -1186,7 +1186,7 @@ The Roadmap is the time-ordered execution plan for the 24-month horizon from Cha
 
 **Downstream actions:**
 
-1. Documentation sync PR (this PR) — adds Roadmap + 4-ADR pointers to CLAUDE.md, MANIFEST.md, CONTEXT.md, DECISIONS.md, SESSIONS.md, and cross-refs to ADR-0001 through ADR-0006.
+1. Documentation sync PR (PR #190) — adds Roadmap + 4-ADR pointers to CLAUDE.md, MANIFEST.md, CONTEXT.md, DECISIONS.md, SESSIONS.md. The six one-line cross-refs on ADR-0001 through ADR-0006 are **deferred to a follow-up PR** (blocked by the `docs/adr/` path-protection hook in this authoring session; CIO applies post-merge, ~2 minutes manual work).
 2. **Phase A execution begins**: 13 issues `[phase-A.1]` through `[phase-A.13]` opened and assigned per Roadmap §2.2.
 3. **Strategy #1 (Crypto Momentum) informal research is in-progress**; Gate 1 PR opens at week ~10 once Phase A §2.2.1/§2.2.2 land.
 4. **Quarterly Roadmap reviews scheduled** at months 3, 6, 9, 12, 15, 18, 21, 24 per Roadmap §12.3.

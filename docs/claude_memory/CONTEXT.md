@@ -44,12 +44,12 @@ The APEX Multi-Strat Platform Charter v1.0 was ratified on 2026-04-18 via PR #18
 4. Per-strategy Redis keys: `kelly:{strategy_id}:{symbol}`, `trades:{strategy_id}:all`, `pnl:{strategy_id}:daily`. Portfolio-level keys remain global: `portfolio:capital`, `risk:heartbeat`, `correlation:matrix`.
 5. ZMQ topic factory `Topics.signal_for(strategy_id, symbol)` → `signal.technical.{strategy_id}.{symbol}` — **planned, not yet implemented in core/topics.py**. Until added (Phase A of multi-strat lift), agents use the current `Topics.signal(symbol)` factory and attach `strategy_id` at the message producer level.
 
-**Documents 2 and 3 are queued for authoring** (sequential missions, Charter-dependent):
+**Documents 2 and 3 are now ratified** (sequential missions, Charter-dependent):
 
-- Document 2: `docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md` — operational playbook for the four gates.
-- Document 3: `docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md` — time-ordered execution plan replacing PHASE_5_SPEC_v2.md.
+- Document 2: [`docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md`](../strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md) — operational playbook for the four gates (v1.0 ratified 2026-04-20 via PR #186).
+- Document 3: [`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`](../phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) — time-ordered execution plan superseding PHASE_5_SPEC_v2.md (v3.0 ratified 2026-04-20 via PR #188 + post-merge fixups PR #189).
 
-Until Document 3 is ratified, in-flight Phase 5 work continues per PHASE_5_SPEC_v2.md with the explicit understanding that the multi-strat infrastructure lift is prepended as an early phase.
+For the current codebase, the binding implementation baseline remains PHASE_5_SPEC_v2.md until each Phase A-D deliverable of the multi-strat infrastructure lift (scheduled in Document 3) progressively supersedes it. Phase A is ready to begin.
 
 ---
 
@@ -83,9 +83,9 @@ The APEX Strategy Development Lifecycle Playbook v1.0 was ratified via PR #186, 
 6. **Decommissioning follows the master checklist** (§10.3.2) regardless of which of the 6 Rules triggered it; post-mortem required within 7 days.
 7. **Reactivation requires full gate re-run** (§11.2) — no grandfathering.
 
-**Documents 1 and 2 of the Charter family are now ratified.** Document 3 (`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`) authoring begins as Mission 3 of 3, with the Playbook informing the Roadmap's gate-specific timelines.
+**Documents 1, 2, and 3 of the Charter family are now ratified.** Document 3 ([`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`](../phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md)) was ratified after the Playbook informed its gate-specific timelines, completing the Charter-Playbook-Roadmap trilogy on 2026-04-20. See the "Roadmap Ratification (2026-04-20)" section below for full detail.
 
-**Pre-Charter documents** (CLAUDE.md, MANIFEST.md, PROJECT_ROADMAP.md, PHASE_5_SPEC_v2.md, 6 existing ADRs) continue to describe current code state; they remain binding until superseded by the multi-strat infrastructure lift Phases A-B-C-D (scheduled in Document 3).
+**Pre-Charter documents** (CLAUDE.md, MANIFEST.md, PROJECT_ROADMAP.md, PHASE_5_SPEC_v2.md, 6 existing ADRs) continue to describe current code state; PHASE_5_SPEC_v2.md and PROJECT_ROADMAP.md are now SUPERSEDED (per PR #189 banners) with Document 3 as the active scheduling authority. The remaining pre-Charter documents (CLAUDE.md, MANIFEST.md, ADR-0001–0006) remain binding until the multi-strat infrastructure lift Phases A-B-C-D (scheduled in Document 3) progressively updates them.
 
 ---
 
@@ -98,7 +98,7 @@ The APEX Multi-Strat Aligned Roadmap v3.0 was ratified via PR #188, merged to ma
 **What the Roadmap defines:**
 
 - **Multi-Strat Infrastructure Lift** (§2–§5) — Phase A (weeks 1–8, `strategy_id` + `Topics.signal_for` + CI backtest-gate un-muzzling + orphan-read resolution), Phase B (weeks 6–14, `StrategyRunner` ABC + `LegacyConfluenceStrategy` wrap + `StrategyHealthCheck` state machine), Phase C (weeks 12–22, `services/portfolio/strategy_allocator/` + 7-step VETO chain), Phase D (weeks 18–28, `services/data/panels/` + per-strategy feedback loop + `run_portfolio` backtest), Phase D.5 (weeks 26–28, topology migration from `services/s01-s10/` → `services/{data,signal,portfolio,execution,research,ops,strategies}/` per Charter §5.4 and ADR-0010).
-- **Six boot strategies lifecycles** (§6–§8) — Strategy #1 Crypto Momentum (W10–37, full detail), Strategy #2 Trend Following (W20–52, full detail), Strategies #3 Mean Rev Equities (W40–78), #4 VRP (W52–94), #5 Macro Carry (W64–106), #6 News-driven (W76–124) sketched.
+- **Six boot strategies lifecycles** (§6–§8) — Strategy #1 Crypto Momentum (Weeks 10–36, full detail), Strategy #2 Trend Following (Weeks 20–50, full detail), Strategies #3 Mean Rev Equities (Weeks 40–70), #4 VRP (Weeks 52–86), #5 Macro Carry (Weeks 64–100), #6 News-driven (Weeks 76–120) sketched.
 - **Portfolio-level benchmarks** (§9) — Survival at month 9 (Charter §10.1 net return >15% / Sharpe >1.0 / max DD <15% simultaneous), Legitimacy at month 15 (Charter §10.2 alpha >10% / beta <0.5 / Sharpe >1.5), Institutional at month 24 (Charter §10.3 Sharpe >2.0 / max DD <10% / cross-strategy correlation <0.3).
 - **Contingency playbook** (§11) — 10 failure scenarios mapped to Charter-compatible responses (phase slips, Gate 1 failures, allocator inadequacy, multi-strat lift regressions, stress-scenario failures, portfolio hard-CB trips during Gate 4, 3-strategies-DEGRADED, new-candidate pre-empting, operator unavailability, catastrophic loss).
 - **Track metrics and governance** (§12) — per-phase success criteria; per-strategy gate pass-rate targets; quarterly/annual review cadence; telemetry.

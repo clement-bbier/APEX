@@ -2432,7 +2432,7 @@ Modified (Batch B):
 **Key decisions reached**:
 
 - **Phase A-D + D.5 schedule** (Roadmap §2–§5): Phase A weeks 1–8 (foundational contracts), Phase B 6–14 (StrategyRunner ABC + legacy wrap + StrategyHealthCheck), Phase C 12–22 (allocator + 7-step chain), Phase D 18–28 (panels + per-strategy feedback + portfolio backtest), Phase D.5 26–28 (topology migration). Overlap windows absorb up to 2-week slips without cascade.
-- **Six boot strategies sequenced**: Crypto Momentum (W10–37) → Trend Following (W20–53) → Mean Rev Equities (W40–79) → VRP (W52–95) → Macro Carry (W64–107) → News-driven (W76–125). Strategy #6 extends beyond 24-month horizon; Roadmap v4.0 rescopes at month 24.
+- **Six boot strategies sequenced** (lifecycle ranges from Roadmap §6–§8): Crypto Momentum (Weeks 10-36) → Trend Following (Weeks 20-50) → Mean Rev Equities (Weeks 40-70) → VRP (Weeks 52-86) → Macro Carry (Weeks 64-100) → News-driven (Weeks 76-120). Strategy #6 Live Full extends beyond 24-month horizon; Roadmap v4.0 rescopes at month 24.
 - **Portfolio benchmarks calendar-mapped** (Roadmap §9): Survival month 9 (Strategy #1 Live Full), Legitimacy month 15 (Strategies #1+#2 live), Institutional month 24 (Strategies #1+#2+#3 live).
 - **Phase 2 Sharpe overlay activation** (Charter §6.2.1): earliest candidate at month 26+; no early activation unless Charter §13.4 amendment procedure invoked.
 - **CI coverage gate raise** scheduled as Phase-A item: `[phase-A.13]` raises `--cov-fail-under=75` → `--cov-fail-under=85` after 7-day stabilization of Phase A deliverables.
@@ -2460,7 +2460,7 @@ Modified (Batch B):
 - docs/claude_memory/CONTEXT.md (Roadmap Ratification section added — this sync PR)
 - docs/claude_memory/DECISIONS.md (Roadmap ratification entry added — this sync PR)
 - docs/claude_memory/SESSIONS.md (this entry — this sync PR)
-- docs/adr/ADR-0001 through ADR-0006 (one-line cross-refs to relevant new ADRs — this sync PR)
+- docs/adr/ADR-0001 through ADR-0006 (one-line cross-refs to relevant new ADRs — **deferred to a follow-up PR**; blocked by the `docs/adr/` path-protection hook in this authoring session; CIO applies post-merge per PR #190 post-merge action list, ~2 minutes manual work)
 
 **Platform state after this session**:
 
