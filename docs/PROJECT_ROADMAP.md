@@ -10,7 +10,7 @@
 
 # APEX / CashMachine — Project Roadmap
 
-**Source of truth for project state, planning, and execution.**
+**⚠️ Historical reference only — see SUPERSEDED banner above. Active source of truth: [docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md](phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md).**
 
 | Field | Value |
 |---|---|

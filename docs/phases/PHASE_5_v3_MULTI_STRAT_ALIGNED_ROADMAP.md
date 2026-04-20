@@ -1627,7 +1627,7 @@ Each semi-annual review produces a session entry in [`docs/claude_memory/SESSION
 
 This section contains **summaries** of the four ADRs authored alongside this Roadmap. Full authoritative content lives in standalone ADR files per Charter §12.4 commitment.
 
-**PATH NOTE — POST-MERGE MANUAL ACTION REQUIRED**: the four ADR files were authored at `docs/adr/` rather than the canonical `docs/adr/` because a path-protection hook on the authoring session blocked `Write`/`Edit` operations against `docs/adr/`. On Roadmap v3.0 ratification merge, the CIO **manually moves** the four files from `docs/adr/` to `docs/adr/` (simple `git mv` + commit; one-time action). After the move, Roadmap §10 and §14.2 link paths are updated in Roadmap v3.1 (non-material amendment per §15.3). See §16.1 for the post-merge checklist.
+**PATH NOTE — COMPLETED**: the four ADR files were originally authored at `docs/adr_pending_roadmap_v3/` because a path-protection hook on the authoring session blocked `Write`/`Edit` operations against `docs/adr/`. Post Roadmap v3.0 ratification, the CIO moved the four files to their canonical `docs/adr/` location via `git mv` (PR #189, merged 2026-04-20). Roadmap §10 and §14.2 link paths have been updated accordingly. This note is retained as historical record of the one-time migration.
 
 Per Playbook §0.6 and Charter §12.4, ADRs prevail over the Roadmap for their technical surface. The Roadmap embeds summaries here for reference; the standalone ADR files are the authoritative source on merge (and re-move).
 
@@ -1972,10 +1972,10 @@ Engineers opening an issue for any of these sub-phases continue to reference PHA
 - [ADR-0004](../adr/ADR-0004-feature-validation-methodology.md) — Feature Validation Methodology. Unchanged; referenced in Gate 1/2.
 - [ADR-0005](../adr/ADR-0005-meta-labeling-fusion-methodology.md) — Meta-Labeling Fusion. Unchanged; per-strategy meta-labeler cards in Phase C §4.2.2 STEP 4.
 - [ADR-0006](../adr/ADR-0006-fail-closed-risk-controls.md) — Fail-Closed Risk Controls. Unchanged; STEP 0 of the 7-step chain.
-- **ADR-0007** (§10.1) — Strategy as Microservice. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
-- **ADR-0008** (§10.2) — Capital Allocator Topology. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
-- **ADR-0009** (§10.3) — Panel Builder Discipline. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
-- **ADR-0010** (§10.4) — Target Topology Reorganization. **NEW**, authored here; file at `docs/adr/` pending post-merge move to `docs/adr/` per §16.1.
+- **ADR-0007** (§10.1) — Strategy as Microservice. **NEW**, authored here; file at `docs/adr/` (canonical location; migrated post PR #188 via PR #189).
+- **ADR-0008** (§10.2) — Capital Allocator Topology. **NEW**, authored here; file at `docs/adr/` (canonical location; migrated post PR #188 via PR #189).
+- **ADR-0009** (§10.3) — Panel Builder Discipline. **NEW**, authored here; file at `docs/adr/` (canonical location; migrated post PR #188 via PR #189).
+- **ADR-0010** (§10.4) — Target Topology Reorganization. **NEW**, authored here; file at `docs/adr/` (canonical location; migrated post PR #188 via PR #189).
 
 ### 14.3 CLAUDE.md and MANIFEST.md
 
@@ -2091,17 +2091,16 @@ This Roadmap is proposed for ratification as of **2026-04-20** and expected to b
 
 **POST-MERGE ACTION REQUIRED** (one-time, CIO manual):
 
-After Roadmap v3.0 ratification merge, the CIO executes the following manual actions because the authoring session was blocked by a path-protection hook on `docs/adr/`:
+**POST-MERGE ACTIONS — COMPLETED** (recorded here as historical evidence):
 
-1. **Move the four ADR files from `docs/adr/` to `docs/adr/`**:
+The Roadmap v3.0 authoring session (PR #188) was blocked by a path-protection hook on `docs/adr/` and `docs/phases/PHASE_5_SPEC_v2.md`, preventing direct writes to those paths. After PR #188 merged on 2026-04-20, the CIO executed the following mechanical actions in a dedicated follow-up PR (PR #189):
 
-   ```bash
-   git mv docs/adr/ADR-0007-strategy-as-microservice.md       docs/adr/ADR-0007-strategy-as-microservice.md
-   git mv docs/adr/ADR-0008-capital-allocator-topology.md     docs/adr/ADR-0008-capital-allocator-topology.md
-   git mv docs/adr/ADR-0009-panel-builder-discipline.md       docs/adr/ADR-0009-panel-builder-discipline.md
-   git mv docs/adr/ADR-0010-target-topology-reorganization.md docs/adr/ADR-0010-target-topology-reorganization.md
-   rmdir docs/adr/
-   git commit -m "docs(adr): move ADR-0007/8/9/10 into canonical docs/adr/ (post Roadmap v3.0 merge)"
+1. Moved the four ADR files from `docs/adr_pending_roadmap_v3/` to their canonical `docs/adr/` location via `git mv` (history preserved).
+2. Added SUPERSEDED banners to `docs/phases/PHASE_5_SPEC_v2.md` and `docs/PROJECT_ROADMAP.md`.
+3. Updated Roadmap §10 and §14.2 ADR link paths to reference `docs/adr/`.
+4. Rewrote this §16.1 block and the §10 PATH NOTE to reflect completion.
+
+PR #189 merged on 2026-04-20. The document trilogy is fully canonicalized on `main`; no further action required.
    git push origin main
    ```
 
