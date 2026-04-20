@@ -117,6 +117,14 @@ class Signal(BaseModel):
     signal_id: str = Field(..., description="Unique signal identifier")
     symbol: str = Field(..., description="Uppercase trading symbol")
     timestamp_ms: int = Field(..., gt=0, description="Signal generation time UTC ms")
+    strategy_id: str = Field(
+        default="default",
+        description=(
+            "Per-strategy identifier (Charter §5.5, ADR-0007 §D6). "
+            "Default 'default' preserves the legacy single-strategy path "
+            "until Phase B wraps it as LegacyConfluenceStrategy."
+        ),
+    )
 
     # Direction and strength
     direction: Direction = Field(..., description="Trade direction")
@@ -167,6 +175,31 @@ class Signal(BaseModel):
     def symbol_uppercase(cls, v: str) -> str:
         """Ensure symbol is uppercase."""
         return v.upper()
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Empty strings, whitespace, forward/backslashes and quote characters are
+        rejected because strategy_id is interpolated into ZMQ topics
+        (`signal.technical.{strategy_id}.{symbol}` per Charter §5.5), Redis keys
+        (`kelly:{strategy_id}:{symbol}` et al. per ADR-0007 §D6) and filesystem
+        paths (`services/strategies/{strategy_id}/` per ADR-0007 §D2). Length is
+        capped at 64 to keep Redis key lengths bounded.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        forbidden = set(" \t\n\r\v\f/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "whitespace, slashes and quotes are not permitted"
+            )
+        return v
 
     @model_validator(mode="after")
     def validate_price_levels(self) -> Signal:
