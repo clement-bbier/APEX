@@ -21,14 +21,21 @@ _logger = structlog.get_logger(__name__)
 class KellySizer:
     """Compute Kelly-optimal position sizes from live trade statistics.
 
-    Statistics are stored in Redis under the per-strategy key
+    Statistics are stored in Redis as HASHES (written by S09 FeedbackLoop
+    via :meth:`StateStore.hset`) under the per-strategy key
     ``kelly:{strategy_id}:{symbol}`` (primary) with a fallback read from the
     legacy single-strategy key ``kelly:{symbol}`` during the Phase A migration
     window (Roadmap v3.0 §2.2.5, ADR-0007 §D9). If neither key is present the
     safe defaults ``win_rate=0.5``, ``avg_rr=1.5`` are used.
 
-    The writer-side migration (s09 FeedbackLoop) lands in a follow-up ticket;
-    this class is reader-side only.
+    Storage shape: each key is a Redis HASH with fields ``win_rate`` and
+    ``avg_rr`` (see ``services/s09_feedback_loop/service.py`` _fast_analysis).
+    The reader therefore issues ``hgetall`` — issuing a plain ``GET`` against
+    the same key would raise ``WRONGTYPE`` at runtime.
+
+    The writer-side migration (S09 FeedbackLoop cutting over to the
+    per-strategy primary key) lands in a follow-up ticket; this class is
+    reader-side only.
     """
 
     # ── Statistics ────────────────────────────────────────────────────────────
@@ -83,11 +90,23 @@ class KellySizer:
 
         Dual-read during Phase A migration (Roadmap v3.0 §2.2.5, ADR-0007 §D9):
         the per-strategy key ``kelly:{strategy_id}:{symbol}`` is tried first,
-        and on miss a fallback read against the legacy ``kelly:{symbol}`` key
-        is performed. Every legacy-path hit emits a structlog WARNING so the
-        residual dependency on the legacy key is observable. When the s09
+        and on empty-miss a fallback read against the legacy ``kelly:{symbol}``
+        key is performed. Every legacy-path hit emits a structlog WARNING so
+        the residual dependency on the legacy key is observable. When the S09
         writer migration lands and all legacy stats have aged out, the
         fallback branch (and this parameter) can be removed.
+
+        Storage contract: S09 writes each key as a Redis HASH via
+        :meth:`StateStore.hset`; the reader therefore uses
+        :meth:`StateStore.hgetall` (which returns ``{}`` for a missing key),
+        not ``get`` — the latter would raise ``WRONGTYPE`` against a hash.
+
+        Fallback semantics: the legacy path is gated strictly on the primary
+        HASH being empty (cache miss). A non-empty primary hash missing
+        ``win_rate`` / ``avg_rr`` fields does **not** trigger fallback; the
+        reader uses the in-dict values (or defaults) directly. Invalid
+        values (non-numeric ``win_rate`` etc.) surface as ``ValueError`` via
+        :func:`float` — fail-loud, mirroring :mod:`portfolio_tracker`.
 
         Args:
             state:       Connected :class:`~core.state.StateStore` instance.
@@ -101,11 +120,11 @@ class KellySizer:
         new_key = f"kelly:{strategy_id}:{symbol}"
         legacy_key = f"kelly:{symbol}"
 
-        raw: dict[str, Any] | None = await state.get(new_key)
+        primary: dict[str, Any] = await state.hgetall(new_key)
 
-        if not isinstance(raw, dict):
-            legacy_raw: dict[str, Any] | None = await state.get(legacy_key)
-            if not isinstance(legacy_raw, dict):
+        if not primary:
+            legacy: dict[str, Any] = await state.hgetall(legacy_key)
+            if not legacy:
                 return 0.5, 1.5
             _logger.warning(
                 "kelly_sizer.legacy_key_fallback",
@@ -114,7 +133,9 @@ class KellySizer:
                 legacy_key=legacy_key,
                 new_key=new_key,
             )
-            raw = legacy_raw
+            raw: dict[str, Any] = legacy
+        else:
+            raw = primary
 
         win_rate = float(raw.get("win_rate", 0.5))
         avg_rr = float(raw.get("avg_rr", 1.5))
