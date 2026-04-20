@@ -129,9 +129,10 @@ class TestDenseGridContract:
     def test_full_report_calendar_day_grid_contract(self) -> None:
         """daily_equity_curve must span the full [first_day, last_day] grid.
 
-        Ten-day span with trades only on days 0, 2, 6. The returned curve
-        must have 11 entries (one seed + 10 calendar days), not 4
-        (one seed + 3 active days) as the sparse-day impl returns.
+        Seven calendar days are covered here: trades occur on days 0, 2,
+        and 6, so the returned curve must have 8 entries (one seed + days
+        0 through 6), not 4 (one seed + 3 active days) as the sparse-day
+        impl returns.
         """
         trades = [
             _make_trade(+1000.0, 0),

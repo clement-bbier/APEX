@@ -237,8 +237,8 @@ def daily_equity_curve_from_trades(
     The sparse-day semantics (one entry per *active* trading day) are
     available via ``include_empty_days=False`` for callers who need the
     older shape. That mode inflates |Sharpe| as a function of trade
-    density and is not the Sharpe input contract (see
-    ``docs/CONVENTIONS/SHARPE_CONVENTION.md``).
+    density and is not the Sharpe input contract used by
+    :func:`sharpe_ratio`.
 
     Args:
         initial_capital: Starting capital.
@@ -283,8 +283,8 @@ def daily_equity_curve_from_trades(
     last_day = datetime.strptime(day_order[-1], "%Y-%m-%d").replace(tzinfo=UTC).date()
     span_days = (last_day - first_day).days + 1
     for offset in range(span_days):
-        day = first_day + timedelta(days=offset)
-        key = day.strftime("%Y-%m-%d")
+        day_date = first_day + timedelta(days=offset)
+        key = day_date.strftime("%Y-%m-%d")
         if key in daily_pnl:
             equity += daily_pnl[key]
         curve.append(equity)

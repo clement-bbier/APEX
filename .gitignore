@@ -39,3 +39,8 @@ graphify-out/
 # Phase 4.6 model artefacts — trained weights and cards are not source
 models/meta_labeler/*.joblib
 models/meta_labeler/*.json
+
+# Temporary exports for issue triage
+issues_full.json
+issues_list.txt
+

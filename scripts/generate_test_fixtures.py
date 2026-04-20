@@ -36,6 +36,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 
 # Ornstein-Uhlenbeck parameters. Tuned so that (a) the process stays
@@ -47,7 +48,7 @@ _OU_SIGMA: float = 15.0  # diffusion term per sqrt(minute)
 _SEED: int = 42  # fixed for byte-deterministic fixture output
 
 
-def _generate_ou_price_path(n: int, rng: np.random.Generator) -> np.ndarray:
+def _generate_ou_price_path(n: int, rng: np.random.Generator) -> npt.NDArray[np.float64]:
     """Simulate n minutes of a discrete OU process starting at mu.
 
     Uses the Euler-Maruyama discretisation with dt=1 (minute). Clamps the
