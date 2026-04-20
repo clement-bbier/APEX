@@ -1,8 +1,8 @@
 # APEX Multi-Strategy Platform — Strategy Development Lifecycle Playbook
 
 **Document 2 of 3** (operational layer)
-**Version**: v1.0 (DRAFT — awaiting CIO ratification)
-**Status**: ACTIVE once merged
+**Version**: v1.0 (RATIFIED)
+**Status**: ACTIVE (binding)
 **Authoring date**: 2026-04-19
 **Inherits from**: [`docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md`](ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md) (Charter v1.0, ratified 2026-04-18)
 **Binds**: Document 3 (`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`, pending authoring)
@@ -2723,7 +2723,7 @@ Anticipated ADRs to be authored with Document 3 (Charter §12.4): ADR-0007 (Stra
 
 ### 16.1 Status — ACTIVE and binding
 
-Once merged, this Playbook is **ACTIVE**. From that moment, every gate transition, every CB response, every decommissioning, every reactivation, every category reassignment must follow its procedures. Deviations require a new ADR + Playbook version bump.
+This Playbook is **ACTIVE** (ratified 2026-04-20 via PR #186; see §17.1). Every gate transition, every CB response, every decommissioning, every reactivation, every category reassignment must follow its procedures. Deviations require a new ADR + Playbook version bump.
 
 ### 16.2 Material changes — what requires amendment
 
@@ -2783,13 +2783,13 @@ Implementation authority is held by:
 
 ### 17.1 Ratification
 
-This Playbook is proposed for ratification on **2026-04-19** and expected to be merged as **v1.0** into the main branch of the APEX / CashMachine repository upon Clement Barbier's review.
+This Playbook was ratified as **v1.0** on **2026-04-20** via PR #186 (merged commit e92c13b) into the main branch of the APEX / CashMachine repository by Clement Barbier (CIO).
 
-Upon merge:
+Upon ratification (completed 2026-04-20):
 
-- An entry is added to [`docs/claude_memory/DECISIONS.md`](../claude_memory/DECISIONS.md) recording Playbook v1.0 ratification.
-- The Playbook is referenced from [`docs/claude_memory/CONTEXT.md`](../claude_memory/CONTEXT.md) as the binding operational layer.
-- Document 3 (Phase 5 v3 Multi-Strat Aligned Roadmap) authoring begins as Mission 3 of 3, with the Playbook informing the Roadmap's gate-specific timelines.
+- An entry was added to [`docs/claude_memory/DECISIONS.md`](../claude_memory/DECISIONS.md) recording Playbook v1.0 ratification.
+- The Playbook is now referenced from [`docs/claude_memory/CONTEXT.md`](../claude_memory/CONTEXT.md) as the binding operational layer.
+- Document 3 (Phase 5 v3 Multi-Strat Aligned Roadmap) authoring is queued as Mission 3 of 3, with the Playbook informing the Roadmap's gate-specific timelines.
 
 ### 17.2 Signatures
 
@@ -2797,7 +2797,7 @@ Upon merge:
 |---|---|---|---|
 | Head of Strategy Research | Claude Opus 4.7 (claude.ai) | Drafted v1.0 | 2026-04-19 |
 | Implementation Lead | Claude Code | Authored on branch `docs/strategy-lifecycle-document-2` | 2026-04-19 |
-| **CIO** | **Clement Barbier** | **PENDING RATIFICATION** | YYYY-MM-DD |
+| **CIO** | **Clement Barbier** | **RATIFIED via PR #186** | 2026-04-20 |
 
 ---
 
@@ -2805,10 +2805,11 @@ Upon merge:
 
 | Version | Date | Change |
 |---|---|---|
-| v1.0-draft | 2026-04-19 | Initial draft authored on branch `docs/strategy-lifecycle-document-2`. Document 2 of the Charter family (Document 1 ratified 2026-04-18 via PR #184). Operationalizes Charter §7, §8, §9, §11, §13.7. Awaiting CIO review and ratification. |
+| v1.0-draft | 2026-04-19 | Initial draft authored on branch `docs/strategy-lifecycle-document-2`. |
+| v1.0 | 2026-04-20 | 5 review corrections applied (§5.2.4/§5.3 pod-reset semantics, §10.4.1 running-peak methodology, §8.0 StrategyHealthCheck state machine added, §14.1 CIO authority distinction, coherence sweep). Ratified by CIO Clement Barbier via PR #186 (merge commit e92c13b). Document 2 of the Charter family (Document 1 ratified 2026-04-18 via PR #184). Operationalizes Charter §7, §8, §9, §11, §13.7. |
 
 ---
 
-**END OF PLAYBOOK v1.0-draft.**
+**END OF PLAYBOOK v1.0.**
 
-*This document awaits CIO ratification. Once merged, it becomes the binding operational layer of the APEX Multi-Strategy Platform.*
+*Ratified via PR #186 on 2026-04-20. This document is the binding operational layer of the APEX Multi-Strategy Platform.*
