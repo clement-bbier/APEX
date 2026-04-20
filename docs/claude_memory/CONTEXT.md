@@ -89,6 +89,42 @@ The APEX Strategy Development Lifecycle Playbook v1.0 was ratified via PR #186, 
 
 ---
 
+## Roadmap Ratification (2026-04-20)
+
+The APEX Multi-Strat Aligned Roadmap v3.0 was ratified via PR #188, merged to main on 2026-04-20, with post-merge fixups applied in PR #189 (ADR canonicalization to `docs/adr/` + SUPERSEDED banners on `docs/phases/PHASE_5_SPEC_v2.md` and `docs/PROJECT_ROADMAP.md`). It is the **executional layer** of the Multi-Strat Platform.
+
+**With Document 3 ratified, the Charter-Playbook-Roadmap trilogy is fully canonical on main.** The three documents now jointly govern the platform: Charter (*what & why*) → Playbook (*how*) → Roadmap (*when & in what order*).
+
+**What the Roadmap defines:**
+
+- **Multi-Strat Infrastructure Lift** (§2–§5) — Phase A (weeks 1–8, `strategy_id` + `Topics.signal_for` + CI backtest-gate un-muzzling + orphan-read resolution), Phase B (weeks 6–14, `StrategyRunner` ABC + `LegacyConfluenceStrategy` wrap + `StrategyHealthCheck` state machine), Phase C (weeks 12–22, `services/portfolio/strategy_allocator/` + 7-step VETO chain), Phase D (weeks 18–28, `services/data/panels/` + per-strategy feedback loop + `run_portfolio` backtest), Phase D.5 (weeks 26–28, topology migration from `services/s01-s10/` → `services/{data,signal,portfolio,execution,research,ops,strategies}/` per Charter §5.4 and ADR-0010).
+- **Six boot strategies lifecycles** (§6–§8) — Strategy #1 Crypto Momentum (W10–37, full detail), Strategy #2 Trend Following (W20–52, full detail), Strategies #3 Mean Rev Equities (W40–78), #4 VRP (W52–94), #5 Macro Carry (W64–106), #6 News-driven (W76–124) sketched.
+- **Portfolio-level benchmarks** (§9) — Survival at month 9 (Charter §10.1 net return >15% / Sharpe >1.0 / max DD <15% simultaneous), Legitimacy at month 15 (Charter §10.2 alpha >10% / beta <0.5 / Sharpe >1.5), Institutional at month 24 (Charter §10.3 Sharpe >2.0 / max DD <10% / cross-strategy correlation <0.3).
+- **Contingency playbook** (§11) — 10 failure scenarios mapped to Charter-compatible responses (phase slips, Gate 1 failures, allocator inadequacy, multi-strat lift regressions, stress-scenario failures, portfolio hard-CB trips during Gate 4, 3-strategies-DEGRADED, new-candidate pre-empting, operator unavailability, catastrophic loss).
+- **Track metrics and governance** (§12) — per-phase success criteria; per-strategy gate pass-rate targets; quarterly/annual review cadence; telemetry.
+
+**Four new ADRs formalized alongside Document 3** (Charter §12.4 commitment):
+
+- [**ADR-0007 Strategy as Microservice**](../adr/ADR-0007-strategy-as-microservice.md) — `StrategyRunner` ABC at `services/strategies/_base.py`; `LegacyConfluenceStrategy` wraps current S02 (Principle 6 continuity); `strategy_id` first-class on order-path models; per-strategy Redis partitioning; crash isolation at OS level.
+- [**ADR-0008 Capital Allocator Topology**](../adr/ADR-0008-capital-allocator-topology.md) — dedicated `services/portfolio/strategy_allocator/` microservice; Phase 1 diagonal-covariance Risk Parity (`w_i ∝ 1/σ_i`, 60-day rolling σ, Sunday-23:00-UTC weekly rebalance); Phase 2 Sharpe overlay ±20% activates when ≥6 months live on ≥3 strategies; cold-start ramp 20%→100% over 60 days.
+- [**ADR-0009 Panel Builder Discipline**](../adr/ADR-0009-panel-builder-discipline.md) — `services/data/panels/` publishes `PanelSnapshot` on `panel.{universe_id}`; every strategy consumes panels via `on_panel()`; point-in-time correctness enforced; staleness tolerance with `is_stale` tagging.
+- [**ADR-0010 Target Topology Reorganization**](../adr/ADR-0010-target-topology-reorganization.md) — retires S01-S10 numbering in favor of domain classification; 7 staged PRs via `git mv` preserving history; individually revertible; import-path shims during transition using `sys.modules` aliasing.
+
+**Factual grounding**: the Roadmap references [`docs/audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md`](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) (701 lines, committed alongside Document 3) as the source of the P0/P1/P2 gap list that Phases A-D address.
+
+**Immediate implications for Claude Code sessions from this point forward:**
+
+1. **Phase A is ready to begin.** Issues `[phase-A.1]` through `[phase-A.13]` enumerated in Roadmap §2.2; Phase A exit criteria in §2.6.
+2. **Strategy #1 informal research is in-progress** per Playbook §3.1 entry criteria; formal Gate 1 PR opens at week ~10 once Phase A §2.2.1/§2.2.2 land.
+3. **New services are born in target topology** per Charter §5.4 — e.g., `services/portfolio/strategy_allocator/` (Phase C), `services/data/panels/` (Phase D), `services/strategies/<strategy_id>/` (per strategy at Gate 2). Phase D.5 migrates the existing S01-S10 services.
+4. **PHASE_5_SPEC_v2.md and PROJECT_ROADMAP.md are SUPERSEDED** (per PR #189 banners). Active scheduling authority is Roadmap v3.0; the superseded files remain for historical reference.
+5. **Every strategy work session** MUST now read CLAUDE.md + CONTEXT.md + Charter + Playbook + Roadmap (per CLAUDE.md banner) before writing code.
+6. **Quarterly Roadmap reviews** (months 3, 6, 9, 12, 15, 18, 21, 24) assess execution progress; **annual reviews** (months 12, 24, 36) revise Roadmap version per §15.
+
+**The Charter trilogy (Documents 1+2+3) is now the constitutional foundation of the APEX Multi-Strategy Platform.** No further foundational documents are queued; all further work is execution of Roadmap phases against the Charter/Playbook contract.
+
+---
+
 ## Phase 5.1 — CLOSED (2026-04-17)
 
 Phase 5.1 Fail-Closed Pre-Trade Risk Controls **merged** via PR #177.

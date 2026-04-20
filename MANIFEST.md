@@ -25,7 +25,9 @@
 >
 > **This document remains binding for current code** until the multi-strat infrastructure lift (Phases A-B-C-D from MULTI_STRAT_READINESS_AUDIT_2026-04-18.md §6, scheduled in Document 3) progressively updates the codebase. Each phase of the lift will update this MANIFEST.md in the same PR as the code change, so current-state and code remain aligned.
 >
-> Migration tracking: `docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md` (pending authoring as Document 3).
+> Migration tracking: [`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`](docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) (Document 3, v3.0, ratified 2026-04-20 via PR #188 + post-merge fixups PR #189). The Roadmap schedules Phase A (weeks 1–8, ready to begin), Phase B (weeks 6–14), Phase C (weeks 12–22), Phase D (weeks 18–28) + Phase D.5 topology migration (weeks 26–28); sequences the six boot strategies' gate windows; and codifies the three portfolio-level benchmarks (Survival at month 9 / Legitimacy at month 15 / Institutional at month 24).
+>
+> **Four new ADRs** formalize Charter §5.1–§5.4 alongside Document 3: [ADR-0007 Strategy as Microservice](docs/adr/ADR-0007-strategy-as-microservice.md), [ADR-0008 Capital Allocator Topology](docs/adr/ADR-0008-capital-allocator-topology.md), [ADR-0009 Panel Builder Discipline](docs/adr/ADR-0009-panel-builder-discipline.md), [ADR-0010 Target Topology Reorganization](docs/adr/ADR-0010-target-topology-reorganization.md). With Document 3 ratified, the **Charter-Playbook-Roadmap trilogy is fully canonical on main**.
 >
 > **Operational procedures** for strategy development, validation, deployment, circuit-breaker response, decommissioning, reactivation, and category reassignment are specified in the **Lifecycle Playbook** (v1.0, ratified 2026-04-20): [`docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md`](docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md). The Playbook references the technical architecture described here; conversely, this MANIFEST references back to the Playbook for any procedure involving strategy microservices at `services/strategies/<strategy_id>/`.
 
