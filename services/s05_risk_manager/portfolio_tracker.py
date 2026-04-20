@@ -121,10 +121,25 @@ class PortfolioTracker:
             The JSON-deserialized payload (typically a ``dict`` with an
             ``available`` key) or ``None`` if neither key resolves.
         """
+        _, payload = await self._resolve(strategy_id=strategy_id)
+        return payload
+
+    async def _resolve(
+        self,
+        *,
+        strategy_id: str,
+    ) -> tuple[str | None, Any | None]:
+        """Perform the dual-key read and report which key produced the payload.
+
+        Returns:
+            ``(resolved_key, payload)``. ``resolved_key`` is the primary key
+            on a primary hit, the legacy key on fallback, and ``None`` when
+            both keys miss (``payload`` is also ``None`` in that case).
+        """
         primary = self.primary_key(strategy_id)
         primary_value = await self._state.get(primary)
         if primary_value is not None:
-            return primary_value
+            return primary, primary_value
 
         legacy_value = await self._state.get(LEGACY_CAPITAL_KEY)
         if legacy_value is not None:
@@ -134,7 +149,9 @@ class PortfolioTracker:
                 legacy_key=LEGACY_CAPITAL_KEY,
                 new_key=primary,
             )
-        return legacy_value
+            return LEGACY_CAPITAL_KEY, legacy_value
+
+        return None, None
 
     async def get_capital(
         self,
@@ -158,16 +175,23 @@ class PortfolioTracker:
         Raises:
             RuntimeError: If a payload was returned but is malformed
                 (not a ``dict`` / missing ``available`` / non-numeric).
-                Fail-loud per ADR-0006 D4.
+                Fail-loud per ADR-0006 D4. The error message includes the
+                resolved key (primary vs legacy) and ``strategy_id`` so
+                post-Phase-B audits can locate the offending producer.
         """
-        payload = await self.read_raw(strategy_id=strategy_id)
+        resolved_key, payload = await self._resolve(strategy_id=strategy_id)
         if payload is None:
             return None
         if not isinstance(payload, dict) or "available" not in payload:
-            raise RuntimeError(f"portfolio:capital malformed: {payload!r}")
+            raise RuntimeError(
+                f"portfolio capital malformed at key={resolved_key!r} "
+                f"strategy_id={strategy_id!r}: {payload!r}"
+            )
         try:
             return Decimal(str(payload["available"]))
         except (InvalidOperation, ValueError) as exc:
             raise RuntimeError(
-                f"portfolio:capital.available not numeric: {payload['available']!r}"
+                f"portfolio capital 'available' not numeric at "
+                f"key={resolved_key!r} strategy_id={strategy_id!r}: "
+                f"{payload['available']!r}"
             ) from exc

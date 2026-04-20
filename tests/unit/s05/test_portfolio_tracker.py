@@ -249,10 +249,13 @@ async def test_malformed_payload_not_dict_raises(
     redis_client: fakeredis.aioredis.FakeRedis,
     tracker: PortfolioTracker,
 ) -> None:
-    """Non-dict payload -> RuntimeError (ADR-0006 D4 fail-loud)."""
+    """Non-dict payload -> RuntimeError with resolved key + strategy_id context."""
     await _seed(redis_client, PortfolioTracker.primary_key("default"), ["not", "a", "dict"])
-    with pytest.raises(RuntimeError, match="malformed"):
+    with pytest.raises(RuntimeError, match="malformed") as excinfo:
         await tracker.get_capital()
+    msg = str(excinfo.value)
+    assert "portfolio:default:capital" in msg
+    assert "default" in msg
 
 
 @pytest.mark.asyncio
@@ -260,10 +263,13 @@ async def test_malformed_payload_missing_available_raises(
     redis_client: fakeredis.aioredis.FakeRedis,
     tracker: PortfolioTracker,
 ) -> None:
-    """Dict missing ``available`` -> RuntimeError."""
+    """Dict missing ``available`` -> RuntimeError with resolved key + strategy_id."""
     await _seed(redis_client, PortfolioTracker.primary_key("default"), {"currency": "USD"})
-    with pytest.raises(RuntimeError, match="malformed"):
+    with pytest.raises(RuntimeError, match="malformed") as excinfo:
         await tracker.get_capital()
+    msg = str(excinfo.value)
+    assert "portfolio:default:capital" in msg
+    assert "default" in msg
 
 
 @pytest.mark.asyncio
@@ -271,14 +277,36 @@ async def test_malformed_payload_non_numeric_available_raises(
     redis_client: fakeredis.aioredis.FakeRedis,
     tracker: PortfolioTracker,
 ) -> None:
-    """Non-numeric ``available`` -> RuntimeError with specific message."""
+    """Non-numeric ``available`` -> RuntimeError with resolved key + strategy_id."""
     await _seed(
         redis_client,
         PortfolioTracker.primary_key("default"),
         {"available": "not_a_number"},
     )
-    with pytest.raises(RuntimeError, match="not numeric"):
+    with pytest.raises(RuntimeError, match="not numeric") as excinfo:
         await tracker.get_capital()
+    msg = str(excinfo.value)
+    assert "portfolio:default:capital" in msg
+    assert "default" in msg
+
+
+@pytest.mark.asyncio
+async def test_malformed_legacy_payload_reports_legacy_key(
+    redis_client: fakeredis.aioredis.FakeRedis,
+    tracker: PortfolioTracker,
+) -> None:
+    """Malformed payload under legacy key -> error cites the LEGACY key, not primary.
+
+    Ensures post-Phase-B audits can distinguish a corrupted legacy producer
+    from a corrupted per-strategy producer (addresses #210 Copilot thread 1).
+    """
+    await _seed(redis_client, LEGACY_CAPITAL_KEY, {"currency": "USD"})
+    with pytest.raises(RuntimeError, match="malformed") as excinfo:
+        await tracker.get_capital(strategy_id="crypto_momentum")
+    msg = str(excinfo.value)
+    assert LEGACY_CAPITAL_KEY in msg
+    assert "crypto_momentum" in msg
+    assert "portfolio:crypto_momentum:capital" not in msg
 
 
 # ---------------------------------------------------------------------------
