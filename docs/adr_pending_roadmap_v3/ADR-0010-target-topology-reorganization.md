@@ -136,18 +136,37 @@ The migration is executed as **Phase D.5** of the Roadmap (weeks 26-28) in a con
 
 - `git mv services/s01_data_ingestion/ services/data/ingestion/`
 - `git mv services/s08_macro_intelligence/ services/data/macro_intelligence/`
-- Add import-path shim `services/s01_data_ingestion/__init__.py` and `services/s08_macro_intelligence/__init__.py` each containing:
-  ```python
-  # DEPRECATED: import redirect during Phase D.5 migration (ADR-0010).
-  # Remove after PR 7. Consumers should import from services.data.ingestion
-  # / services.data.macro_intelligence.
-  import warnings
-  warnings.warn(
-      "services.s01_data_ingestion is deprecated; use services.data.ingestion",
-      DeprecationWarning, stacklevel=2,
-  )
-  from services.data.ingestion import *  # noqa
-  ```
+- Add compatibility shim at `services/s01_data_ingestion/__init__.py` and `services/s08_macro_intelligence/__init__.py` preserving both package-root and submodule-path imports via explicit `sys.modules` aliasing:
+
+    ```python
+    # DEPRECATED: import redirect during Phase D.5 migration (ADR-0010).
+    # Remove after PR 7. Consumers should import from services.data.ingestion.
+    from importlib import import_module
+    import sys
+    import warnings
+
+    _NEW_PACKAGE = "services.data.ingestion"
+    _OLD_PACKAGE = "services.s01_data_ingestion"
+    _ALIASES = {
+        _OLD_PACKAGE: _NEW_PACKAGE,
+        f"{_OLD_PACKAGE}.connectors": f"{_NEW_PACKAGE}.connectors",
+        f"{_OLD_PACKAGE}.normalizers": f"{_NEW_PACKAGE}.normalizers",
+        f"{_OLD_PACKAGE}.adapters": f"{_NEW_PACKAGE}.adapters",
+        f"{_OLD_PACKAGE}.publishers": f"{_NEW_PACKAGE}.publishers",
+        f"{_OLD_PACKAGE}.serving": f"{_NEW_PACKAGE}.serving",
+    }
+    warnings.warn(
+        "services.s01_data_ingestion is deprecated; use "
+        "services.data.ingestion",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    for _old_name, _new_name in _ALIASES.items():
+        sys.modules[_old_name] = import_module(_new_name)
+    from services.data.ingestion import *  # noqa: F401,F403
+    ```
+
+  If a package has deeper direct imports beyond these namespace roots (verified by `grep -r "from services.s0N" services/ tests/ scripts/` before each domain PR), add submodule-level stub modules at the old paths so every previously-valid import path continues to resolve during the migration window.
 - CI green; merge.
 
 **PR 2 — `services/signal/` domain migration**:
@@ -156,39 +175,39 @@ The migration is executed as **Phase D.5** of the Roadmap (weeks 26-28) in a con
 - `git mv services/s03_regime_detector/ services/signal/regime_detector/`
 - `git mv services/s04_fusion_engine/ services/signal/fusion/`
 - `git mv services/s07_quant_analytics/ services/signal/quant_analytics/`
-- Add shims at each old path.
+- Add `sys.modules`-aliasing shims at each old path, following the PR-1 pattern with per-package `_NEW_PACKAGE` / `_OLD_PACKAGE` / `_ALIASES` values (e.g., `_NEW_PACKAGE = "services.signal.engine"`, `_OLD_PACKAGE = "services.s02_signal_engine"`, and a `_ALIASES` dict covering the submodule roots present in the source — verified by grep before authoring the shim).
 - CI green; merge.
 
 **PR 3 — `services/portfolio/` domain migration**:
 
 - `git mv services/s05_risk_manager/ services/portfolio/risk_manager/`
-- Add shim at `services/s05_risk_manager/__init__.py`.
+- Add `sys.modules`-aliasing shim at `services/s05_risk_manager/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.portfolio.risk_manager"`, `_OLD_PACKAGE = "services.s05_risk_manager"`, and the submodule roots of s05 (e.g., `chain_orchestrator`, `context_loader`, `fail_closed`, `meta_label_gate`, `position_rules`, `exposure_monitor`, `circuit_breaker`, `cb_event_guard`, `decision_builder`, `in_memory_state`, `reconciliation`, `models`).
 - `services/portfolio/strategy_allocator/` already exists (Phase C).
 - CI green; merge.
 
 **PR 4 — `services/execution/` domain migration**:
 
 - `git mv services/s06_execution/ services/execution/engine/`
-- Add shim at `services/s06_execution/__init__.py`.
+- Add `sys.modules`-aliasing shim at `services/s06_execution/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.execution.engine"`, `_OLD_PACKAGE = "services.s06_execution"`, and the submodule roots of s06 (`broker_base`, `broker_alpaca`, `broker_binance`, `broker_factory`, `portfolio_tracker`).
 - CI green; merge.
 
 **PR 5 — `services/research/` domain migration**:
 
 - `git mv services/s09_feedback_loop/ services/research/feedback_loop/`
-- Add shim at `services/s09_feedback_loop/__init__.py`.
+- Add `sys.modules`-aliasing shim at `services/s09_feedback_loop/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.research.feedback_loop"`, `_OLD_PACKAGE = "services.s09_feedback_loop"`, and the submodule roots of s09 (`drift_detector`, `trade_analyzer`, `signal_quality`, `pnl_tracker`, `position_aggregator`, `alert_engine`).
 - CI green; merge.
 
 **PR 6 — `services/ops/` domain migration**:
 
 - `git mv services/s10_monitor/ services/ops/monitor_dashboard/`
-- Add shim at `services/s10_monitor/__init__.py`.
+- Add `sys.modules`-aliasing shim at `services/s10_monitor/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.ops.monitor_dashboard"`, `_OLD_PACKAGE = "services.s10_monitor"`, and the submodule roots of s10 (`dashboard`, `alert_engine`, `command_api`, `metrics`).
 - CI green; merge.
 
 **PR 7 — remove shims; finalize**:
 
 - Delete all `services/s0N/__init__.py` shim files.
 - Update `supervisor/orchestrator.py` startup order to the target paths per Charter §5.9.
-- Update `docker-compose.yml`: container names and build contexts reference target paths.
+- Update `docker/docker-compose.yml` and `docker/docker-compose.test.yml`: container names and build contexts reference target paths.
 - Update `MANIFEST.md` to describe the target topology.
 - Update `CLAUDE.md` top banner if it references specific service paths.
 - Update all import statements in tests and scripts to target paths (CI fails if any remain).
@@ -407,7 +426,7 @@ Executed in weeks 26-28, in order:
 - [`services/s09_feedback_loop/`](../../services/s09_feedback_loop/) → `services/research/feedback_loop/`
 - [`services/s10_monitor/`](../../services/s10_monitor/) → `services/ops/monitor_dashboard/`
 - [`supervisor/orchestrator.py`](../../supervisor/orchestrator.py) — startup order updated in PR 7.
-- [`docker/docker-compose.yml`](../../docker/docker-compose.yml) — container build contexts updated in PR 7.
+- [`docker/docker-compose.yml`](../../docker/docker-compose.yml) and [`docker/docker-compose.test.yml`](../../docker/docker-compose.test.yml) — container build contexts updated in PR 7.
 - [`MANIFEST.md`](../../MANIFEST.md) — service section rewritten in PR 7.
 - [`CLAUDE.md`](../../CLAUDE.md) §2 — topology description updated in PR 7.
 

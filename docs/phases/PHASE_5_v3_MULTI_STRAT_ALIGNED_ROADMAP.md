@@ -53,9 +53,9 @@ Where the Roadmap and the Charter or Playbook appear to conflict: the conflict i
 
 On merge, this Document 3 explicitly supersedes:
 
-1. **[`docs/phases/PHASE_5_SPEC_v2.md`](PHASE_5_SPEC_v2.md)** — the current active Phase 5 execution spec. The PR that merges this Roadmap adds a `SUPERSEDED` banner to PHASE_5_SPEC_v2. The file remains in the repository for historical reference; no content is deleted. Ongoing 5.2/5.3/5.5/5.4/5.8/5.10 sub-phase work is re-sequenced by this Roadmap (see §2.4 for the explicit mapping).
+1. **[`docs/phases/PHASE_5_SPEC_v2.md`](PHASE_5_SPEC_v2.md)** — the current active Phase 5 execution spec. A follow-up PR (post-merge action per §16.1) adds a `SUPERSEDED` banner to PHASE_5_SPEC_v2. The file remains in the repository for historical reference; no content is deleted. Ongoing 5.2/5.3/5.5/5.4/5.8/5.10 sub-phase work is re-sequenced by this Roadmap (see §2.4 for the explicit mapping).
 
-2. **[`docs/PROJECT_ROADMAP.md`](../PROJECT_ROADMAP.md)** — the pre-Charter high-level roadmap. The PR that merges this Roadmap adds a `SUPERSEDED` banner. The file remains for historical reference; Charter §10.5 and this Roadmap's §9 together replace its forward-looking content.
+2. **[`docs/PROJECT_ROADMAP.md`](../PROJECT_ROADMAP.md)** — the pre-Charter high-level roadmap. A follow-up PR (post-merge action per §16.1) adds a `SUPERSEDED` banner. The file remains for historical reference; Charter §10.5 and this Roadmap's §9 together replace its forward-looking content.
 
 Pre-Charter documents that **are not** superseded:
 
@@ -361,13 +361,21 @@ def signal_for(strategy_id: str, symbol: str) -> str:
 - **"[phase-A.11] Dual-write kelly and trades Redis keys with per-strategy partitioning"** — scope: S09.
 - **"[phase-A.12] Per-strategy scoping in new PnLTracker"** — scope: S09 PnLTracker (from §2.2.4 A.8).
 
+#### 2.2.6 Raise CI coverage gate from 75% to 85%
+
+**Scope**: once all Phase A §2.2.1 through §2.2.5 deliverables are merged and main has stably shown total coverage ≥ 85% for at least 7 days, raise the CI coverage gate in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) from `--cov-fail-under=75` to `--cov-fail-under=85`. This aligns the mechanical gate with the CLAUDE.md §6 target.
+
+**Prerequisite**: main shows `pytest --cov` ≥ 85% for 7 consecutive days.
+
+**Issue**: **"[phase-A.13] Raise CI coverage gate from 75% to 85% (post-Phase-A stabilization)"**.
+
 ### 2.3 Testing discipline
 
 Every Phase A deliverable ships with:
 
 1. **Hypothesis property tests** for the Pydantic model changes — the `strategy_id` field must round-trip via `model_dump_json() / model_validate_json()` under arbitrary ASCII strings; the default value `"default"` must be preserved when the field is omitted on construction.
 2. **Integration test for backward compatibility** — a test that constructs an `OrderCandidate` *without* `strategy_id`, passes it through the current legacy chain (S04 → S05 → S06), and verifies behavior is unchanged bit-for-bit against a pre-Phase-A baseline. This is the Principle-6-in-code assertion.
-3. **CI coverage maintained ≥ 85% overall** (CLAUDE.md §6 target); ≥ 90% on new modules per standard pattern.
+3. **Coverage discipline**: CI's current repository coverage gate (`--cov-fail-under=75`, per [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml)) continues to pass. Phase A §2.2 deliverables are expected to raise effective total coverage to ≥ 85% (CLAUDE.md §6 target); ≥ 90% coverage on new modules remains the standard pattern. A Phase-A-scoped action item raises the CI gate itself from 75% to 85% once Phase A deliverables land on main — see Phase A §2.2.6 below.
 4. **mypy strict clean; ruff clean; bandit clean** per CI contract.
 
 **Regression harness**: a dedicated `tests/regression/test_phase_a_backward_compat.py` is introduced to hold the Phase A backward-compatibility assertions. This file persists beyond Phase A and is consulted whenever future phases touch the `strategy_id` plumbing.
@@ -404,6 +412,7 @@ Phase A is closed when **all** of the following hold (verifiable via CI, PR revi
 - [ ] Per-strategy Redis key dual-write active for `kelly:{strategy_id}:{symbol}` and `trades:{strategy_id}:all` (legacy keys still written; per-strategy keys additionally written).
 - [ ] CI pipeline (quality + rust + unit-tests + integration-tests + backtest-gate) green on `main`.
 - [ ] Overall coverage maintained ≥ 85% (CLAUDE.md §6).
+- [ ] CI coverage gate raised from `--cov-fail-under=75` to `--cov-fail-under=85` (issue `[phase-A.13]` closed), OR a documented exception noting the gate remains at 75% pending further deliverables in Phase B.
 - [ ] mypy strict clean across the repository.
 - [ ] Regression harness `tests/regression/test_phase_a_backward_compat.py` is present and green.
 
