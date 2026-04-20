@@ -23,11 +23,13 @@ It defines non-negotiable constraints for all development work on this project.
 > - If the target-state location is already specified in the Charter, create the file directly in the target location (e.g., `services/strategies/crypto_momentum/service.py`, NOT `services/s11_crypto_momentum/service.py`).
 > - If adding functionality to an existing S01-S10 service, continue using the current path (e.g., `services/s05_risk_manager/` stays until the refactor) but ensure that new contracts (Pydantic models, ZMQ topics, Redis keys) include `strategy_id` where the Charter requires it, and reference the Charter section that motivates the change.
 >
-> Migration from current topology to target topology is scheduled in **Document 3 (PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md, pending authoring)**.
+> Migration from current topology to target topology is scheduled in **Document 3 ([`PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`](docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md), v3.0, ratified 2026-04-20 via PR #188 + #189)**.
 >
 > **Binding precedence**: When CLAUDE.md and the Charter conflict, the Charter prevails for architectural decisions; CLAUDE.md prevails for code-convention rules (forbidden patterns, mandatory types, testing gates). No conflict is expected in practice because they operate on different levels.
 >
 > **Lifecycle Playbook (operational layer)**: [`docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md`](docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md) (v1.0, ratified 2026-04-20 via PR #186).
+>
+> **Multi-Strat Aligned Roadmap (executional layer)**: [`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`](docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) (v3.0, ratified 2026-04-20 via PR #188; post-merge fixups PR #189). Four new ADRs formalized alongside: [ADR-0007 Strategy as Microservice](docs/adr/ADR-0007-strategy-as-microservice.md), [ADR-0008 Capital Allocator Topology](docs/adr/ADR-0008-capital-allocator-topology.md), [ADR-0009 Panel Builder Discipline](docs/adr/ADR-0009-panel-builder-discipline.md), [ADR-0010 Target Topology Reorganization](docs/adr/ADR-0010-target-topology-reorganization.md). With Document 3, the **Charter-Playbook-Roadmap trilogy is fully canonical on main**; Phase A (weeks 1–8) is ready to begin.
 >
 > **Every Claude Code session invoked on strategy work MUST read the Playbook alongside the Charter.** The Charter defines *what* the platform is and *what* the gates require; the Playbook defines *how* a strategy is built, validated, deployed, monitored, and retired in mechanical detail. An agent that opens a Gate 1 or Gate 2 PR without following the Playbook's §3 or §4 deliverables respectively is operating outside platform discipline.
 >
@@ -36,7 +38,8 @@ It defines non-negotiable constraints for all development work on this project.
 > 2. [`docs/claude_memory/CONTEXT.md`](docs/claude_memory/CONTEXT.md) — current project state
 > 3. [APEX Multi-Strat Charter](docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md) — constitutional layer
 > 4. [Lifecycle Playbook](docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md) — operational layer
-> 5. The relevant per-strategy Charter at `docs/strategy/per_strategy/<strategy_id>.md` if working on a specific strategy.
+> 5. [Multi-Strat Aligned Roadmap](docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) — executional layer (scheduling + phase exit criteria)
+> 6. The relevant per-strategy Charter at `docs/strategy/per_strategy/<strategy_id>.md` if working on a specific strategy.
 
 ---
 

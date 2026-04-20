@@ -2401,3 +2401,73 @@ Modified (Batch B):
 - Roadmap v3 (Document 3, executional layer) — QUEUED, pending authoring
 - Multi-Strat Infrastructure Lift — QUEUED after Doc 3
 - 6 boot strategies — still at backlog; Strategy #1 (Crypto Momentum) ready to enter Gate 1 once Doc 3 schedules it
+
+---
+
+## Session 043 — Multi-Strat Aligned Roadmap v3.0 ratified (2026-04-20)
+
+**Outcome**: Roadmap v3.0 (Document 3 of 3) + ADR-0007/8/9/10 authored, reviewed, 5 Copilot corrections applied, merged via PR #188. Post-merge fixups (ADR canonicalization + SUPERSEDED banners) merged via PR #189. Charter-Playbook-Roadmap trilogy now fully canonical on main.
+
+**Key activities**:
+
+1. Roadmap drafted by Claude Code on branch `docs/phase-5-v3-roadmap-document-3` (commit `3add4e7`). 2,099 lines across 18 sections (§0–§17). Synthesizes Charter v1.0 (Doc 1), Playbook v1.0 (Doc 2), MULTI_STRAT_READINESS_AUDIT_2026-04-18, PHASE_5_SPEC_v2, PROJECT_ROADMAP, CLAUDE.md + MANIFEST.md into a 24-month time-ordered execution plan.
+2. Four ADRs authored alongside per Charter §12.4 commitment:
+   - ADR-0007 Strategy as Microservice (~430 lines) — formalizes Charter §5.1 Q1.
+   - ADR-0008 Capital Allocator Topology (~380 lines) — formalizes Charter §5.2, §6.
+   - ADR-0009 Panel Builder Discipline (~350 lines) — formalizes Charter §5.3 Q3.
+   - ADR-0010 Target Topology Reorganization (~400 lines) — formalizes Charter §5.4.
+3. ADRs authored at `docs/adr_pending_roadmap_v3/` rather than canonical `docs/adr/` due to a path-protection hook on the authoring session blocking Write/Edit against `docs/adr/`. Supersession banners on `docs/phases/PHASE_5_SPEC_v2.md` and `docs/PROJECT_ROADMAP.md` similarly blocked. Both deferred to post-merge manual action documented in Roadmap §16.1 and in the PR description.
+4. Initial atomic commit: 3,741 insertions across 5 new files. Single-commit discipline per CLAUDE.md §12 commit conventions.
+5. Copilot auto-review surfaced 8 comments (4 broken-link reports for missing audit file + 4 substantive fixes):
+   - FIX 1: add `docs/audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md` (701 lines; was untracked despite being cited extensively).
+   - FIX 2: Roadmap §0.4 "on merge" wording corrected — "A follow-up PR (post-merge action per §16.1) adds a SUPERSEDED banner" (was "The PR that merges this Roadmap adds").
+   - FIX 3: Phase A §2.3 item 3 rewritten + new §2.2.6 coverage-gate raise issue `[phase-A.13]` authored + §2.6 exit criteria updated.
+   - FIX 4: ADR-0010 §D4 shim approach upgraded from naive re-export to explicit `sys.modules` aliasing preserving submodule paths.
+   - FIX 5: ADR-0010 §D4 PR 7 + §7.4 clarified as `docker/docker-compose.yml` and `docker/docker-compose.test.yml` (not ambiguous root `docker-compose.yml`).
+   Fixes landed in commit `c952e07` (751 insertions / 22 deletions across 3 files). All 8 Copilot threads replied to and resolved via GraphQL `resolveReviewThread` mutation.
+6. PR #188 merged 2026-04-20 (`db706f4`).
+7. Post-merge fixups applied by CIO per Roadmap §16.1 procedure and merged via PR #189 (`bf281bb`, 2026-04-20): 4 ADRs moved from `docs/adr_pending_roadmap_v3/` to `docs/adr/` via `git mv`; SUPERSEDED banners applied to `docs/phases/PHASE_5_SPEC_v2.md` and `docs/PROJECT_ROADMAP.md`; Roadmap §10 and §14.2 link paths canonicalized.
+8. Documentation sync PR (this session) propagates Roadmap + 4-ADR references across CLAUDE.md, MANIFEST.md, CONTEXT.md, DECISIONS.md, SESSIONS.md, and adds one-line cross-refs to ADR-0001 through ADR-0006.
+
+**Key decisions reached**:
+
+- **Phase A-D + D.5 schedule** (Roadmap §2–§5): Phase A weeks 1–8 (foundational contracts), Phase B 6–14 (StrategyRunner ABC + legacy wrap + StrategyHealthCheck), Phase C 12–22 (allocator + 7-step chain), Phase D 18–28 (panels + per-strategy feedback + portfolio backtest), Phase D.5 26–28 (topology migration). Overlap windows absorb up to 2-week slips without cascade.
+- **Six boot strategies sequenced** (lifecycle ranges from Roadmap §6–§8): Crypto Momentum (Weeks 10-36) → Trend Following (Weeks 20-50) → Mean Rev Equities (Weeks 40-70) → VRP (Weeks 52-86) → Macro Carry (Weeks 64-100) → News-driven (Weeks 76-120). Strategy #6 Live Full extends beyond 24-month horizon; Roadmap v4.0 rescopes at month 24.
+- **Portfolio benchmarks calendar-mapped** (Roadmap §9): Survival month 9 (Strategy #1 Live Full), Legitimacy month 15 (Strategies #1+#2 live), Institutional month 24 (Strategies #1+#2+#3 live).
+- **Phase 2 Sharpe overlay activation** (Charter §6.2.1): earliest candidate at month 26+; no early activation unless Charter §13.4 amendment procedure invoked.
+- **CI coverage gate raise** scheduled as Phase-A item: `[phase-A.13]` raises `--cov-fail-under=75` → `--cov-fail-under=85` after 7-day stabilization of Phase A deliverables.
+- **Topology migration** (ADR-0010): 7 staged PRs with `sys.modules`-aliasing import shims; individually revertible; `git mv` preserves blame/log history.
+
+**Work queued**:
+
+- **Phase A execution begins immediately**. Issues `[phase-A.1]` through `[phase-A.13]` to be opened and assigned against Roadmap §2.2 scope. Phase A exit criteria in §2.6; 8-week target window (weeks 1–8) with 2-week slip tolerance to week 10.
+- Strategy #1 Crypto Momentum informal research (notebook) in-progress per Playbook §3.1; formal Gate 1 PR opens at week ~10 once Phase A §2.2.1 and §2.2.2 land on main.
+- In-flight CI backtest-gate fix on branch `fix/ci-backtest-gate-sharpe` (issue #102) — becomes Phase A §2.2.3 deliverable.
+- Quarterly Roadmap reviews scheduled at months 3, 6, 9, 12, 15, 18, 21, 24 per Roadmap §12.3.
+
+**Key files affected** (this session):
+
+- docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md (created via PR #188, polished via PR #189)
+- docs/adr/ADR-0007-strategy-as-microservice.md (created + canonicalized via PR #189)
+- docs/adr/ADR-0008-capital-allocator-topology.md (created + canonicalized via PR #189)
+- docs/adr/ADR-0009-panel-builder-discipline.md (created + canonicalized via PR #189)
+- docs/adr/ADR-0010-target-topology-reorganization.md (created + canonicalized via PR #189)
+- docs/audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md (added in Copilot fix `c952e07`)
+- docs/phases/PHASE_5_SPEC_v2.md (SUPERSEDED banner applied via PR #189)
+- docs/PROJECT_ROADMAP.md (SUPERSEDED banner applied via PR #189)
+- CLAUDE.md (Roadmap + 4 ADR pointers added to banner — this sync PR)
+- MANIFEST.md (Roadmap + 4 ADR pointers added to banner — this sync PR)
+- docs/claude_memory/CONTEXT.md (Roadmap Ratification section added — this sync PR)
+- docs/claude_memory/DECISIONS.md (Roadmap ratification entry added — this sync PR)
+- docs/claude_memory/SESSIONS.md (this entry — this sync PR)
+- docs/adr/ADR-0001 through ADR-0006 (one-line cross-refs to relevant new ADRs — **deferred to a follow-up PR**; blocked by the `docs/adr/` path-protection hook in this authoring session; CIO applies post-merge per PR #190 post-merge action list, ~2 minutes manual work)
+
+**Platform state after this session**:
+
+- Charter v1.0 (Document 1, constitutional layer) — RATIFIED 2026-04-18 via PR #184.
+- Playbook v1.0 (Document 2, operational layer) — RATIFIED 2026-04-20 via PR #186.
+- **Roadmap v3.0 (Document 3, executional layer) — RATIFIED 2026-04-20 via PR #188 + #189.**
+- **Charter-Playbook-Roadmap trilogy complete and fully canonical on main.** No further foundational documents are queued.
+- ADR-0007/8/9/10 at canonical `docs/adr/` location.
+- Multi-Strat Infrastructure Lift — **Phase A ready to begin**.
+- 6 boot strategies — Strategy #1 (Crypto Momentum) in informal research; formal Gate 1 PR opens at week ~10.
