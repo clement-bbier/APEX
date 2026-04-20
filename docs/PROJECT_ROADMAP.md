@@ -20,6 +20,8 @@
 > Current phase specification remains [PHASE_5_SPEC_v2.md](phases/PHASE_5_SPEC_v2.md) until Document 3 supersedes it.
 >
 > **For strategic direction**, read the Charter first: [docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md](strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md).
+>
+> **Operational procedures** are now binding via the **Lifecycle Playbook v1.0** (ratified 2026-04-20 via PR #186): [`docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md`](strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md). Document 3 will schedule specific gate timelines for the 6 boot strategies; until Doc 3 ratification, gate timings remain per the trigger-based lifecycle defined in Charter §7 and operationalized in Playbook §3-§6.
 
 > **⚠️ PHASE-NUMBERING DRIFT NOTICE (2026-04-17)**
 >

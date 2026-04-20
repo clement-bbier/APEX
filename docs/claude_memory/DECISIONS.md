@@ -1081,3 +1081,46 @@ alongside deletion of the now-redundant prototype.
 4. Multi-Strat Infrastructure Lift (Phases A-B-C-D) — scheduled in Document 3, begins after Doc 3 ratification.
 
 **Review cadence**: Charter reviewed semi-annually (per Charter §9.6). Emergency review triggered by 3+ decommissionings in 12M, 3+ hard CB trips in 12M, or Charter fundamentally blocking a desired strategy deployment.
+
+---
+
+## 2026-04-20 — APEX Strategy Development Lifecycle Playbook v1.0 ratified (PR #186)
+
+**Decision**: Adopt the Lifecycle Playbook as the binding operational layer of the APEX Multi-Strat Platform.
+
+**File**: [`docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md`](../strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md) (v1.0)
+
+**PR**: #186 (merged 2026-04-20)
+
+**What the Playbook binds:**
+
+The Playbook prescribes mechanical operational detail for every stage of a strategy's lifecycle — who acts, what evidence is consumed, what artifacts are produced, what triggers the next step. From this point forward, deviations from Playbook procedures require an ADR + Playbook version bump per §16.4.
+
+**Key constitutional additions (Playbook-specific, not in Charter):**
+
+1. **10 canonical stress scenarios** (§4.2.2) — the fixed Gate 2 test battery: equity flash crash, vol spike, Fed surprise, SNB-class FX shock, geopolitical oil shock, liquidity evaporation, correlation breakdown, crypto tail event, single-symbol gap, data feed outage.
+2. **StrategyHealthCheck state machine** (§8.0) — 6 states with formal transition table; canonical spec for STEP 3 of the VETO chain.
+3. **Master decommissioning checklist** (§10.3.2) — identical for all 6 Charter §9.2 rules.
+4. **Per-strategy Charter template** (§2.3) — reusable across all strategies; 12 sections.
+5. **18-month candidate aging out** (§13.3.3) — backlog hygiene discipline.
+
+**Participants:**
+- CIO: Clement Barbier (ratifier)
+- Head of Strategy Research: Claude Opus 4.7 (Playbook author; applied 5 review corrections after initial draft)
+- Implementation Lead: Claude Code (authored on branch `docs/strategy-lifecycle-document-2`; applied corrections)
+
+**5 review corrections applied before merge:**
+
+1. §5.2.4 + §5.3: pod-crash reset semantics clarified (3-reset limit formalized)
+2. §10.4.1: running-peak methodology (not inception-peak) — matches Charter §9.2 Rule #4 intent
+3. §8.0 ADDED: canonical StrategyHealthCheck state machine specification
+4. §14.1: CIO authority distinction (Rules #1/#2 via review_mode can be cleared; Rules #3/#4/#5 auto-decomm cannot be blocked)
+5. Coherence sweep for "inception-peak" references
+
+**Downstream actions:**
+
+1. Documentation sync PR (this PR) — adds Playbook pointers to CLAUDE.md, MANIFEST.md, CONTEXT.md, DECISIONS.md, SESSIONS.md, PROJECT_ROADMAP.md.
+2. Document 3 (PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) — next authoring mission; sequences Multi-Strat Infrastructure Lift Phases A-B-C-D against the 6 boot strategies' gate timelines.
+3. Multi-Strat Infrastructure Lift begins after Doc 3 ratification.
+
+**Review cadence**: Playbook reviewed annually alongside Charter semi-annual reviews (§16.5).

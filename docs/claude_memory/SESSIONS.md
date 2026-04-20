@@ -2366,3 +2366,38 @@ Modified (Batch B):
 - docs/claude_memory/DECISIONS.md (Charter ratification entry added)
 - docs/claude_memory/SESSIONS.md (this entry)
 - docs/adr/ADR-0001 through ADR-0006 (one-line Charter cross-reference)
+
+---
+
+## Session 042 — Lifecycle Playbook v1.0 ratified (2026-04-20)
+
+**Outcome**: Playbook v1.0 (Document 2 of 3) authored, reviewed, 5 corrections applied, merged via PR #186.
+
+**Key activities**:
+
+1. Playbook drafted by Claude Code on branch `docs/strategy-lifecycle-document-2` (commit 0161bca). 2,772 lines across 19 sections (§0–§18).
+2. Joint review (CIO + Head of Strategy Research as Claude Opus 4.7) identified 5 corrections: (a) §5.2.4+§5.3 pod-crash reset semantics clarified, (b) §10.4.1 running-peak methodology corrected (was inception-peak, introduced 20% trigger bug), (c) §8.0 StrategyHealthCheck state machine formally specified, (d) §14.1 CIO authority distinction Rules #1/#2 vs #3/#4/#5, (e) coherence sweep.
+3. Corrections applied in follow-up commit on same branch (b1e84ec). Merged 2026-04-20 (e92c13b).
+4. Documentation sync PR (this session) adds Playbook pointers to 6 critical files in the agent-read path.
+
+**Work queued**:
+
+- Document 3 (PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md) — next mission. Sequences Multi-Strat Infrastructure Lift Phases A-B-C-D against the 6 boot strategies' gate timelines. Will author ADR-0007 (Strategy as Microservice), ADR-0008 (Capital Allocator Topology), ADR-0009 (Panel Builder Discipline), ADR-0010 (Target Topology Reorganization) as per Charter §12.4.
+- Multi-Strat Infrastructure Lift Phases A, B, C, D — scheduled in Doc 3, begins after Doc 3 ratification.
+- In-flight CI backtest-gate fix on branch `fix/ci-backtest-gate-sharpe` — independent track.
+
+**Key files affected** (this session):
+- docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md (created + corrections, v1.0)
+- CLAUDE.md (Playbook pointer added to STATUS banner)
+- MANIFEST.md (Playbook pointer added to STATUS banner)
+- docs/PROJECT_ROADMAP.md (Playbook pointer added to STATUS banner)
+- docs/claude_memory/CONTEXT.md (Playbook pointer + Playbook Ratification section added)
+- docs/claude_memory/DECISIONS.md (Playbook ratification entry added)
+- docs/claude_memory/SESSIONS.md (this entry)
+
+**Platform state after this session**:
+- Charter v1.0 (Document 1, constitutional layer) — RATIFIED 2026-04-18
+- Playbook v1.0 (Document 2, operational layer) — RATIFIED 2026-04-20
+- Roadmap v3 (Document 3, executional layer) — QUEUED, pending authoring
+- Multi-Strat Infrastructure Lift — QUEUED after Doc 3
+- 6 boot strategies — still at backlog; Strategy #1 (Crypto Momentum) ready to enter Gate 1 once Doc 3 schedules it

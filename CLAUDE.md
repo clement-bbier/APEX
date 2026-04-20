@@ -26,6 +26,17 @@ It defines non-negotiable constraints for all development work on this project.
 > Migration from current topology to target topology is scheduled in **Document 3 (PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md, pending authoring)**.
 >
 > **Binding precedence**: When CLAUDE.md and the Charter conflict, the Charter prevails for architectural decisions; CLAUDE.md prevails for code-convention rules (forbidden patterns, mandatory types, testing gates). No conflict is expected in practice because they operate on different levels.
+>
+> **Lifecycle Playbook (operational layer)**: [`docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md`](docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md) (v1.0, ratified 2026-04-20 via PR #186).
+>
+> **Every Claude Code session invoked on strategy work MUST read the Playbook alongside the Charter.** The Charter defines *what* the platform is and *what* the gates require; the Playbook defines *how* a strategy is built, validated, deployed, monitored, and retired in mechanical detail. An agent that opens a Gate 1 or Gate 2 PR without following the Playbook's §3 or §4 deliverables respectively is operating outside platform discipline.
+>
+> Per Playbook §14.3.1, mandatory pre-session reads for any strategy work:
+> 1. This document (CLAUDE.md) — code conventions
+> 2. [`docs/claude_memory/CONTEXT.md`](docs/claude_memory/CONTEXT.md) — current project state
+> 3. [APEX Multi-Strat Charter](docs/strategy/ALPHA_THESIS_AND_MULTI_STRAT_CHARTER.md) — constitutional layer
+> 4. [Lifecycle Playbook](docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md) — operational layer
+> 5. The relevant per-strategy Charter at `docs/strategy/per_strategy/<strategy_id>.md` if working on a specific strategy.
 
 ---
 
