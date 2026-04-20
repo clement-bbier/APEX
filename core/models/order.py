@@ -9,7 +9,7 @@ from __future__ import annotations
 from decimal import Decimal
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from core.models.signal import Direction, Signal
 
@@ -49,6 +49,14 @@ class OrderCandidate(BaseModel):
     symbol: str = Field(..., description="Uppercase trading symbol")
     direction: Direction = Field(..., description="Trade direction")
     timestamp_ms: int = Field(..., gt=0, description="Proposal time UTC ms")
+    strategy_id: str = Field(
+        default="default",
+        description=(
+            "Per-strategy identifier (Charter §5.5, ADR-0007 §D6). "
+            "Default 'default' preserves the legacy single-strategy path "
+            "until Phase B wraps it as LegacyConfluenceStrategy."
+        ),
+    )
 
     # Sizing
     size: Decimal = Field(..., gt=Decimal("0"), description="Total position size in base units")
@@ -90,6 +98,37 @@ class OrderCandidate(BaseModel):
     # Lineage
     source_signal: Signal | None = None
     linked_order_id: str | None = Field(default=None, description="ID of hedge counterpart order")
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Mirrors the Signal.validate_strategy_id validator (see
+        ``core/models/signal.py``) so every order-path model applies the same
+        structural guarantees per Charter §5.5 and ADR-0007 §D6. Empty strings,
+        whitespace, forward/backslashes and quote characters are rejected, and
+        length is capped at 64 so downstream Redis keys
+        (``kelly:{strategy_id}:{symbol}`` etc.) and filesystem paths
+        (``services/strategies/{strategy_id}/``) stay bounded and safe.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; "
+                "ASCII and Unicode whitespace (incl. NBSP \\u00A0) are not permitted"
+            )
+        forbidden = set("/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "slashes and quotes are not permitted"
+            )
+        return v
 
     @model_validator(mode="after")
     def validate_exit_sizes(self) -> OrderCandidate:
