@@ -116,12 +116,17 @@ class OrderCandidate(BaseModel):
             raise ValueError("strategy_id must be non-empty")
         if len(v) > 64:
             raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
-        forbidden = set(" \t\n\r\v\f/\\'\"")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; "
+                "ASCII and Unicode whitespace (incl. NBSP \\u00A0) are not permitted"
+            )
+        forbidden = set("/\\'\"")
         bad = sorted(set(v) & forbidden)
         if bad:
             raise ValueError(
                 f"strategy_id contains forbidden characters {bad!r}; "
-                "whitespace, slashes and quotes are not permitted"
+                "slashes and quotes are not permitted"
             )
         return v
 

@@ -91,6 +91,8 @@ class TestStrategyIdFrozen:
         "has space",
         "has\ttab",
         "has\nnewline",
+        "has\u00a0nbsp",
+        "has\u2003emspace",
         "has/slash",
         "has\\backslash",
         "has'quote",
