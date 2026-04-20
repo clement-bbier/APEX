@@ -15,6 +15,8 @@
 > This is the **constitutional document** of the APEX Multi-Strategy Platform (v1.0, ratified 2026-04-18). It defines the vision, the seven binding principles, the target architecture, the six boot strategies, the capital allocation framework, the strategy lifecycle, the defense-in-depth model, and the governance rules. Every design, implementation, or deployment decision must be defensible under the Charter's principles.
 >
 > This CONTEXT.md file complements the Charter by providing session-continuity operational context (what was done recently, what is in flight, where the main branch currently stands).
+>
+> **Lifecycle Playbook**: [`docs/strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md`](../strategy/STRATEGY_DEVELOPMENT_LIFECYCLE.md) (v1.0, ratified 2026-04-20). The **operational layer** of the platform. Required reading alongside the Charter for any strategy work (see Playbook §14.3.1 mandatory pre-session reads).
 
 ---
 
@@ -48,6 +50,42 @@ The APEX Multi-Strat Platform Charter v1.0 was ratified on 2026-04-18 via PR #18
 - Document 3: `docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md` — time-ordered execution plan replacing PHASE_5_SPEC_v2.md.
 
 Until Document 3 is ratified, in-flight Phase 5 work continues per PHASE_5_SPEC_v2.md with the explicit understanding that the multi-strat infrastructure lift is prepended as an early phase.
+
+---
+
+## Playbook Ratification (2026-04-20)
+
+The APEX Strategy Development Lifecycle Playbook v1.0 was ratified via PR #186, merged to main on 2026-04-20. It is the **operational layer** of the Multi-Strat Platform.
+
+**What the Playbook defines:**
+
+- **Per-strategy Charter template** (§2) — every strategy gets a one-page Charter that the CIO ratifies at Gate 2.
+- **Gate 1 protocol** (§3) — research-to-formal-evidence with ADR-0002 10-point checklist, Charter §7.1 thresholds.
+- **Gate 2 protocol** (§4) — research-to-production-code with CPCV + 10 canonical stress scenarios + ≥90% coverage + per-strategy Charter ratification.
+- **Gate 3 protocol** (§5) — paper trading ≥8 weeks + ≥50 trades with paper evidence package.
+- **Gate 4 protocol** (§6) — 60-day live-micro linear ramp with Day-60 decision (live Sharpe > 70% paper).
+- **StrategyHealthCheck state machine** (§8.0) — 6 states (HEALTHY, DD_KELLY_ADJUSTED, PAUSED_24H, PAUSED_OPERATIONAL, REVIEW_MODE, DECOMMISSIONED) with formal transition table.
+- **Soft CB response protocols** (§8) — per-strategy: DD 8%/24h → Kelly×0.5; DD 12%/24h → pause; DD 15%/72h → review_mode; win rate <25%/50 trades → Kelly×0.75; pod crash → pause.
+- **Hard CB response protocols** (§9) — portfolio: DD 12%/24h → halt; DD 15%/72h → halt + 48h cooling; 3+ strategies DEGRADED → halt; VaR > 8% → Kelly×0.5 across all.
+- **Decommissioning checklist** (§10) — six Charter §9.2 rules operationalized with master checklist.
+- **Reactivation protocol** (§11) — 6-month wait + corrected root cause + gate re-run.
+- **Category reassignment** (§12) — promotion (Medium→Low Vol) / demotion (Low→Medium Vol) thresholds and mechanics.
+- **New candidate onboarding** (§13) — informal evaluation → candidate note → CIO go/no-go → Gate 1 entry.
+- **Roles and responsibilities** (§14) — CIO / Head of Strategy Research / Claude Code Implementation Lead / CI System boundaries.
+
+**Immediate implications for Claude Code sessions from this point forward:**
+
+1. **Every strategy work session** MUST read CLAUDE.md + CONTEXT.md + Charter + Playbook (+ per-strategy Charter if applicable) before writing code (per §14.3.1).
+2. **Gate PRs use Playbook templates verbatim**: Gate 1 PR template at §3.4; Gate 2 PR template at §4.3.1; Gate 3 paper evidence package at §5.4.1; Gate 4 Day-60 evidence package at §6.3.2.
+3. **Per-strategy Charter is mandatory**: drafted during Gate 1 (sections 1-4), completed and CIO-ratified at Gate 2 (sections 5-12). Template at Playbook §2.3.
+4. **10 canonical stress scenarios** (Playbook §4.2.2) are the fixed battery every Gate 2 PR must pass. Structural exemptions documented in per-strategy Charter §9.
+5. **StrategyHealthCheck state machine** (§8.0) is the single canonical spec for strategy state transitions; all strategy microservices inherit it.
+6. **Decommissioning follows the master checklist** (§10.3.2) regardless of which of the 6 Rules triggered it; post-mortem required within 7 days.
+7. **Reactivation requires full gate re-run** (§11.2) — no grandfathering.
+
+**Documents 1 and 2 of the Charter family are now ratified.** Document 3 (`docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`) authoring begins as Mission 3 of 3, with the Playbook informing the Roadmap's gate-specific timelines.
+
+**Pre-Charter documents** (CLAUDE.md, MANIFEST.md, PROJECT_ROADMAP.md, PHASE_5_SPEC_v2.md, 6 existing ADRs) continue to describe current code state; they remain binding until superseded by the multi-strat infrastructure lift Phases A-B-C-D (scheduled in Document 3).
 
 ---
 
