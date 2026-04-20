@@ -117,6 +117,14 @@ class Signal(BaseModel):
     signal_id: str = Field(..., description="Unique signal identifier")
     symbol: str = Field(..., description="Uppercase trading symbol")
     timestamp_ms: int = Field(..., gt=0, description="Signal generation time UTC ms")
+    strategy_id: str = Field(
+        default="default",
+        description=(
+            "Per-strategy identifier (Charter §5.5, ADR-0007 §D6). "
+            "Default 'default' preserves the legacy single-strategy path "
+            "until Phase B wraps it as LegacyConfluenceStrategy."
+        ),
+    )
 
     # Direction and strength
     direction: Direction = Field(..., description="Trade direction")
@@ -167,6 +175,42 @@ class Signal(BaseModel):
     def symbol_uppercase(cls, v: str) -> str:
         """Ensure symbol is uppercase."""
         return v.upper()
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        At Phase A.1, ``strategy_id`` is carried as metadata on the Signal
+        contract but the downstream consumers still use the legacy single-
+        strategy form: ZMQ publishes on ``signal.technical.{SYMBOL}``
+        (``core.topics.Topics.signal``) and Kelly stats live at
+        ``kelly:{symbol}`` / ``feedback:kelly_stats:{strategy_key}``
+        (``services/s04_fusion_engine/kelly_sizer.py``). Phase A.4 introduces
+        ``Topics.signal_for(strategy_id, symbol)`` →
+        ``signal.technical.{strategy_id}.{symbol}`` and Phase A.5+ rewrites
+        the Redis keys to ``kelly:{strategy_id}:{symbol}`` per Charter §5.5
+        and ADR-0007 §D6/D7; filesystem paths follow
+        ``services/strategies/{strategy_id}/`` per ADR-0007 §D2.
+
+        The validator enforces the structural constraints required by those
+        future consumers **now**, so no invalid identifier can enter the
+        pipeline before the downstream code flips over. Empty strings,
+        whitespace, forward/backslashes and quote characters are rejected,
+        and length is capped at 64 to keep Redis key lengths bounded.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        forbidden = set(" \t\n\r\v\f/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "whitespace, slashes and quotes are not permitted"
+            )
+        return v
 
     @model_validator(mode="after")
     def validate_price_levels(self) -> Signal:
