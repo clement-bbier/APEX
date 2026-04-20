@@ -10,49 +10,67 @@ Schema is aligned with backtesting.data_loader.load_parquet():
     bid / ask    : float64
     spread_bps   : float64
     session      : str        ("after_hours")
-"""
 
-# ── KNOWN ISSUE: APEX-METRICS-V2 ──────────────────────────────────────
-# This fixture intentionally generates a CONSTANT price series so that
-# the backtest engine produces zero trades, exercising the data-loader
-# contract end-to-end without triggering a structural bug in
-# backtesting/metrics.full_report().
-#
-# The bug: full_report() computes Sharpe on per-trade returns minus an
-# annualised 5% risk-free rate (~2bps per period). For HFT-style tiny
-# per-trade returns (1e-5 magnitude), the -rf term dominates entirely,
-# producing arbitrarily negative Sharpe even with winrate >90% and
-# positive net PnL (verified empirically: PF=15.84, WR=93% -> Sharpe=-3709).
-#
-# Until APEX-METRICS-V2 reworks Sharpe to use the equity-curve returns,
-# the backtest-gate job is marked `continue-on-error: true` in CI and
-# this fixture stays constant. DO NOT add price variation here without
-# first fixing full_report().
-# ──────────────────────────────────────────────────────────────────────
+The price path is a discrete Ornstein-Uhlenbeck process:
+
+    X_{t+1} = X_t + theta * (mu - X_t) * dt + sigma * sqrt(dt) * Z_t
+
+with ``Z_t ~ N(0, 1)``, ``dt = 1`` minute. Parameters (see
+``_OU_THETA``, ``_OU_MU``, ``_OU_SIGMA``) produce a price that oscillates
+inside a plausible band around ``mu`` with a half-life of ~11.5 hours,
+creating mean-reversion opportunities the Phase 3/4 signal suite can
+exercise. The RNG seed is fixed so the fixture is byte-deterministic
+across runs (tests/unit/scripts/test_fixture_determinism.py enforces).
+
+Why this fixture replaced the previous constant-price one: the old
+generator emitted ``np.full(43_200, 45_000.0)`` so the BacktestEngine
+produced zero trades and ``scripts/backtest_regression.py`` short-
+circuited with exit 0 without ever running ``full_report()``. That made
+the CI backtest-gate structurally vacuous — passing regardless of
+Sharpe/DD correctness. See issue #102 + STRATEGIC_AUDIT_2026-04-17
+Tech Finding 3.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
+
+# Ornstein-Uhlenbeck parameters. Tuned so that (a) the process stays
+# inside a realistic ~1% band around mu, (b) minute-scale volatility is
+# large enough to trigger the microstructure signal suite.
+_OU_THETA: float = 0.001  # mean-reversion speed per minute (half-life ~11.5h)
+_OU_MU: float = 45_000.0  # long-term mean in USD
+_OU_SIGMA: float = 15.0  # diffusion term per sqrt(minute)
+_SEED: int = 42  # fixed for byte-deterministic fixture output
+
+
+def _generate_ou_price_path(n: int, rng: np.random.Generator) -> npt.NDArray[np.float64]:
+    """Simulate n minutes of a discrete OU process starting at mu.
+
+    Uses the Euler-Maruyama discretisation with dt=1 (minute). Clamps the
+    output at a 1.0 floor as a defensive guard — with the chosen params
+    the steady-state std is ~335, so the floor never activates in
+    practice but we want to fail loudly if the params are ever retuned
+    to something unrealistic.
+    """
+    price = np.empty(n, dtype=np.float64)
+    price[0] = _OU_MU
+    noise = rng.standard_normal(n)
+    for i in range(1, n):
+        drift = _OU_THETA * (_OU_MU - price[i - 1])
+        price[i] = price[i - 1] + drift + _OU_SIGMA * noise[i]
+    return np.maximum(price, 1.0)
 
 
 def main() -> None:
-    rng = np.random.default_rng(42)
-    n = 43_200  # 30 days x 24h x 60min
+    rng = np.random.default_rng(_SEED)
+    n = 43_200  # 30 days × 24h × 60min
 
-    # Strong trending bull market with small mean-reverting noise: produces
-    # a clean positive-EV regime for scalping/trend strategies.
-    # Constant-price fixture: no signal triggers in the BacktestEngine, so
-    # zero trades are generated and scripts/backtest_regression.py exits 0
-    # via its no-trades short-circuit. The full_report Sharpe formula is
-    # computed against a 5% annualised risk-free rate which structurally
-    # produces large negative ratios on the engine's tiny default position
-    # sizes; until that calculation is reworked (separate issue), this
-    # fixture is intentionally non-tradeable so the regression gate runs
-    # the data-loader contract end-to-end without false-failing on Sharpe.
-    price = np.full(n, 45_000.0, dtype=np.float64)
+    price = _generate_ou_price_path(n, rng)
 
     start_ms = int(pd.Timestamp("2024-01-01", tz="UTC").timestamp() * 1000)
     timestamp_ms = start_ms + np.arange(n, dtype=np.int64) * 60_000  # 1-min cadence
@@ -75,7 +93,8 @@ def main() -> None:
     out.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(out, index=False)
     print(f"Generated {n} candles -> {out}")
-    print(f"  Price range: ${price.min():.0f} - ${price.max():.0f}")
+    print(f"  Price range: ${price.min():.2f} - ${price.max():.2f}")
+    print(f"  Price mean / std: ${price.mean():.2f} / ${price.std():.2f}")
     print(f"  Time range:  {timestamp_ms[0]} -> {timestamp_ms[-1]} (ms epoch)")
 
 

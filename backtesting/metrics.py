@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import math
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
@@ -218,25 +218,45 @@ def equity_curve_from_trades(initial_capital: float, trades: list[TradeRecord]) 
 def daily_equity_curve_from_trades(
     initial_capital: float,
     trades: list[TradeRecord],
+    *,
+    include_empty_days: bool = True,
 ) -> list[float]:
     """Build a daily-resampled equity curve from trade records.
 
-    Trades are bucketed by UTC calendar day on their ``exit_timestamp_ms``.
-    The returned series contains one equity value per active day, equal to
-    the running portfolio equity after applying every trade closed on that
-    day. The initial capital is prepended so that ``pct_change`` over the
+    Returns the daily equity curve on a full calendar-day grid between
+    the first and last trade (both by UTC calendar day on
+    ``exit_timestamp_ms``). Days with no trades carry the previous day's
+    equity forward. This is the annualisation-safe representation: the
+    resulting series has one entry per calendar day in the active span,
+    so applying √252 annualisation in :func:`sharpe_ratio` yields a
+    density-invariant statistic (issue #102).
+
+    The initial capital is prepended so that ``pct_change`` over the
     series captures the first day's PnL.
 
-    This is the standard input for an annualised (√252) Sharpe ratio
-    (Lopez de Prado, 2018, Ch. 14): per-trade returns are not iid in time
-    and produce arbitrarily biased Sharpe values for HFT-style strategies.
+    The sparse-day semantics (one entry per *active* trading day) are
+    available via ``include_empty_days=False`` for callers who need the
+    older shape. That mode inflates |Sharpe| as a function of trade
+    density and is not the Sharpe input contract used by
+    :func:`sharpe_ratio`.
 
     Args:
         initial_capital: Starting capital.
         trades: Trade records (any order).
+        include_empty_days: When True (default), pad the curve to a full
+            calendar-day grid with carry-forward equity on silent days.
+            When False, emit one entry per active trading day
+            (pre-fix shape).
 
     Returns:
-        List of daily equity values, length = 1 + number of active days.
+        List of daily equity values. Length with ``include_empty_days``
+        is ``1 + (last_day - first_day + 1)`` calendar days; with
+        ``include_empty_days=False`` it is ``1 + n_active_days``.
+
+    Reference:
+        Lopez de Prado (2018). Advances in Financial Machine Learning,
+        Ch. 14.5 — annualised Sharpe is defined on an evenly-spaced
+        return series.
     """
     if not trades:
         return [initial_capital]
@@ -248,10 +268,25 @@ def daily_equity_curve_from_trades(
         if day not in daily_pnl:
             day_order.append(day)
         daily_pnl[day] += _to_float(trade.net_pnl)
+
     equity = initial_capital
     curve = [equity]
-    for day in day_order:
-        equity += daily_pnl[day]
+    if not include_empty_days:
+        for day in day_order:
+            equity += daily_pnl[day]
+            curve.append(equity)
+        return curve
+
+    # Dense calendar-day grid: iterate every day from first to last
+    # active day (inclusive). Silent days carry equity forward.
+    first_day = datetime.strptime(day_order[0], "%Y-%m-%d").replace(tzinfo=UTC).date()
+    last_day = datetime.strptime(day_order[-1], "%Y-%m-%d").replace(tzinfo=UTC).date()
+    span_days = (last_day - first_day).days + 1
+    for offset in range(span_days):
+        day_date = first_day + timedelta(days=offset)
+        key = day_date.strftime("%Y-%m-%d")
+        if key in daily_pnl:
+            equity += daily_pnl[key]
         curve.append(equity)
     return curve
 
