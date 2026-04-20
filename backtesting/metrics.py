@@ -19,12 +19,15 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import structlog
 from scipy import stats as scipy_stats
 
 from core.models.order import TradeRecord
 
 if TYPE_CHECKING:
     from backtesting.walk_forward import CombinatorialPurgedCV
+
+logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 
 # Annualisation factor for 1-minute bars (252 trading days × 390 min/day)
 _ANNUAL_FACTOR_1M: float = math.sqrt(252 * 390)
@@ -1359,6 +1362,52 @@ def _split_trades_is_oos(
     return is_trades, oos_trades
 
 
+# ---------------------------------------------------------------------------
+# full_report — PSR/DSR excess-return consistency audit (issue #195, phase-A.5)
+# ---------------------------------------------------------------------------
+# Why this matters (ADR-0002 mandatory evaluation checklist item 5):
+# PSR and DSR are confidence statements about the Sharpe point estimate. If
+# the series fed to PSR/DSR differs from the one used to compute Sharpe, the
+# resulting interval no longer brackets the point estimate and the gate is
+# statistically incoherent.
+#
+# State of the pipeline below:
+#   * `sharpe_ratio(returns, risk_free_rate, annual_factor)` subtracts
+#     ``rf_per_period = risk_free_rate / (annual_factor**2)`` from raw returns
+#     INTERNALLY, then reports (mean / std) * annual_factor on that excess
+#     series.
+#   * `probabilistic_sharpe_ratio(returns, ...)` and
+#     `deflated_sharpe_ratio(returns, ...)` do NOT subtract the risk-free
+#     rate — their inputs are treated as the excess series directly. The
+#     caller is responsible for feeding them the same series Sharpe is built
+#     from.
+#   * `_stationary_bootstrap_sharpe_ci(returns, risk_free_rate, ...)` forwards
+#     ``risk_free_rate`` into ``sharpe_ratio`` for each bootstrap replicate.
+#     If its input is already excess, ``risk_free_rate=0.0`` avoids a double
+#     subtraction.
+#
+# Risk-free-rate convention:
+#   * `risk_free_rate` (float, legacy) keeps backward compatibility with
+#     callers that already pass 0.05 or 0.0. Default stays 0.05 for the
+#     legacy positional/kwarg path.
+#   * `risk_free_rate_annual: Decimal | None` is the CLAUDE.md §10-compliant
+#     typed annual rate. When provided it overrides `risk_free_rate`; the
+#     Decimal is converted once to float at the top of `full_report`.
+#     Default ``None`` preserves the legacy default (0.05) when no explicit
+#     typed rate is supplied.
+#
+# Fix scope (PR for issue #195, part 2):
+#   1. Centralise the annual-rate resolution and per-period conversion at
+#      the top of `full_report`.
+#   2. Build `daily_excess_returns` once, feed the SAME series to PSR, DSR,
+#      bootstrap CI, Sortino, and keep the headline Sharpe mathematically
+#      consistent by construction.
+#   3. Emit a structlog DEBUG line with the resolved rate plus the mean/std
+#      of the excess-return series so the audit trail exists when a gate
+#      decision is relitigated (CLAUDE.md §10 / ADR-0002 discipline).
+# ---------------------------------------------------------------------------
+
+
 def full_report(
     trades: list[TradeRecord],
     initial_capital: float = 100_000.0,
@@ -1373,6 +1422,7 @@ def full_report(
     strategy_returns_matrix: np.ndarray[Any, np.dtype[np.float64]] | None = None,
     n_cv_splits: int = 10,
     n_cv_test_splits: int = 2,
+    risk_free_rate_annual: Decimal | None = None,
 ) -> dict[str, Any]:
     """Generate a complete performance report from trade records.
 
@@ -1408,6 +1458,12 @@ def full_report(
         daily_volatility: Daily return volatility as a fraction
             (e.g. 0.02 = 2%). Used by the Almgren-Chriss slippage
             model (ADR-0002 Section A item 8). Default 0.02.
+        risk_free_rate_annual: CLAUDE.md §10-compliant Decimal annual
+            risk-free rate. When provided, overrides ``risk_free_rate``
+            for the Sharpe / PSR / DSR / bootstrap-CI / Sortino block so
+            all five statistics share the same excess-return series
+            (ADR-0002 item 5). Default ``None`` preserves legacy
+            behaviour (the float ``risk_free_rate`` kwarg is used).
 
     Returns:
         Dict with all metrics: sharpe, sortino, calmar, max_dd, win_rate,
@@ -1422,6 +1478,14 @@ def full_report(
 
     if not trades:
         return {"error": "no trades"}
+
+    # Resolve the annual risk-free rate once: Decimal kwarg takes precedence
+    # over the legacy float kwarg. The resolved float rate is then the single
+    # source of truth for Sharpe, PSR, DSR, bootstrap CI and Sortino.
+    if risk_free_rate_annual is not None:
+        effective_rf_annual = float(risk_free_rate_annual)
+    else:
+        effective_rf_annual = float(risk_free_rate)
 
     curve = equity_curve_from_trades(initial_capital, trades)
     # Sharpe is computed on daily-resampled equity curve returns (not
@@ -1444,11 +1508,31 @@ def full_report(
     # Per Bailey & Lopez de Prado (2012, 2014), PSR and DSR must be computed
     # on the same excess-return series that the headline Sharpe is built from
     # — otherwise PSR/DSR would be silently inconsistent with Sharpe whenever
-    # risk_free_rate != 0. sharpe_ratio() subtracts ``rf / annual_factor**2``
-    # internally; we mirror that here exactly.
-    rf_per_period = risk_free_rate / (_ANNUAL_FACTOR_DAILY**2)
+    # the risk-free rate is non-zero. sharpe_ratio() subtracts
+    # ``rf / annual_factor**2`` internally; we mirror that here exactly and
+    # feed the resulting excess series to every downstream statistic.
+    rf_per_period = effective_rf_annual / (_ANNUAL_FACTOR_DAILY**2)
     daily_excess_returns = [r - rf_per_period for r in daily_returns]
     daily_excess_returns_arr = np.asarray(daily_excess_returns, dtype=float)
+
+    # Audit trail (ADR-0002 item 5, CLAUDE.md §10). Logs the resolved rate
+    # and the moments of the excess-return series so a reviewer can
+    # reproduce Sharpe / PSR / DSR from the report alone. The single-day
+    # fixture path (len==1) still needs the std=0 guard because
+    # ``np.std(ddof=1)`` on a one-element array is NaN.
+    _mean_excess = float(np.mean(daily_excess_returns_arr)) if daily_excess_returns else 0.0
+    _std_excess = (
+        float(np.std(daily_excess_returns_arr, ddof=1)) if len(daily_excess_returns) >= 2 else 0.0
+    )
+    logger.debug(
+        "full_report.excess_returns",
+        risk_free_rate_annual=effective_rf_annual,
+        rf_per_period=rf_per_period,
+        mean_excess_return=_mean_excess,
+        std_excess_return=_std_excess,
+        n_daily_returns=len(daily_excess_returns),
+    )
+
     psr = probabilistic_sharpe_ratio(
         daily_excess_returns,
         benchmark_sharpe=0.0,
@@ -1492,7 +1576,7 @@ def full_report(
         cagr = 0.0
     ulcer = _ulcer_index(equity_values)
     max_dd_abs = _max_drawdown_absolute(equity_values)
-    martin = _martin_ratio(cagr, risk_free_rate, ulcer)
+    martin = _martin_ratio(cagr, effective_rf_annual, ulcer)
     calmar_new = _calmar_ratio(cagr, abs(dd))
     sortino_new = _sortino_ratio(
         daily_excess_returns_arr,
@@ -1512,20 +1596,20 @@ def full_report(
         pbo = probability_of_backtest_overfitting_cpcv(
             strategy_returns_matrix,
             cv,
-            risk_free_rate=risk_free_rate,
+            risk_free_rate=effective_rf_annual,
             annual_factor=_ANNUAL_FACTOR_DAILY,
         )
 
     by_regime_enriched = by_regime_breakdown(
         trades,
         initial_capital=1.0,
-        risk_free_rate=risk_free_rate,
+        risk_free_rate=effective_rf_annual,
     )
 
     report: dict[str, Any] = {
         "sharpe": sharpe_ratio(
             daily_returns,
-            risk_free_rate=risk_free_rate,
+            risk_free_rate=effective_rf_annual,
             annual_factor=_ANNUAL_FACTOR_DAILY,
         ),
         "psr": float(psr),
@@ -1601,7 +1685,7 @@ def full_report(
             full_report(
                 trades=is_trades,
                 initial_capital=initial_capital,
-                risk_free_rate=risk_free_rate,
+                risk_free_rate=effective_rf_annual,
                 n_trials=n_trials,
                 impact_k_bps=impact_k_bps,
                 adv_usd=adv_usd,
@@ -1614,7 +1698,7 @@ def full_report(
             full_report(
                 trades=oos_trades,
                 initial_capital=initial_capital,
-                risk_free_rate=risk_free_rate,
+                risk_free_rate=effective_rf_annual,
                 n_trials=n_trials,
                 impact_k_bps=impact_k_bps,
                 adv_usd=adv_usd,
