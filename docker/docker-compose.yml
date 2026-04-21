@@ -46,8 +46,8 @@ services:
     # Matches ADR-0014 §3 image pin.
     image: timescale/timescaledb-ha:pg16
     environment:
-      POSTGRES_DB: apex
-      POSTGRES_USER: apex
+      POSTGRES_DB: "${DB_NAME:-apex}"
+      POSTGRES_USER: "${DB_USER:-apex}"
       POSTGRES_PASSWORD: "${DB_PASSWORD:-apex_secret}"
     ports:
       - "5432:5432"
@@ -59,7 +59,7 @@ services:
     networks: [apex]
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apex -d apex"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-apex} -d ${DB_NAME:-apex}"]
       interval: 10s
       timeout: 5s
       retries: 5

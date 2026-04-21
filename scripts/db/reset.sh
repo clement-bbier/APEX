@@ -61,12 +61,15 @@ docker compose -f "$COMPOSE_FILE" stop timescaledb || true
 echo "[reset] removing timescaledb container ..."
 docker compose -f "$COMPOSE_FILE" rm -f timescaledb || true
 
-VOLUME_NAME="$(docker volume ls --format '{{.Name}}' | grep -E '(^|_)timescale_data$' | head -n 1 || true)"
-if [ -n "$VOLUME_NAME" ]; then
+# Target the exact volume name built from the compose project to avoid
+# matching volumes that belong to other compose projects on this machine.
+COMPOSE_PROJECT="${COMPOSE_PROJECT_NAME:-apex-trading}"
+VOLUME_NAME="${COMPOSE_PROJECT}_timescale_data"
+if docker volume inspect "$VOLUME_NAME" >/dev/null 2>&1; then
     echo "[reset] removing volume $VOLUME_NAME ..."
     docker volume rm "$VOLUME_NAME"
 else
-    echo "[reset] (no timescale_data volume found — already gone)"
+    echo "[reset] (no $VOLUME_NAME volume found — already gone)"
 fi
 
 echo "[reset] done. Run scripts/db/init.sh to rebuild."
