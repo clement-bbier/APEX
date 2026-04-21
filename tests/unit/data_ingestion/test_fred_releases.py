@@ -176,9 +176,7 @@ class TestFREDReleasesFetch:
 
         with (
             patch("services.data_ingestion.connectors.fred_releases.Fred"),
-            patch(
-                "services.data_ingestion.connectors.fred_releases.get_settings"
-            ) as mock_settings,
+            patch("services.data_ingestion.connectors.fred_releases.get_settings") as mock_settings,
         ):
             mock_secret = MagicMock()
             mock_secret.get_secret_value.return_value = "settings-key-123"

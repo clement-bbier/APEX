@@ -17,9 +17,9 @@ from unittest.mock import AsyncMock
 import fakeredis.aioredis
 import pytest
 
+from services.macro_intelligence.cb_watcher import CBWatcher
 from services.risk_manager.cb_event_guard import CBEventGuard
 from services.risk_manager.models import BlockReason
-from services.macro_intelligence.cb_watcher import CBWatcher
 
 
 class TestCBEventProtocol:

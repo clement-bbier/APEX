@@ -38,15 +38,15 @@ from core.models.regime import (
 from core.models.signal import Direction, Signal
 from core.models.tick import NormalizedTick, Session
 from services.data_ingestion.normalizer import SessionTagger
-from services.signal_engine.microstructure import MicrostructureAnalyzer
-from services.signal_engine.technical import TechnicalAnalyzer
+from services.execution.paper_trader import PaperTrader
 from services.risk_manager.position_rules import (
     check_max_risk_per_trade,
     check_max_size,
     check_min_rr,
     check_stop_loss_present,
 )
-from services.execution.paper_trader import PaperTrader
+from services.signal_engine.microstructure import MicrostructureAnalyzer
+from services.signal_engine.technical import TechnicalAnalyzer
 
 logger = get_logger("backtesting.engine")
 
