@@ -108,20 +108,19 @@ Required test coverage of 75% reached. Total coverage: 81.40%
 
 **Methodology note**: this audit reads the coverage numbers from the most recent green CI log (run `24717829193`, commit on `phase-A.8/pnl-tracker-risk-manager-pretrade`). A local re-run was attempted but the dev environment (Windows, no venv) is missing `numpy`/`polars`; CI numbers are more authoritative anyway because they reflect the real `[tool.coverage.run] omit` set.
 
-### 3.4 Gate raise preparation
+### 3.4 Gate raise — deferred to issue #203
 
-This PR ships the coverage-gate raise as a **separate, clearly-marked commit** (`infra(ci): prepare 75%→85% coverage gate`) but the mission brief asks for a conditional merge decision.
+**Verdict: coverage is 81.40% on main, NOT ≥ 85%. The raise does not ship in this PR.**
 
-**Verdict: coverage is 81.40% on main, NOT ≥ 85%. Do not ship the raise yet.**
-
-Recommendation: **(C) push CI modernization now, defer coverage raise to a later PR**. Rationale:
+Recommendation: **(C) push CI modernization now, defer coverage raise to issue #203**. Rationale:
 
 1. Current main is 81.40% — raising to 85% today would make CI red on the next commit.
 2. Roadmap §2.2.6 gates the raise on "7 consecutive days of pytest --cov ≥ 85% on main". Neither the 85% figure nor the 7-day stability window is achievable today.
 3. The six 0%-coverage modules (zmq_broker, service_runner, three feeds, orchestrator/main) contribute ~440 missed statements. Closing that accounts for the whole 3.6pp gap but needs either (a) integration-level coverage stitched in via `coverage combine`, or (b) those modules moved into the existing `omit` list with justification. Both are their own design decisions, not a ci.yml change.
-4. The `[phase-A.13]` issue already owns the eventual gate raise per Roadmap §2.2.6 — that issue is the right vehicle, not this infrastructure-reset PR.
+4. The `[phase-A.13]` issue (#203) already owns the eventual gate raise per Roadmap §2.2.6 — that issue is the right vehicle, not this infrastructure-reset PR.
+5. Four other PRs are in flight during this sprint. Shipping `--cov-fail-under=85` now would block every one of them until each lands enough per-module coverage to clear 85%. That's operational risk this PR is not authorized to introduce.
 
-The raise commit is still included on this branch (see §10 below) so reviewers can see the exact one-line change and flip it on in the follow-up without re-deriving it. The commit subject starts with `⚠️ CONDITIONAL` to make the merge discipline unmissable in `git log --oneline`.
+**This PR does NOT modify the `--cov-fail-under` value.** All preparation stays in this document — §3.2 (baseline), §3.3 (per-module gaps), and §10 (the exact one-line diff and activation checklist for issue #203).
 
 ---
 
@@ -235,13 +234,53 @@ No SBOM generation in this PR; Dependabot's alert surface and the pip-audit base
 
 ---
 
-## 10. Coverage-gate commit (this PR)
+## 10. Coverage gate raise — handoff to issue #203
 
-A separate commit `infra(ci): prepare 75%→85% coverage gate (CONDITIONAL merge)` was authored on this branch. It is the one-line bump from `--cov-fail-under=75` to `--cov-fail-under=85` in `ci-unit-tests.yml`.
+**Status on this PR**: no commit, no file modification. The gate stays at `--cov-fail-under=75` in `ci-unit-tests.yml` after this PR merges. Baseline behavior is preserved.
 
-**⚠️ CONDITIONAL merge**: do NOT merge that commit together with the rest of this PR while main sits at 81.40% total coverage. The commit is shipped on-branch so reviewers see the exact diff; the preferred path is to merge it after a follow-up PR closes the 3.6pp gap (via either `omit`-ing the 0%-coverage entrypoints with a written rationale, or adding minimal unit tests for them).
+### 10.1 Exact diff to apply when #203 activates
 
-See §3.4 for the three options (A/B/C) and the recommendation (C).
+File: `.github/workflows/ci-unit-tests.yml` — the `pytest tests/unit/` step inside the `unit-tests` job. On the post-merge state of this PR, the relevant line is approximately `ci-unit-tests.yml:93` (line number may shift by one if the file is reformatted; anchor on the `--cov-fail-under=` token).
+
+```diff
+           pytest tests/unit/ -v \
+             --cov=services --cov=core --cov=backtesting \
+             --cov-report=xml --cov-report=term-missing \
+-            --cov-fail-under=75 --timeout=30
++            --cov-fail-under=85 --timeout=30
+```
+
+One character change. No other file touches needed. `pyproject.toml` does not have a repo-wide `--cov-fail-under` today; the CI workflow is the single source of truth for the gate.
+
+### 10.2 Activation condition (from Roadmap §2.2.6)
+
+> Once all Phase A §2.2.1 through §2.2.5 deliverables are merged and main has stably shown total coverage ≥ 85% for at least 7 days, raise the CI coverage gate in `.github/workflows/ci.yml` [now `ci-unit-tests.yml` — see §6] from `--cov-fail-under=75` to `--cov-fail-under=85`.
+
+Mechanically: before opening the PR that applies §10.1, verify on main:
+
+```bash
+# For each of the last 7 green CI runs on main, the "coverage" line
+# under the unit-tests job should read ≥ 85.0%. Spot-check via:
+gh run list --workflow=unit-tests --branch=main --limit=20 --json conclusion,createdAt,databaseId \
+  --jq '[.[] | select(.conclusion == "success")][:7]'
+# For each run ID, `gh run view <id> --log | grep "Total coverage"` should show ≥ 85%.
+```
+
+### 10.3 Per-module residual gap (snapshot 2026-04-21)
+
+The table of 35 modules below 85% is captured in §3.3 above. When activating #203, re-run the coverage audit and verify that every entry either cleared 85% or was moved into `[tool.coverage.run] omit` with a documented rationale (per §3.4 point 3).
+
+Focus targets (ordered by marginal yield for the 3.6pp gap):
+
+1. `core/zmq_broker.py` (0%, 136 stmts) — candidate for `omit` (ZMQ infra, live-only) or dedicated integration coverage.
+2. `services/data_ingestion/{alpaca_feed,binance_feed,macro_feed}.py` (0%, 216 stmts total) — same disposition.
+3. `core/service_runner.py` (0%, 52 stmts) — candidate for `omit` (requires ZMQ/Redis runtime per existing `[tool.coverage.run] omit` policy on `services/*/service.py`).
+4. `services/command_center/pnl_tracker.py` (14%) and `services/command_center/health_checker.py` (33%) — testable, need unit coverage.
+5. `services/signal_engine/technical.py` (59%, 190 stmts) — highest absolute yield among non-zero-coverage modules.
+
+### 10.4 Handoff statement
+
+**This work is captured for issue #203 (Phase A.13). When activated: apply the one-line diff in §10.1, and verify that every module listed in §3.3 has either cleared 85% in the preceding 7 days, or been moved into `[tool.coverage.run] omit` with a documented rationale.** The baseline snapshot (81.40%, 35 modules under 85%, 1349 missed statements) in §3 is the "before" picture that §2.2.6's "stably ≥ 85% for 7 days" must visibly move past before the gate raise is safe.
 
 ---
 
@@ -254,7 +293,7 @@ See §3.4 for the three options (A/B/C) and the recommendation (C).
 - This audit doc
 
 **Defer to follow-up**:
-- Coverage gate raise (see §3.4, option C)
+- Coverage gate raise — handed off to **issue #203 (phase-A.13)**, activation condition in §10.2, exact diff in §10.1. **Not committed on this branch.**
 - mypy debt fix on `backtesting/data_loader.py:116` (see §7)
 - Branch protection on `main` requiring `quality`, `rust`, `unit-tests`, `integration-tests`
 
