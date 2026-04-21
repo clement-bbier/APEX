@@ -38,6 +38,13 @@ def _make_candidate(**overrides: object) -> OrderCandidate:
 
 
 def _make_approved(**overrides: object) -> ApprovedOrder:
+    strategy_id_override = overrides.get("strategy_id")
+    candidate_override = overrides.get("candidate")
+    if isinstance(strategy_id_override, str) and candidate_override is None:
+        overrides = {
+            **overrides,
+            "candidate": _make_candidate(strategy_id=strategy_id_override),
+        }
     defaults: dict[str, Any] = {
         "candidate": _make_candidate(),
         "approved_at_ms": 1_700_000_001_000,
@@ -48,7 +55,19 @@ def _make_approved(**overrides: object) -> ApprovedOrder:
 
 
 def _make_executed(**overrides: object) -> ExecutedOrder:
-    """Build a minimally valid ExecutedOrder, with optional overrides."""
+    """Build a minimally valid ExecutedOrder, with optional overrides.
+
+    If ``strategy_id`` is overridden but ``approved_order`` is not, the same
+    ``strategy_id`` is propagated to the nested ApprovedOrder (and transitively
+    to its candidate) so the model validators do not reject on divergence.
+    """
+    strategy_id_override = overrides.get("strategy_id")
+    approved_override = overrides.get("approved_order")
+    if isinstance(strategy_id_override, str) and approved_override is None:
+        overrides = {
+            **overrides,
+            "approved_order": _make_approved(strategy_id=strategy_id_override),
+        }
     defaults: dict[str, Any] = {
         "approved_order": _make_approved(),
         "broker_order_id": "brk-001",
@@ -81,6 +100,60 @@ class TestStrategyIdDefault:
             "news_driven",
         ):
             assert _make_executed(strategy_id=sid).strategy_id == sid
+
+
+# ── Propagation from nested ApprovedOrder (and transitively OrderCandidate) ──
+
+
+class TestStrategyIdPropagation:
+    """Guard against silent strategy_id divergence between ExecutedOrder and its
+    nested ApprovedOrder/OrderCandidate. Critical for multi-strat PnL attribution
+    (Charter §5.5).
+    """
+
+    def test_strategy_id_derived_from_nested_when_omitted(self) -> None:
+        candidate = _make_candidate(strategy_id="momentum")
+        approved = _make_approved(candidate=candidate)
+        eo = ExecutedOrder(
+            approved_order=approved,
+            broker_order_id="brk-001",
+            fill_price=Decimal("100.5"),
+            fill_size=Decimal("1.0"),
+            fill_timestamp_ms=1_700_000_002_000,
+        )
+        assert eo.strategy_id == "momentum"
+        assert approved.strategy_id == "momentum"
+
+    def test_strategy_id_mismatch_raises(self) -> None:
+        candidate = _make_candidate(strategy_id="momentum")
+        approved = _make_approved(candidate=candidate)
+        with pytest.raises(ValidationError, match="must match"):
+            ExecutedOrder(
+                approved_order=approved,
+                broker_order_id="brk-001",
+                fill_price=Decimal("100.5"),
+                fill_size=Decimal("1.0"),
+                fill_timestamp_ms=1_700_000_002_000,
+                strategy_id="reversion",
+            )
+
+    def test_strategy_id_match_accepted(self) -> None:
+        candidate = _make_candidate(strategy_id="momentum")
+        approved = _make_approved(candidate=candidate)
+        eo = ExecutedOrder(
+            approved_order=approved,
+            broker_order_id="brk-001",
+            fill_price=Decimal("100.5"),
+            fill_size=Decimal("1.0"),
+            fill_timestamp_ms=1_700_000_002_000,
+            strategy_id="momentum",
+        )
+        assert eo.strategy_id == "momentum"
+
+    def test_strategy_id_default_when_nested_uses_default(self) -> None:
+        eo = _make_executed()
+        assert eo.strategy_id == "default"
+        assert eo.approved_order.strategy_id == "default"
 
 
 # ── Frozen / immutability ────────────────────────────────────────────────────

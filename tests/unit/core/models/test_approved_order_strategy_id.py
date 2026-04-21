@@ -47,7 +47,19 @@ def _make_candidate(**overrides: object) -> OrderCandidate:
 
 
 def _make_approved(**overrides: object) -> ApprovedOrder:
-    """Build a minimally valid ApprovedOrder, with optional overrides."""
+    """Build a minimally valid ApprovedOrder, with optional overrides.
+
+    If ``strategy_id`` is overridden but ``candidate`` is not, the same
+    ``strategy_id`` is propagated to the nested candidate so the model
+    validator does not reject on divergence.
+    """
+    strategy_id_override = overrides.get("strategy_id")
+    candidate_override = overrides.get("candidate")
+    if isinstance(strategy_id_override, str) and candidate_override is None:
+        overrides = {
+            **overrides,
+            "candidate": _make_candidate(strategy_id=strategy_id_override),
+        }
     defaults: dict[str, Any] = {
         "candidate": _make_candidate(),
         "approved_at_ms": 1_700_000_001_000,
@@ -78,6 +90,54 @@ class TestStrategyIdDefault:
             "news_driven",
         ):
             assert _make_approved(strategy_id=sid).strategy_id == sid
+
+
+# ── Propagation from nested OrderCandidate ───────────────────────────────────
+
+
+class TestStrategyIdPropagation:
+    """Guard against silent strategy_id divergence between ApprovedOrder and its
+    nested OrderCandidate. Critical for multi-strat PnL attribution (Charter §5.5).
+    """
+
+    def test_strategy_id_derived_from_nested_when_omitted(self) -> None:
+        candidate = _make_candidate(strategy_id="momentum")
+        ao = ApprovedOrder(
+            candidate=candidate,
+            approved_at_ms=1_700_000_001_000,
+            adjusted_size=Decimal("1.0"),
+        )
+        assert ao.strategy_id == "momentum"
+
+    def test_strategy_id_mismatch_raises(self) -> None:
+        candidate = _make_candidate(strategy_id="momentum")
+        with pytest.raises(ValidationError, match="must match"):
+            ApprovedOrder(
+                candidate=candidate,
+                approved_at_ms=1_700_000_001_000,
+                adjusted_size=Decimal("1.0"),
+                strategy_id="reversion",
+            )
+
+    def test_strategy_id_match_accepted(self) -> None:
+        candidate = _make_candidate(strategy_id="momentum")
+        ao = ApprovedOrder(
+            candidate=candidate,
+            approved_at_ms=1_700_000_001_000,
+            adjusted_size=Decimal("1.0"),
+            strategy_id="momentum",
+        )
+        assert ao.strategy_id == "momentum"
+
+    def test_strategy_id_default_when_nested_uses_default(self) -> None:
+        candidate = _make_candidate()
+        ao = ApprovedOrder(
+            candidate=candidate,
+            approved_at_ms=1_700_000_001_000,
+            adjusted_size=Decimal("1.0"),
+        )
+        assert ao.strategy_id == "default"
+        assert candidate.strategy_id == "default"
 
 
 # ── Frozen / immutability ────────────────────────────────────────────────────
