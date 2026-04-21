@@ -1,0 +1,18 @@
+# Polygon.io connector — market data only.
+#
+# Copy this file to `config.yaml` (gitignored) or inject the key via
+# the `APEX_POLYGON_API_KEY` env var. Never commit real keys.
+#
+# Polygon does NOT support order execution; pair it with Alpaca or IBKR
+# for trading.
+
+api_key: "YOUR_POLYGON_API_KEY_HERE"
+
+# REST API root. Polygon's /v2/aggs/ range and /v3/reference/ endpoints
+# come off this base.
+base_url: "https://api.polygon.io"
+
+# Real-time websocket (premium tier). On the free tier this endpoint
+# returns delayed data, so Phase B Gate 2A will primarily use the REST
+# historical endpoints.
+websocket_url: "wss://socket.polygon.io"

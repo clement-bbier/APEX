@@ -1,0 +1,29 @@
+# Interactive Brokers connector — paper by default.
+#
+# IBKR requires a running TWS or IB Gateway process. The connector talks
+# to it over a local socket (default 127.0.0.1). The "paper" environment
+# uses port 7497 for TWS or 4002 for IB Gateway.
+#
+# Never commit live credentials. The API key surface is minimal (keys
+# are derived from the TWS login session) but always keep this file
+# populated only with paper-safe defaults in source control.
+
+host: "127.0.0.1"
+
+# 7497: paper TWS          — safe default
+# 7496: live TWS           — requires explicit opt-in
+# 4002: paper IB Gateway
+# 4001: live IB Gateway
+port: 7497
+
+# Unique across concurrent TWS API sessions; bump if you have another
+# ib_insync client connected to the same TWS instance.
+client_id: 1
+
+# Optional explicit account code (DU* for paper, U* for live).
+# Leave null to let TWS pick the default account.
+account: null
+
+# PAPER-SAFE DEFAULT. Set to false only after reviewing the VETO chain
+# and the Gate 3 rollout checklist.
+read_only: true
