@@ -1,6 +1,6 @@
 pydantic>=2.11.0,<3.0.0
 pydantic-settings>=2.6.0,<3.0.0
-pyzmq>=26.2.0,<27.0.0
+pyzmq>=26.2.0,<28.0.0
 redis[asyncio]>=5.2.0,<6.0.0
 fastapi[standard]>=0.115.0,<1.0.0
 uvicorn[standard]>=0.34.0,<1.0.0
