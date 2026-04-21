@@ -1,0 +1,40 @@
+# Dependabot configuration for APEX.
+#
+# See CICD_RESET_AUDIT_2026-04-21.md §9 for rationale.
+# Group open-PR caps keep Sunday digests reviewable in solo-dev mode.
+#
+# Rust: the workspace manifest lives at /rust (members: apex_mc,
+# apex_risk, no per-crate Cargo.lock). Dependabot only needs the
+# workspace directory — member-level entries would be redundant.
+
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "python"
+
+  - package-ecosystem: "cargo"
+    directory: "/rust"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "rust"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "sunday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
