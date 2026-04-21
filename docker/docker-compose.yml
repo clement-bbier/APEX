@@ -41,18 +41,29 @@ services:
       retries: 5
 
   timescaledb:
-    image: timescale/timescaledb:latest-pg16
+    # HA variant bundles the production-grade toolchain (pgBackRest,
+    # patroni helpers) and tracks TimescaleDB upstream more aggressively.
+    # Matches ADR-0014 §3 image pin.
+    image: timescale/timescaledb-ha:pg16
     environment:
       POSTGRES_DB: apex
       POSTGRES_USER: apex
       POSTGRES_PASSWORD: "${DB_PASSWORD:-apex_secret}"
+    ports:
+      - "5432:5432"
     volumes:
-      - timescale_data:/var/lib/postgresql/data
+      - timescale_data:/home/postgres/pgdata/data
+      # Schema v2 migrations auto-apply on first boot; re-runs are no-op
+      # because every DDL is idempotent (see db/migrations/README.md).
+      - ../db/migrations:/docker-entrypoint-initdb.d:ro
     networks: [apex]
+    restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U apex"]
+      test: ["CMD-SHELL", "pg_isready -U apex -d apex"]
       interval: 10s
+      timeout: 5s
       retries: 5
+      start_period: 30s
 
   zmq-broker:
     build:
