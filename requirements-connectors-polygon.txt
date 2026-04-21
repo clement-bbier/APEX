@@ -1,0 +1,2 @@
+-r requirements.txt
+polygon-api-client>=1.14.0
