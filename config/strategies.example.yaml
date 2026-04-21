@@ -1,0 +1,284 @@
+# =========================================================================
+# config/strategies.example.yaml  --  TEMPLATE (NOT wired into any loader)
+# -------------------------------------------------------------------------
+# Canonical example of the Tier 1 static-allocation schema defined in
+# ADR-0013 (Capital Allocation Trajectory).
+#
+# Real deployment copies this file to config/strategies.yaml and populates
+# it with the strategies that have passed Gate 2. The loader (planned at
+# core/config/strategies.py, Phase B) reads the live file, validates the
+# schema, and exposes per-strategy capital envelopes to each strategy's
+# sub-book (ADR-0012).
+#
+# All comments explain field purpose and valid ranges. Every weight/price
+# value uses YAML numerics that map to Python Decimal in the loader --
+# never float -- per CLAUDE.md Section 2.
+#
+# Reference: docs/adr/ADR-0013-capital-allocation-trajectory.md
+# Companion: docs/research/CAPITAL_ALLOCATION_TRAJECTORY.md
+# =========================================================================
+
+
+# -------------------------------------------------------------------------
+# 1. Top-level allocator selection
+# -------------------------------------------------------------------------
+
+allocation_tier: static
+  # Which allocation algorithm the allocator service runs.
+  # Valid: "static" | "risk_parity" | "hrp"
+  # -- static      (Tier 1): weights below are authoritative; no runtime compute.
+  # -- risk_parity (Tier 2): allocator computes 1/sigma weights weekly.
+  # -- hrp         (Tier 3): allocator computes HRP weights monthly.
+  # See ADR-0013 sections 3.1 / 3.2 / 3.3.
+
+
+cash_buffer: 0.20
+  # Fraction of portfolio capital held as USD, not allocated to any strategy.
+  # Valid: 0.0 <= cash_buffer <= 1.0
+  # Recommended range: 0.10 -- 0.30.
+  # Rationale: margin-call protection + emergency liquidity for hard-CB halt
+  # redemption. A cash_buffer of 0.20 means all enabled strategies together
+  # receive at most 80% of portfolio capital.
+
+
+portfolio_capital_usd: 250000.00
+  # Total USD capital under APEX management. Reference value only -- the
+  # allocator uses this to translate `weight` into `capital_usd` when
+  # emitting envelopes to the per-strategy sub-books (ADR-0012).
+  # The operator should keep this in sync with the actual broker balance
+  # via a daily reconciliation (manual or automated). If it drifts, the
+  # per-strategy `capital_usd` becomes stale but is still harmless because
+  # sub-books enforce their own position caps.
+
+
+# -------------------------------------------------------------------------
+# 2. Per-strategy entries
+# -------------------------------------------------------------------------
+# Each entry defines one strategy's participation in the allocation.
+# Order does not matter. Every `id` must be unique across both `strategies`
+# and `blacklist`.
+#
+# Schema contract (enforced by Pydantic loader at startup):
+#   - sum(strategies[enabled].weight) + cash_buffer <= 1.0  (strict)
+#   - 0.0 <= weight <= 1.0
+#   - 0.0 <= min_weight <= weight <= max_weight <= 1.0
+#   - burn_in_days >= 0
+#   - capital_usd > 0 (when enabled=true)
+# -------------------------------------------------------------------------
+
+strategies:
+
+  # -----------------------------------------------------------------------
+  # Strategy #1 -- established, passed Gate 4, full allocation.
+  # -----------------------------------------------------------------------
+  - id: legacy_confluence
+      # Canonical strategy_id. Matches `strategy_id="default"` once the
+      # pre-multi-strat signal engine is wrapped as LegacyConfluenceStrategy
+      # in Phase B per Roadmap sec 3.2. Keep this id stable across PRs --
+      # renaming breaks `apex_strategy_metrics` history and Redis keys.
+
+    enabled: true
+      # Whether the strategy participates in allocation.
+      # Valid: true | false
+      # Setting enabled=false excludes the strategy from the rebalance;
+      # its share redistributes pro-rata to other enabled strategies.
+      # Use this for operational pauses (e.g., broker maintenance). For
+      # permanent decommissioning, use the `blacklist:` list instead.
+
+    weight: 0.50
+      # Fraction of portfolio capital allocated to this strategy.
+      # Valid: 0.0 -- 1.0 (further bounded by min_weight/max_weight).
+      # At Tier 1, this is the authoritative weight.
+      # At Tier 2/3, this is the seed weight for the first rebalance and
+      # the fallback if the compute job fails.
+
+    min_weight: 0.30
+      # Lower bound enforced during Tier 2/3 clip-then-renormalise.
+      # Valid: 0.0 -- weight.
+      # If Tier 2 would compute a weight below this, it is clipped up.
+
+    max_weight: 0.60
+      # Upper bound enforced during Tier 2/3 clip-then-renormalise.
+      # Valid: weight -- 1.0 (typically <= 0.60 per Charter sec 6.1.2).
+      # Guards against runaway concentration when a strategy's vol drops.
+
+    burn_in_days: 0
+      # Days after enabling during which the strategy is excluded from
+      # adaptive compute (its weight stays pinned at min_weight).
+      # Valid: 0 -- 90 typically.
+      # legacy_confluence has no burn-in: it has multi-year history.
+      # A newly-Gate-2'd strategy uses burn_in_days: 30 (see #2 below).
+
+    capital_usd: 125000.00
+      # Absolute USD envelope for the strategy's sub-book (ADR-0012).
+      # Computed field: weight * portfolio_capital_usd = 0.50 * 250000 = 125000.
+      # The loader may re-derive this; specifying it here makes the YAML
+      # self-documenting for grep/audit.
+
+  # -----------------------------------------------------------------------
+  # Strategy #2 -- new, just passed Gate 2, in 30-day burn-in.
+  # -----------------------------------------------------------------------
+  - id: har_rv_momentum
+      # HAR-RV (Heterogeneous Autoregressive model of Realised Volatility,
+      # Corsi 2009) applied to crypto cross-sectional momentum. Fresh
+      # Gate 2 PR; no live history.
+
+    enabled: true
+    weight: 0.20
+    min_weight: 0.10
+    max_weight: 0.40
+      # Lower max_weight than legacy_confluence while building a track
+      # record. Can be raised to 0.40--0.50 after 6 months of Gate 4
+      # live-micro via a CIO-ratified config edit.
+
+    burn_in_days: 30
+      # First 30 days on paper: excluded from adaptive compute. Weight
+      # stays pinned at min_weight (0.10) while `apex_strategy_metrics`
+      # fills out. After day 30, adaptive compute starts using partial
+      # history; at day 60, full 60-day sigma window is available and
+      # the strategy participates normally.
+
+    capital_usd: 50000.00
+      # 0.20 * 250000 = 50000
+
+  # -----------------------------------------------------------------------
+  # Strategy #3 -- mature, targeting volatility arbitrage.
+  # -----------------------------------------------------------------------
+  - id: vol_arb
+      # Systematic variance-swap vs straddle dispersion across majors
+      # (BTC, ETH). Higher realised Sharpe but also higher volatility.
+
+    enabled: true
+    weight: 0.10
+    min_weight: 0.05
+    max_weight: 0.25
+      # Tighter cap than legacy_confluence because vol_arb has higher
+      # realised vol; Risk Parity would otherwise push its weight down
+      # naturally, but the floor/ceiling bounds keep Tier 1 consistent.
+
+    burn_in_days: 0
+      # Established strategy; ported from a prior live book.
+
+    capital_usd: 25000.00
+      # 0.10 * 250000 = 25000
+
+
+# -------------------------------------------------------------------------
+# 3. Rebalance policy
+# -------------------------------------------------------------------------
+
+rebalance:
+
+  policy: static
+    # How often the allocator recomputes and writes envelopes.
+    # Valid: "static" | "weekly" | "monthly"
+    # -- static  -> Tier 1: change requires config edit + service restart.
+    # -- weekly  -> Tier 2: compute runs at weekly_day / weekly_time_utc.
+    # -- monthly -> Tier 3: compute runs at monthly_day 00:00 UTC.
+    # Must be consistent with allocation_tier (the loader enforces).
+
+  weekly_day: sun
+    # Day of week for weekly rebalance (Tier 2).
+    # Valid: mon | tue | wed | thu | fri | sat | sun.
+    # Charter sec 6.1.2 + ADR-0008 sec D2 specify Sunday before Asia open.
+
+  weekly_time_utc: "23:00"
+    # Time of day (HH:MM, UTC) for weekly rebalance.
+    # Aligned to ADR-0008 sec D2 (Sunday 23:00 UTC).
+
+  monthly_day: 1
+    # Day of month for monthly rebalance (Tier 3).
+    # Valid: 1 -- 28 (avoid 29/30/31 to side-step month-length edge cases).
+    # Default: 1 (first calendar day). The allocator falls forward to the
+    # first trading day of the month if the 1st is a weekend/holiday.
+
+  trigger_threshold_pct: 0.5
+    # Minimum per-strategy weight delta (in percentage points of portfolio
+    # value) before the allocator emits OrderCandidates to rebalance.
+    # Valid: > 0.0, typically 0.1 -- 2.0.
+    # Example: with trigger_threshold_pct=0.5 and portfolio_capital=250k,
+    # a weight change of less than 1250 USD per strategy is ignored.
+    # Rationale: below-threshold deltas are indistinguishable from sigma
+    # estimation noise; acting on them churns the book for no alpha.
+
+  transition_cost_cap_pct: 0.20
+    # If the summed transition cost for a rebalance exceeds this fraction
+    # of the expected incremental Sharpe contribution, the rebalance is
+    # deferred to the next cycle. See ADR-0013 sec 5.3 + Almgren-Chriss 2000.
+    # Default: 0.20 (20% of incremental Sharpe).
+
+
+# -------------------------------------------------------------------------
+# 4. Tier 2/3 compute parameters (ignored when allocation_tier=static)
+# -------------------------------------------------------------------------
+
+compute:
+
+  sigma_window_days: 60
+    # Rolling window (trading days) for sigma estimation in Tier 2.
+    # Valid: 20 -- 252. Charter sec 6.1.2 default: 60.
+    # Shorter windows (e.g. 20) are more responsive but noisier;
+    # longer windows (e.g. 252) are stable but slow to adapt.
+
+  correlation_window_days: 60
+    # Rolling window for correlation matrix estimation in Tier 3.
+    # Valid: 20 -- 252. Default: 60, escalating to 120 when history allows.
+    # Ignored when allocation_tier != hrp.
+
+  linkage: ward
+    # Hierarchical clustering linkage method for HRP (Tier 3).
+    # Valid: "ward" | "single" | "complete" | "average"
+    # Default: ward (more stable on small samples; scipy default).
+    # Lopez de Prado 2016 uses "single"; a follow-up ADR may revisit.
+
+  sigma_floor: 0.000001
+    # Numerical guard against division-by-zero when sigma is unobservable
+    # or estimated as zero (e.g., a strategy that made zero trades in the
+    # window). Very small but non-zero.
+
+  shadow_mode: false
+    # If true, the allocator computes the target tier's weights, writes
+    # them to `portfolio:allocation:shadow:{strategy_id}` (separate Redis
+    # namespace), and publishes `portfolio.allocation.shadow` on ZMQ, but
+    # does NOT act on them. The previous tier continues to drive live
+    # allocation. Used during the 4-week shadow window before a tier
+    # cutover per ADR-0013 sec 7.
+
+
+# -------------------------------------------------------------------------
+# 5. Blacklist (strategies barred from allocation)
+# -------------------------------------------------------------------------
+# Strategies that failed a Gate criterion (CPCV PBO > 50%, PSR < 0.5,
+# 3 consecutive DD breaches, 9 months of negative Sharpe, etc.) are
+# moved here with weight forced to 0. Their share is redistributed
+# pro-rata to active strategies.
+#
+# Reactivation requires a fresh Gate 2 PR per Playbook sec 9. Entries
+# here are permanent in git history -- do not delete rows, mark them
+# with `reactivated_at:` when they are re-admitted (future schema
+# extension; for now just move back to `strategies:` with fresh history).
+# -------------------------------------------------------------------------
+
+blacklist:
+
+  - id: experimental_mean_rev
+    reason: "CPCV PBO = 62% on 2026-Q1 walk-forward; benched pending re-derivation"
+      # Free-form text describing why the strategy was benched. Should
+      # reference the failing metric (CPCV PBO, PSR, DSR, DD, etc.) and
+      # the evaluation window. Searchable in `git log -p`.
+
+    benched_since: "2026-04-01"
+      # ISO-8601 date (YYYY-MM-DD) when the strategy entered the blacklist.
+      # Useful for auditing how long a strategy has been benched.
+
+
+# -------------------------------------------------------------------------
+# End of file.
+# -------------------------------------------------------------------------
+# Validation command (planned, Phase B):
+#   $ apex-strategy-yaml-validate config/strategies.yaml
+#
+# Which runs the Pydantic loader against the schema and reports any
+# violations with line numbers. The same validator runs as a CI gate
+# on every PR that touches config/strategies.yaml.
+# -------------------------------------------------------------------------
