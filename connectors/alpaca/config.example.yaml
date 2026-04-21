@@ -1,0 +1,16 @@
+# Alpaca Markets connector — paper account by default.
+#
+# Copy this file to `config.yaml` (gitignored) or inject values via env vars
+# `APEX_ALPACA_API_KEY` and `APEX_ALPACA_API_SECRET`. Never commit real keys.
+#
+# Paper endpoints are listed below. For a live account, swap `base_url` to
+# https://api.alpaca.markets and use a live-account key pair.
+
+api_key: "YOUR_PAPER_API_KEY_HERE"
+api_secret: "YOUR_PAPER_API_SECRET_HERE"
+
+# Paper by default. Switch to `https://api.alpaca.markets` for live trading.
+base_url: "https://paper-api.alpaca.markets"
+
+# Market-data endpoint is the same for paper and live.
+data_url: "https://data.alpaca.markets"
