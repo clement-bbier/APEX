@@ -162,6 +162,72 @@ class ApprovedOrder(BaseModel):
     )
     order_type: OrderType = Field(default=OrderType.LIMIT)
     notes: list[str] = Field(default_factory=list)
+    strategy_id: str = Field(
+        default="default",
+        description="Per-strategy identifier (Charter §5.5, ADR-0007 §D6).",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_and_validate_strategy_id(cls, data: object) -> object:
+        """Derive strategy_id from nested candidate when omitted; reject mismatches.
+
+        Prevents silent strategy_id divergence between ApprovedOrder and its
+        nested OrderCandidate. Critical for multi-strat PnL attribution
+        (Charter §5.5).
+        """
+        if not isinstance(data, dict):
+            return data
+        candidate = data.get("candidate")
+        candidate_strategy_id: str | None = None
+        if isinstance(candidate, OrderCandidate):
+            candidate_strategy_id = candidate.strategy_id
+        elif isinstance(candidate, dict):
+            raw = candidate.get("strategy_id")
+            if isinstance(raw, str):
+                candidate_strategy_id = raw
+        if candidate_strategy_id is None:
+            return data
+        provided = data.get("strategy_id")
+        if provided is None or provided == "":
+            data["strategy_id"] = candidate_strategy_id
+            return data
+        if provided != candidate_strategy_id:
+            raise ValueError(
+                f"ApprovedOrder.strategy_id={provided!r} must match "
+                f"candidate.strategy_id={candidate_strategy_id!r}; silent divergence "
+                "would corrupt multi-strategy PnL attribution"
+            )
+        return data
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Enforces the same overall strategy-id safety constraints used across
+        order/signal models per Charter §5.5 and ADR-0007 §D6. This validator
+        rejects empty values, Unicode whitespace (via c.isspace()), slashes,
+        quotes, and length > 64 so downstream Redis keys
+        (kelly:{strategy_id}:{symbol} etc.) and filesystem paths
+        (services/strategies/{strategy_id}/) stay bounded and safe.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; whitespace (ASCII or Unicode) is not permitted"
+            )
+        forbidden = set("/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "slashes and quotes are not permitted"
+            )
+        return v
 
     @property
     def order_id(self) -> str:
@@ -192,6 +258,72 @@ class ExecutedOrder(BaseModel):
         default=Decimal("0"), description="Commission charged in quote currency"
     )
     is_paper: bool = Field(default=True, description="True if simulated paper trade")
+    strategy_id: str = Field(
+        default="default",
+        description="Per-strategy identifier (Charter §5.5, ADR-0007 §D6).",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def populate_and_validate_strategy_id(cls, data: object) -> object:
+        """Derive strategy_id from nested approved_order when omitted; reject mismatches.
+
+        Prevents silent strategy_id divergence between ExecutedOrder and its
+        nested ApprovedOrder (which in turn propagates from OrderCandidate).
+        Critical for multi-strat PnL attribution (Charter §5.5).
+        """
+        if not isinstance(data, dict):
+            return data
+        approved = data.get("approved_order")
+        approved_strategy_id: str | None = None
+        if isinstance(approved, ApprovedOrder):
+            approved_strategy_id = approved.strategy_id
+        elif isinstance(approved, dict):
+            raw = approved.get("strategy_id")
+            if isinstance(raw, str):
+                approved_strategy_id = raw
+        if approved_strategy_id is None:
+            return data
+        provided = data.get("strategy_id")
+        if provided is None or provided == "":
+            data["strategy_id"] = approved_strategy_id
+            return data
+        if provided != approved_strategy_id:
+            raise ValueError(
+                f"ExecutedOrder.strategy_id={provided!r} must match "
+                f"approved_order.strategy_id={approved_strategy_id!r}; silent divergence "
+                "would corrupt multi-strategy PnL attribution"
+            )
+        return data
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Enforces the same overall strategy-id safety constraints used across
+        order/signal models per Charter §5.5 and ADR-0007 §D6. This validator
+        rejects empty values, Unicode whitespace (via c.isspace()), slashes,
+        quotes, and length > 64 so downstream Redis keys
+        (kelly:{strategy_id}:{symbol} etc.) and filesystem paths
+        (services/strategies/{strategy_id}/) stay bounded and safe.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; whitespace (ASCII or Unicode) is not permitted"
+            )
+        forbidden = set("/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "slashes and quotes are not permitted"
+            )
+        return v
 
     @property
     def order_id(self) -> str:
@@ -239,6 +371,40 @@ class TradeRecord(BaseModel):
     exit_reason: str = Field(
         default="", description="stop_loss / take_profit_scalp / take_profit_swing / manual"
     )
+
+    strategy_id: str = Field(
+        default="default",
+        description="Per-strategy identifier (Charter §5.5, ADR-0007 §D6).",
+    )
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Enforces the same overall strategy-id safety constraints used across
+        order/signal models per Charter §5.5 and ADR-0007 §D6. This validator
+        rejects empty values, Unicode whitespace (via c.isspace()), slashes,
+        quotes, and length > 64 so downstream Redis keys
+        (kelly:{strategy_id}:{symbol} etc.) and filesystem paths
+        (services/strategies/{strategy_id}/) stay bounded and safe.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; whitespace (ASCII or Unicode) is not permitted"
+            )
+        forbidden = set("/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "slashes and quotes are not permitted"
+            )
+        return v
 
     @property
     def is_winner(self) -> bool:
