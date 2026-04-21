@@ -22,16 +22,16 @@ This file is the single source of truth for what each AI agent is allowed to rea
 | `core/config.py`                              |  R  |  R    |  RW    |  R  |     —      |
 | `core/models/**`                              |  R  |  R    |   R    |  R  |   **RW**   |
 | `core/topics.py`, `core/logger.py`            | RW  |  R    |   R    |  R  |     —      |
-| `services/s01_data_ingestion/**`              | RW  |  R    |   R    |  R  |     —      |
-| `services/s02_signal_engine/**`               |  R  |  RW   |   R    |  R  |     —      |
-| `services/s03_regime_detector/**`             |  R  |  RW   |   R    |  R  |     —      |
-| `services/s04_fusion_engine/**`               |  R  |  RW   |   R    |  R  |     —      |
-| `services/s05_risk_manager/**`                |  R  |  R    |   R    |  R  |   **RW**   |
-| `services/s06_execution/**`                   |  R  |  R    |   R    |  R  |   **RW**   |
-| `services/s07_quant_analytics/**`             |  R  |  RW   |   R    |  R  |     —      |
-| `services/s08_macro_intelligence/**`          |  R  |  RW   |   R    |  R  |     —      |
-| `services/s09_feedback_loop/**`               |  R  |  RW   |   R    |  R  |     —      |
-| `services/s10_monitor/**`                     | RW  |  R    |   R    |  R  |     —      |
+| `services/data_ingestion/**`              | RW  |  R    |   R    |  R  |     —      |
+| `services/signal_engine/**`               |  R  |  RW   |   R    |  R  |     —      |
+| `services/regime_detector/**`             |  R  |  RW   |   R    |  R  |     —      |
+| `services/fusion_engine/**`               |  R  |  RW   |   R    |  R  |     —      |
+| `services/risk_manager/**`                |  R  |  R    |   R    |  R  |   **RW**   |
+| `services/execution/**`                   |  R  |  R    |   R    |  R  |   **RW**   |
+| `services/quant_analytics/**`             |  R  |  RW   |   R    |  R  |     —      |
+| `services/macro_intelligence/**`          |  R  |  RW   |   R    |  R  |     —      |
+| `services/feedback_loop/**`               |  R  |  RW   |   R    |  R  |     —      |
+| `services/command_center/**`                     | RW  |  R    |   R    |  R  |     —      |
 | `supervisor/**`                               | RW  |  R    |   R    |  R  |     —      |
 | `backtesting/**`                              |  R  |  RW   |   R    |  R  |     —      |
 | `rust/**`                                     |  R  |  R    |   R    |  R  |   **RW**   |

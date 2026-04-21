@@ -1,6 +1,6 @@
 # APEX Calculator Skill
 
-Skill for creating and validating new FeatureCalculator implementations in the APEX/CashMachine quant trading system.
+Skill for creating and validating new FeatureCalculator implementations in the APEX quant trading system.
 
 ## When to use this skill
 

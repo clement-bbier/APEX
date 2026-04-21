@@ -334,9 +334,9 @@ def signal_for(strategy_id: str, symbol: str) -> str:
 
 **Issues**:
 
-- **"[phase-A.7] Implement portfolio:capital writer in S06 on-fill updates"** — scope: `services/s06_execution/portfolio_tracker.py` (new, ~100 LOC).
-- **"[phase-A.8] Implement pnl:daily + pnl:intraday_30m writers in S09"** — scope: `services/s09_feedback_loop/pnl_tracker.py` (new, ~120 LOC).
-- **"[phase-A.9] Implement portfolio:positions aggregator in S09"** — scope: `services/s09_feedback_loop/position_aggregator.py`.
+- **"[phase-A.7] Implement portfolio:capital writer in S06 on-fill updates"** — scope: `services/execution/portfolio_tracker.py` (new, ~100 LOC).
+- **"[phase-A.8] Implement pnl:daily + pnl:intraday_30m writers in S09"** — scope: `services/feedback_loop/pnl_tracker.py` (new, ~120 LOC).
+- **"[phase-A.9] Implement portfolio:positions aggregator in S09"** — scope: `services/feedback_loop/position_aggregator.py`.
 - **"[phase-A.10] Session/macro Redis persistence shims in S03 + S01"** — bundled.
 
 #### 2.2.5 Per-strategy Redis key adoption
@@ -345,7 +345,7 @@ def signal_for(strategy_id: str, symbol: str) -> str:
 
 | Key pattern | Writer | Reader | Phase A work |
 |---|---|---|---|
-| `kelly:{strategy_id}:{symbol}` | S09 | S04 | Extend [`services/s09_feedback_loop/drift_detector.py`](../../services/s09_feedback_loop/drift_detector.py) (currently 160 LOC) and `kelly_updater.py` to accept optional `strategy_id`; write both `kelly:{symbol}` (legacy) and `kelly:{strategy_id}:{symbol}` (new) until Phase B decommissions the legacy write |
+| `kelly:{strategy_id}:{symbol}` | S09 | S04 | Extend [`services/feedback_loop/drift_detector.py`](../../services/feedback_loop/drift_detector.py) (currently 160 LOC) and `kelly_updater.py` to accept optional `strategy_id`; write both `kelly:{symbol}` (legacy) and `kelly:{strategy_id}:{symbol}` (new) until Phase B decommissions the legacy write |
 | `trades:{strategy_id}:all` | S06 + S09 | S09 fast_analysis | Extend S09 `service.py` persistence to write per-strategy Redis list; legacy `trades:all` continues until Phase B |
 | `pnl:{strategy_id}:daily` | S09 PnLTracker | S05, S10 | Per-strategy scoping in the PnLTracker introduced in §2.2.4 |
 | `portfolio:allocation:{strategy_id}` | (Phase C allocator) | S05 PerStrategyExposureGuard | **OUT OF PHASE A** — scheduled for Phase C §4.2.2 |
@@ -438,7 +438,7 @@ Test location: `tests/integration/test_phase_a_dual_path_signal_flow.py`.
 
 ### 3.1 Goal
 
-Introduce the `StrategyRunner` ABC that every strategy microservice (boot and future) inherits from; wrap the legacy S02 single-path pipeline as `LegacyConfluenceStrategy(StrategyRunner)` preserving all current behavior per Principle 6; implement the `StrategyHealthCheck` state machine (Playbook §8.0) as the foundation for STEP 3 of the Charter's 7-step VETO chain; add per-strategy dashboard panels to `services/s10_monitor/` so operators see state per strategy.
+Introduce the `StrategyRunner` ABC that every strategy microservice (boot and future) inherits from; wrap the legacy S02 single-path pipeline as `LegacyConfluenceStrategy(StrategyRunner)` preserving all current behavior per Principle 6; implement the `StrategyHealthCheck` state machine (Playbook §8.0) as the foundation for STEP 3 of the Charter's 7-step VETO chain; add per-strategy dashboard panels to `services/command_center/` so operators see state per strategy.
 
 Phase B begins at week 6 (overlapping the last 2 weeks of Phase A) and runs 8 weeks total (weeks 6–14; calendar: 2026-05-25 → 2026-07-27). The overlap with Phase A is deliberate: Pydantic model changes and topic factory must be **merged** before `StrategyRunner` ABC design settles, but the ABC design itself, the `LegacyConfluenceStrategy` wrap, and the state machine can be drafted and unit-tested in parallel on a separate branch.
 
@@ -489,7 +489,7 @@ class StrategyRunner(ABC):
       the STEP 3 StrategyHealthCheck consumer.
 
     Legacy single-strategy behavior is preserved by LegacyConfluenceStrategy
-    (§3.2.2) which wraps services/s02_signal_engine/pipeline.py unchanged.
+    (§3.2.2) which wraps services/signal_engine/pipeline.py unchanged.
     """
 
     strategy_id: str
@@ -536,9 +536,9 @@ The ABC is **minimal by design** — it expresses only the contract every strate
 
 **Location**: `services/strategies/legacy_confluence/service.py` and `services/strategies/legacy_confluence/strategy.py`.
 
-**Scope**: wrap the current `SignalPipeline` at [`services/s02_signal_engine/pipeline.py`](../../services/s02_signal_engine/pipeline.py) (487 LOC per `wc -l`) as a concrete `StrategyRunner` subclass carrying `strategy_id = "default"`. The `service.py` is a thin `BaseService` that instantiates the subclass and routes ticks to it; the existing `services/s02_signal_engine/` module tree remains in place unchanged during Phase B (ripped out only after Phase D.5 Topology Migration).
+**Scope**: wrap the current `SignalPipeline` at [`services/signal_engine/pipeline.py`](../../services/signal_engine/pipeline.py) (487 LOC per `wc -l`) as a concrete `StrategyRunner` subclass carrying `strategy_id = "default"`. The `service.py` is a thin `BaseService` that instantiates the subclass and routes ticks to it; the existing `services/signal_engine/` module tree remains in place unchanged during Phase B (ripped out only after Phase D.5 Topology Migration).
 
-**Principle 6 assertion**: every integration test that currently passes on `services/s02_signal_engine/` continues to pass against the legacy wrap. The scope-guard test in Phase B's PR verifies that the LegacyConfluenceStrategy's output on a fixture tick stream is bit-identical (within Decimal tolerance) to the pre-Phase-B output.
+**Principle 6 assertion**: every integration test that currently passes on `services/signal_engine/` continues to pass against the legacy wrap. The scope-guard test in Phase B's PR verifies that the LegacyConfluenceStrategy's output on a fixture tick stream is bit-identical (within Decimal tolerance) to the pre-Phase-B output.
 
 **Issues**:
 
@@ -547,7 +547,7 @@ The ABC is **minimal by design** — it expresses only the contract every strate
 
 #### 3.2.3 `StrategyHealthCheck` state machine — Playbook §8.0 canonical implementation
 
-**Location**: `services/s05_risk_manager/strategy_health_check.py` (during Phase B the risk manager stays at its current S05 path; Phase D.5 moves it to `services/portfolio/risk_manager/`).
+**Location**: `services/risk_manager/strategy_health_check.py` (during Phase B the risk manager stays at its current S05 path; Phase D.5 moves it to `services/portfolio/risk_manager/`).
 
 **Scope**: implement the 6-state machine defined canonically in Playbook §8.0:
 
@@ -560,11 +560,11 @@ The ABC is **minimal by design** — it expresses only the contract every strate
 | `REVIEW_MODE` | ALLOW (strategy continues at floored allocation) |
 | `DECOMMISSIONED` | REJECT with `BlockReason.STRATEGY_DECOMMISSIONED` permanently |
 
-**Transition table**: the 14 transitions enumerated in Playbook §8.0 are enforced. Property tests in `tests/unit/services/s05_risk_manager/test_strategy_health_check.py` exhaustively verify every allowed transition fires correctly and every disallowed transition raises `ValueError`.
+**Transition table**: the 14 transitions enumerated in Playbook §8.0 are enforced. Property tests in `tests/unit/services/risk_manager/test_strategy_health_check.py` exhaustively verify every allowed transition fires correctly and every disallowed transition raises `ValueError`.
 
 **Redis persistence**: each strategy's state is persisted at Redis key `strategy_health:<strategy_id>:state` with no TTL (state is authoritative and survives container restarts). Transitions are published via structlog event `strategy_health.transition` carrying `{from, to, trigger, timestamp, strategy_id}`.
 
-**New Pydantic model**: `BlockReason.STRATEGY_PAUSED`, `BlockReason.STRATEGY_OPERATIONAL_HALT`, `BlockReason.STRATEGY_DECOMMISSIONED` are added to [`services/s05_risk_manager/models.py`](../../services/s05_risk_manager/models.py) `BlockReason` enum per CLAUDE.md §8 checklist.
+**New Pydantic model**: `BlockReason.STRATEGY_PAUSED`, `BlockReason.STRATEGY_OPERATIONAL_HALT`, `BlockReason.STRATEGY_DECOMMISSIONED` are added to [`services/risk_manager/models.py`](../../services/risk_manager/models.py) `BlockReason` enum per CLAUDE.md §8 checklist.
 
 **Issues**:
 
@@ -574,7 +574,7 @@ The ABC is **minimal by design** — it expresses only the contract every strate
 
 #### 3.2.4 Per-strategy dashboard panels in S10
 
-**Location**: [`services/s10_monitor/`](../../services/s10_monitor/) (current). The audit at [`MULTI_STRAT_READINESS_AUDIT_2026-04-18.md`](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) Q8 notes **zero grep hits for "strategy"** in this service.
+**Location**: [`services/command_center/`](../../services/command_center/) (current). The audit at [`MULTI_STRAT_READINESS_AUDIT_2026-04-18.md`](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) Q8 notes **zero grep hits for "strategy"** in this service.
 
 **Scope**: add per-strategy panels to the dashboard:
 
@@ -590,13 +590,13 @@ The ABC is **minimal by design** — it expresses only the contract every strate
 
 **Issues**:
 
-- **"[phase-B.7] Add per-strategy panels to S10 monitor dashboard"** — scope: `services/s10_monitor/dashboard.py` + templates.
+- **"[phase-B.7] Add per-strategy panels to S10 monitor dashboard"** — scope: `services/command_center/dashboard.py` + templates.
 
 ### 3.3 Testing discipline (Phase B)
 
 - **ABC contract tests**: `tests/unit/strategies/test__base_contract.py` parametrizes a fixture subclass + the `LegacyConfluenceStrategy` subclass; asserts ABC invariants (every abstract method is overridden, `strategy_id` is set, etc.).
 - **State machine property tests**: exhaustive transition coverage via hypothesis, per §3.2.3.
-- **Bit-identical regression**: `LegacyConfluenceStrategy` must produce the same `Signal`s and `OrderCandidate`s as the pre-Phase-B `services/s02_signal_engine/pipeline.py` on the 30-day BTCUSDT 1-min fixture.
+- **Bit-identical regression**: `LegacyConfluenceStrategy` must produce the same `Signal`s and `OrderCandidate`s as the pre-Phase-B `services/signal_engine/pipeline.py` on the 30-day BTCUSDT 1-min fixture.
 - **Coverage ≥ 90%** on all new modules; ≥ 85% overall.
 - **mypy strict clean; ruff clean; bandit clean**.
 
@@ -727,7 +727,7 @@ class AllocatorResult(BaseModel):
 
 #### 4.2.2 Extend VETO chain to 7 steps (Charter §8.2)
 
-**Current state**: [`services/s05_risk_manager/chain_orchestrator.py`](../../services/s05_risk_manager/chain_orchestrator.py) (285 LOC) implements a 6-step chain (STEP 0 FailClosed → STEP 1 CBEvent → STEP 2 CircuitBreaker → STEP 3 MetaLabel → STEP 4 PositionRules → STEP 5 ExposureMonitor) per the Batch D refactor. The chain is wired by constructor injection per `__init__(fail_closed=, cb_guard=, circuit_breaker=, meta_gate=, context_load_fn=, decision_builder=)` at [`chain_orchestrator.py:81-96`](../../services/s05_risk_manager/chain_orchestrator.py).
+**Current state**: [`services/risk_manager/chain_orchestrator.py`](../../services/risk_manager/chain_orchestrator.py) (285 LOC) implements a 6-step chain (STEP 0 FailClosed → STEP 1 CBEvent → STEP 2 CircuitBreaker → STEP 3 MetaLabel → STEP 4 PositionRules → STEP 5 ExposureMonitor) per the Batch D refactor. The chain is wired by constructor injection per `__init__(fail_closed=, cb_guard=, circuit_breaker=, meta_gate=, context_load_fn=, decision_builder=)` at [`chain_orchestrator.py:81-96`](../../services/risk_manager/chain_orchestrator.py).
 
 **Target state** (Charter §8.2):
 
@@ -747,11 +747,11 @@ The chain grows from **6 numbered steps (STEP 0–5)** to **8 numbered steps (ST
 **Refactor requirement — data-driven chain**: the audit ([MULTI_STRAT_READINESS_AUDIT_2026-04-18.md](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) Q5) flagged the current chain orchestrator as Open/Closed-violating (hardcoded injection; adding a step requires modifying `__init__` signature AND `process()` method). Phase C refactors the orchestrator to accept `guards: list[RiskGuard]` where `RiskGuard` is a new ABC:
 
 ```python
-# services/s05_risk_manager/risk_guard.py
+# services/risk_manager/risk_guard.py
 from __future__ import annotations
 from abc import ABC, abstractmethod
 
-from services.s05_risk_manager.models import RuleResult
+from services.risk_manager.models import RuleResult
 from core.models.order import OrderCandidate
 
 class RiskGuard(ABC):
@@ -771,7 +771,7 @@ class RiskGuard(ABC):
 Each existing guard (`FailClosedGuard`, `CBEventGuard`, `CircuitBreaker`, `MetaLabelGate`, position/exposure helper functions) is refactored to inherit from `RiskGuard`. The orchestrator becomes:
 
 ```python
-# services/s05_risk_manager/chain_orchestrator.py (post-refactor)
+# services/risk_manager/chain_orchestrator.py (post-refactor)
 class RiskChainOrchestrator:
     def __init__(self, guards: list[RiskGuard], context_load_fn, decision_builder):
         # Sort by step; verify exactly one guard per step 0-7
@@ -948,17 +948,17 @@ class PanelSnapshot(BaseModel):
 
 #### 5.2.2 Per-strategy feedback loop partitioning
 
-**Scope**: extend [`services/s09_feedback_loop/drift_detector.py`](../../services/s09_feedback_loop/drift_detector.py) (160 LOC) to operate per strategy. Currently, `DriftDetector.check_drift(recent_trades, baseline_win_rate)` is strategy-agnostic; it pools all trades globally.
+**Scope**: extend [`services/feedback_loop/drift_detector.py`](../../services/feedback_loop/drift_detector.py) (160 LOC) to operate per strategy. Currently, `DriftDetector.check_drift(recent_trades, baseline_win_rate)` is strategy-agnostic; it pools all trades globally.
 
-**Changes** ([`services/s09_feedback_loop/drift_detector.py:35-80`](../../services/s09_feedback_loop/drift_detector.py)):
+**Changes** ([`services/feedback_loop/drift_detector.py:35-80`](../../services/feedback_loop/drift_detector.py)):
 
 1. **New method** `check_drift_per_strategy(strategy_id, recent_trades, baseline_win_rate)` — same semantics as `check_drift` but tagged with `strategy_id`. The legacy `check_drift` continues to work on the `"default"` strategy until Phase D.5.
 2. **DriftAlert gains `strategy_id`** field (requires Pydantic model update — already compatible after Phase A §2.2.1 `strategy_id` adoption discipline).
 3. **Baseline source** per Charter §5.5: reads `trades:<strategy_id>:all` (introduced in Phase A §2.2.5) instead of global `trades:all`. Baseline rolls forward across 3-month trailing windows captured during Gate 3 paper trading (Playbook §5.2.3).
 
-**Minimum-sample floor**: the existing `MIN_TRADES = 50` ([drift_detector.py:43](../../services/s09_feedback_loop/drift_detector.py)) stays per strategy. A strategy with < 50 completed trades since baseline capture does not receive drift alerts (this is intentional statistical discipline — noise dominates below 50 trades).
+**Minimum-sample floor**: the existing `MIN_TRADES = 50` ([drift_detector.py:43](../../services/feedback_loop/drift_detector.py)) stays per strategy. A strategy with < 50 completed trades since baseline capture does not receive drift alerts (this is intentional statistical discipline — noise dominates below 50 trades).
 
-**Drift threshold**: the existing `DRIFT_THRESHOLD = 0.10` ([drift_detector.py:42](../../services/s09_feedback_loop/drift_detector.py)) stays per strategy at Phase D default; per-strategy overrides may be introduced in later phases via `config/strategies/<strategy_id>.yaml`.
+**Drift threshold**: the existing `DRIFT_THRESHOLD = 0.10` ([drift_detector.py:42](../../services/feedback_loop/drift_detector.py)) stays per strategy at Phase D default; per-strategy overrides may be introduced in later phases via `config/strategies/<strategy_id>.yaml`.
 
 **Issues**:
 
@@ -1030,7 +1030,7 @@ def run_portfolio(
 - The full mapping from `services/s01-s10/` to `services/{data,signal,portfolio,execution,research,ops,strategies}/` (enumerated at §10.4).
 - The migration procedure: staged PRs per domain (one PR per `services/<domain>/` target), with `git mv` preserving file history.
 - The rollback procedure: each staged PR is individually revertible; until the final migration PR merges, both old and new paths coexist.
-- Import-path shim semantics: during migration, old-path imports (`from services.s05_risk_manager import ...`) continue to work via a `__init__.py` redirect; new imports (`from services.portfolio.risk_manager import ...`) are the target. The shim is removed in the final migration PR.
+- Import-path shim semantics: during migration, old-path imports (`from services.risk_manager import ...`) continue to work via a `__init__.py` redirect; new imports (`from services.portfolio.risk_manager import ...`) are the target. The shim is removed in the final migration PR.
 
 **Physical migration is scheduled for Phase D.5** (§5.5) to contain its merge-conflict surface.
 
@@ -1066,16 +1066,16 @@ def run_portfolio(
 
 | Current path | Target path |
 |---|---|
-| `services/s01_data_ingestion/` | `services/data/ingestion/` |
-| `services/s02_signal_engine/` | `services/signal/engine/` (legacy confluence retained as strategy runner post-Phase B) |
-| `services/s03_regime_detector/` | `services/signal/regime_detector/` |
-| `services/s04_fusion_engine/` | `services/signal/fusion/` |
-| `services/s05_risk_manager/` | `services/portfolio/risk_manager/` |
-| `services/s06_execution/` | `services/execution/engine/` |
-| `services/s07_quant_analytics/` | `services/signal/quant_analytics/` |
-| `services/s08_macro_intelligence/` | `services/data/macro_intelligence/` |
-| `services/s09_feedback_loop/` | `services/research/feedback_loop/` |
-| `services/s10_monitor/` | `services/ops/monitor_dashboard/` |
+| `services/data_ingestion/` | `services/data/ingestion/` |
+| `services/signal_engine/` | `services/signal/engine/` (legacy confluence retained as strategy runner post-Phase B) |
+| `services/regime_detector/` | `services/signal/regime_detector/` |
+| `services/fusion_engine/` | `services/signal/fusion/` |
+| `services/risk_manager/` | `services/portfolio/risk_manager/` |
+| `services/execution/` | `services/execution/engine/` |
+| `services/quant_analytics/` | `services/signal/quant_analytics/` |
+| `services/macro_intelligence/` | `services/data/macro_intelligence/` |
+| `services/feedback_loop/` | `services/research/feedback_loop/` |
+| `services/command_center/` | `services/ops/monitor_dashboard/` |
 
 **New services born in Phase C/D** are already in target topology:
 
@@ -1463,7 +1463,7 @@ Each of the four remaining boot strategies follows the same four-gate structure.
 
 **Platform-level capabilities validated**:
 
-- **FX asset class** — first G10 FX strategy; exercises FX data ingestion (central bank rate scrapers in `services/s01_data_ingestion/connectors/` per audit §1, plus Yahoo/FRED daily FX bars).
+- **FX asset class** — first G10 FX strategy; exercises FX data ingestion (central bank rate scrapers in `services/data_ingestion/connectors/` per audit §1, plus Yahoo/FRED daily FX bars).
 - **Regime overlay under Low Vol category** — the Low Vol Sharpe bar (1.0) is deliberately tight for a strategy known to suffer 15%+ drawdowns in crisis; forcing the regime overlay to be effective is a deliberate Charter §4.5 design choice.
 - **Central bank blackout discipline** — STEP 1 `CBEventGuard` (Charter §8.2) must block FX trades during the 45-minute window before Fed/ECB/BoJ/BoE/SNB announcements; Strategy #5 is the heaviest user of this guard.
 
@@ -2087,7 +2087,7 @@ Implementation authority held by:
 
 ### 16.1 Ratification and post-merge manual actions
 
-This Roadmap is proposed for ratification as of **2026-04-20** and expected to be merged as **v3.0** into the main branch of the APEX / CashMachine repository upon Clement Barbier's review.
+This Roadmap is proposed for ratification as of **2026-04-20** and expected to be merged as **v3.0** into the main branch of the APEX repository upon Clement Barbier's review.
 
 **POST-MERGE ACTION REQUIRED** (one-time, CIO manual):
 

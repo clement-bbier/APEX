@@ -74,7 +74,7 @@ Never touch alpha logic. Run `make preflight`. Open PR.
 
 The single most important rule: **one agent = one branch = one issue at a time per zone**.
 
-If two issues touch overlapping zones (e.g. two `alpha` issues both touching `services/s04_fusion_engine/`), pick them up SEQUENTIALLY, not in parallel.
+If two issues touch overlapping zones (e.g. two `alpha` issues both touching `services/fusion_engine/`), pick them up SEQUENTIALLY, not in parallel.
 
 ## Emergency stop
 

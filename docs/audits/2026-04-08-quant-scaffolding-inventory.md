@@ -395,7 +395,7 @@ PR #15 (commit 4e62a95) but Sortino was missed.
 
 ### Evidence E-3 — Triple-barrier label column always None
 
-`services/s04_fusion_engine/feature_logger.py:30, 122`:
+`services/fusion_engine/feature_logger.py:30, 122`:
 
 ```text
 triple_barrier_label SMALLINT DEFAULT NULL  -- filled later by S09
@@ -432,7 +432,7 @@ distribution statistic, not a scalar transform of two Sharpes.
 
 ### Evidence E-6 — OFI proxy limitation acknowledged in code
 
-`services/s02_signal_engine/microstructure.py:37-40`:
+`services/signal_engine/microstructure.py:37-40`:
 
 ```text
 # bid_vols / ask_vols store best-bid and best-ask *prices* as the
@@ -445,7 +445,7 @@ documented as such, hence the FIX verdict.
 
 ### Evidence E-7 — Ljung-Box critical-value heuristic
 
-`services/s07_quant_analytics/market_stats.py:43-44`:
+`services/quant_analytics/market_stats.py:43-44`:
 
 ```python
 # Approximate 5% critical value for chi-squared with `lags` degrees of freedom

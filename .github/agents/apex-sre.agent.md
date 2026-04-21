@@ -22,7 +22,7 @@ CONTEXTE TECHNIQUE :
 ## Tâches et Approche
 1. **Remaniement de la Topologie ZMQ (Le conflit 5555)**
    - Modifie `core/bus.py` : la méthode `init_publisher` doit accepter `bind: bool = False`. Si True -> `socket.bind()`, si False -> `socket.connect()`.
-   - Modifie `services/s01_data_ingestion/service.py` : c'est le SEUL service autorisé à faire `bind=True`.
+   - Modifie `services/data_ingestion/service.py` : c'est le SEUL service autorisé à faire `bind=True`.
    - Modifie TOUS les autres services (S02 à S10) pour qu'ils fassent `bind=False` (connexion au bus de S01).
 
 2. **Compatibilité Windows et Robustesse**

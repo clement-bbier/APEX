@@ -46,7 +46,7 @@ Architecture Decision: **ADR-0006 Fail-Closed Pre-Trade Risk Controls** (ACCEPTE
 
 Deliverables:
 - `core/state.py` — `SystemRiskState`, `SystemRiskStateCause`, `SystemRiskStateChange`, `SystemRiskMonitor`.
-- `services/s05_risk_manager/fail_closed.py` — `FailClosedGuard` (STEP 0 of risk chain).
+- `services/risk_manager/fail_closed.py` — `FailClosedGuard` (STEP 0 of risk chain).
 - `core/topics.py:48` — `RISK_SYSTEM_STATE_CHANGE = "risk.system.state_change"`.
 - 43+ tests added under `tests/unit/s05/` for fail-closed coverage.
 - S10 dashboard observability wired in Batch A of the post-audit execution (PR #178).

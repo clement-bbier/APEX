@@ -83,8 +83,8 @@ The APEX project has **strong governance foundations**: CLAUDE.md is comprehensi
 
 | File | Pertinence | Fraicheur | Completude | Accessibilite | Coherence | Verdict |
 |---|---|---|---|---|---|---|
-| `services/s01_data_ingestion/observability/README.md` | Yes | Up-to-date | Complete | Medium | Consistent | **KEEP** |
-| `services/s01_data_ingestion/orchestrator/README.md` | Yes | Up-to-date | Complete | Medium | Consistent | **KEEP** |
+| `services/data_ingestion/observability/README.md` | Yes | Up-to-date | Complete | Medium | Consistent | **KEEP** |
+| `services/data_ingestion/orchestrator/README.md` | Yes | Up-to-date | Complete | Medium | Consistent | **KEEP** |
 
 ### A.6 Config files
 
@@ -94,7 +94,7 @@ The APEX project has **strong governance foundations**: CLAUDE.md is comprehensi
 | `docker/docker-compose.yml` | Yes | Up-to-date | Complete | High | Consistent | **KEEP** |
 | `docker/docker-compose.test.yml` | Yes | Up-to-date | Complete | High | Consistent | **KEEP** |
 | `docker/prometheus.yml` | Yes | Up-to-date | Complete | Medium | Consistent | **KEEP** |
-| `services/s01_data_ingestion/orchestrator/jobs.yaml` | Yes | Up-to-date | Complete | Medium | Consistent | **KEEP** |
+| `services/data_ingestion/orchestrator/jobs.yaml` | Yes | Up-to-date | Complete | Medium | Consistent | **KEEP** |
 | `.claude/settings.json` | Yes | Up-to-date | N/A | Low | N/A | **KEEP** |
 | `.claude/settings.local.json` | Yes | Up-to-date | N/A | Low | N/A | **KEEP** |
 

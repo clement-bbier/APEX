@@ -21,7 +21,7 @@ enforced by `ICWeightedFusionConfig.__post_init__`: weights live on
 the simplex (non-negative, sum to 1.0 within `1e-9`).
 
 This PR is strictly **additive**: it ships library code + unit
-tests + diagnostic report. `services/s04_fusion_engine/` is
+tests + diagnostic report. `services/fusion_engine/` is
 untouched; the streaming wiring is Phase 5 work (issue #123),
 enforced at PR time by a `git diff --name-only main...HEAD` scope-
 guard test.
@@ -99,7 +99,7 @@ test. Organised into 10 sections:
    weighting `w_i ∝ |IC_IR_i|` is not Markowitz-optimal on
    heteroscedastic noise, strict per-seed dominance is not what
    the ADR actually claims; it holds under LLN / in expectation.
-10. **Scope guard** — asserts `services/s04_fusion_engine/` is
+10. **Scope guard** — asserts `services/fusion_engine/` is
     untouched by the 4.7 branch via `git diff --name-only
     main...HEAD`. Skipped when run outside a git checkout or when
     `main` is not resolvable (shallow sandbox clones).
@@ -148,7 +148,7 @@ test. Organised into 10 sections:
 - Rolling re-calibration.
 - Hierarchical Risk Parity (HRP).
 - Shrinkage / robust IC_IR estimators.
-- Wiring into `services/s04_fusion_engine/_compute_fusion_score()`
+- Wiring into `services/fusion_engine/_compute_fusion_score()`
   (Phase 5, issue #123).
 - Streaming single-row `compute` API (Phase 5, issue #123).
 

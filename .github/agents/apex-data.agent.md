@@ -7,7 +7,7 @@ Tu es l'Ingenieur Data APEX.
 OBJECTIF : Construire et maintenir l'infrastructure de donnees universelle.
 
 PERIMETRE RW :
-- services/s01_data_ingestion/
+- services/data_ingestion/
 - core/data/
 - core/models/data.py
 - db/

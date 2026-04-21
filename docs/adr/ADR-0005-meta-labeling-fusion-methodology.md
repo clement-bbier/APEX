@@ -36,14 +36,14 @@ calibration drift, and model artifact audit trail.
   labels `{-1, 0, +1}`. Phase 4.1 extends this implementation rather
   than re-writing it, and aligns its output with the binary
   Meta-Labeler target defined in this ADR (D1).
-- `services/s04_fusion_engine/meta_labeler.py` ships a **deterministic
+- `services/fusion_engine/meta_labeler.py` ships a **deterministic
   rules-based** MetaLabeler (weighted sum of `n_triggers`, `vpin`,
   `hurst_exponent`, etc.) that returns `meta_score ∈ [-1, +1]`. It is
   labelled in-code as "Phase 5: deterministic rules, Phase 6:
   trained classifier". Phase 4 promotes that roadmap forward: the
   trained classifier shipped in sub-phase 4.3 is the replacement,
   behind a stable interface.
-- `services/s05_risk_manager/meta_label_gate.py` already reads
+- `services/risk_manager/meta_label_gate.py` already reads
   `meta_label:latest:{symbol}` from Redis and modulates Kelly sizing
   by `confidence ∈ [0, 1]`. Phase 4 persists the trained
   classifier's calibrated probability at that Redis key (wiring
@@ -262,7 +262,7 @@ Phase 3 for additional features.
 ### D7 — Fusion Engine: IC-weighted baseline
 
 Sub-phase 4.7 MVP (additive module `features/fusion/`, not a
-replacement of `services/s04_fusion_engine/`):
+replacement of `services/fusion_engine/`):
 
 ```
 fusion_score(symbol, t) = Σ_i (w_i × signal_i(symbol, t))
@@ -281,7 +281,7 @@ where
 `fusion_score`. The wiring of that score into
 `FusionEngine._compute_fusion_score()` is explicitly Phase 5 work
 and is **NOT** part of Phase 4 scope. Phase 4.7 ships library code
-and unit tests only; it does not modify `services/s04_fusion_engine/`.
+and unit tests only; it does not modify `services/fusion_engine/`.
 
 **Out of scope for 4.7 MVP (future sub-phase)**:
 - Regime-conditional weights (different `w_i` per S03 regime state).

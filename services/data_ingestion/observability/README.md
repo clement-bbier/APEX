@@ -33,7 +33,7 @@ from `metrics.py` — they never import `prometheus_client` directly.
 ## Tracing (OpenTelemetry)
 
 ```python
-from services.s01_data_ingestion.observability.tracing import trace_async
+from services.data_ingestion.observability.tracing import trace_async
 
 @trace_async("connector.alpaca.fetch_bars")
 async def fetch_bars(self, ...) -> ...:
@@ -45,7 +45,7 @@ Exports to OTLP/gRPC when `otel_endpoint` is set, otherwise ConsoleSpanExporter.
 ## Health Checks
 
 ```python
-from services.s01_data_ingestion.observability.healthcheck import (
+from services.data_ingestion.observability.healthcheck import (
     HealthChecker, DatabaseCheck,
 )
 

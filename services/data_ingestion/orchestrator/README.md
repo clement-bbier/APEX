@@ -53,26 +53,26 @@ No modification to JobRunner, Scheduler, or StateManager is needed.
 ### Daemon mode
 
 ```bash
-python -m services.s01_data_ingestion.orchestrator.main
+python -m services.data_ingestion.orchestrator.main
 ```
 
 ### CLI
 
 ```bash
 # List all jobs
-python -m services.s01_data_ingestion.orchestrator.cli list
+python -m services.data_ingestion.orchestrator.cli list
 
 # Run a specific job immediately
-python -m services.s01_data_ingestion.orchestrator.cli run --job binance_btcusdt_1m
+python -m services.data_ingestion.orchestrator.cli run --job binance_btcusdt_1m
 
 # Check job status
-python -m services.s01_data_ingestion.orchestrator.cli status --job binance_btcusdt_1m
+python -m services.data_ingestion.orchestrator.cli status --job binance_btcusdt_1m
 
 # Reset job state (clear lock + history)
-python -m services.s01_data_ingestion.orchestrator.cli reset --job binance_btcusdt_1m
+python -m services.data_ingestion.orchestrator.cli reset --job binance_btcusdt_1m
 
 # Detect data gaps
-python -m services.s01_data_ingestion.orchestrator.cli gaps
+python -m services.data_ingestion.orchestrator.cli gaps
 ```
 
 ### Docker

@@ -21,9 +21,9 @@ The APEX platform is transitioning from a single-strategy architecture (Phase 1-
 
 The **Multi-Strat Readiness Audit** ([`MULTI_STRAT_READINESS_AUDIT_2026-04-18.md`](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md)) identified the current signal pipeline as the dominant architectural blocker to multi-strategy deployment:
 
-- [`services/s02_signal_engine/pipeline.py`](../../services/s02_signal_engine/pipeline.py) (487 LOC) implements a single-path 5-component confluence pipeline with a 290-LOC hardcoded `_run()` method. No ABC for signal generators exists; no registry.
-- [`services/s04_fusion_engine/strategy.py`](../../services/s04_fusion_engine/strategy.py) (124 LOC) defines a `STRATEGY_REGISTRY` of 4 hardcoded regime-keyed strategies (momentum_scalp, mean_reversion, spike_scalp, short_momentum) — these are **regime profiles**, not independent strategies producing independent bets.
-- Two Claude Code agents developing Strategy A and Strategy B in parallel would git-conflict on `services/s02_signal_engine/pipeline.py`, `services/s02_signal_engine/signal_scorer.py`, and `services/s04_fusion_engine/strategy.py` simultaneously.
+- [`services/signal_engine/pipeline.py`](../../services/signal_engine/pipeline.py) (487 LOC) implements a single-path 5-component confluence pipeline with a 290-LOC hardcoded `_run()` method. No ABC for signal generators exists; no registry.
+- [`services/fusion_engine/strategy.py`](../../services/fusion_engine/strategy.py) (124 LOC) defines a `STRATEGY_REGISTRY` of 4 hardcoded regime-keyed strategies (momentum_scalp, mean_reversion, spike_scalp, short_momentum) — these are **regime profiles**, not independent strategies producing independent bets.
+- Two Claude Code agents developing Strategy A and Strategy B in parallel would git-conflict on `services/signal_engine/pipeline.py`, `services/signal_engine/signal_scorer.py`, and `services/fusion_engine/strategy.py` simultaneously.
 
 The Charter (§5.1) resolves this via Q1 — strategies are **complete microservices**, not plug-ins. This is the Citadel/Millennium pod-model reference: each pod is isolated at the operating-system level (separate container, separate process, dedicated resources), not a module inside a shared monolith.
 
@@ -49,7 +49,7 @@ Every strategy deployed on APEX is a standalone microservice with:
 
 The **`strategy_id`** is a snake_case identifier matching the folder name (Charter §5.5, Playbook §2.2). Examples: `crypto_momentum`, `trend_following`, `mean_rev_equities`, `volatility_risk_premium`, `macro_carry`, `news_driven`.
 
-Legacy single-strategy behavior is preserved by a **`LegacyConfluenceStrategy`** (D4) that wraps the current `services/s02_signal_engine/pipeline.py` unchanged. The legacy path continues under `strategy_id = "default"` during the multi-strat transition; once Strategy #1 reaches Gate 4 Live Full, the legacy path is decommissioned per the standard decommissioning protocol (Playbook §10).
+Legacy single-strategy behavior is preserved by a **`LegacyConfluenceStrategy`** (D4) that wraps the current `services/signal_engine/pipeline.py` unchanged. The legacy path continues under `strategy_id = "default"` during the multi-strat transition; once Strategy #1 reaches Gate 4 Live Full, the legacy path is decommissioned per the standard decommissioning protocol (Playbook §10).
 
 ### D2 — `StrategyRunner` ABC location
 
@@ -152,7 +152,7 @@ class StrategyRunner(ABC):
 
 ### D4 — `LegacyConfluenceStrategy` — preserve current behavior
 
-The current `services/s02_signal_engine/pipeline.py` behavior is preserved **unchanged** by wrapping it as a concrete `StrategyRunner` subclass named `LegacyConfluenceStrategy`, located at `services/strategies/legacy_confluence/`.
+The current `services/signal_engine/pipeline.py` behavior is preserved **unchanged** by wrapping it as a concrete `StrategyRunner` subclass named `LegacyConfluenceStrategy`, located at `services/strategies/legacy_confluence/`.
 
 **Folder structure**:
 
@@ -167,7 +167,7 @@ services/strategies/legacy_confluence/
     └── test_legacy_confluence.py  # Bit-identical regression vs pre-Phase-B baseline
 ```
 
-**Principle 6 assertion**: the `LegacyConfluenceStrategy` produces bit-identical `Signal`s and `OrderCandidate`s to the pre-Phase-B `services/s02_signal_engine/pipeline.py` on a fixed fixture tick stream (the 30-day BTCUSDT 1-min fixture at [`tests/fixtures/30d_btcusdt_1m.parquet`](../../tests/fixtures/30d_btcusdt_1m.parquet)). The scope-guard test blocks any Phase B PR that would alter this behavior.
+**Principle 6 assertion**: the `LegacyConfluenceStrategy` produces bit-identical `Signal`s and `OrderCandidate`s to the pre-Phase-B `services/signal_engine/pipeline.py` on a fixed fixture tick stream (the 30-day BTCUSDT 1-min fixture at [`tests/fixtures/30d_btcusdt_1m.parquet`](../../tests/fixtures/30d_btcusdt_1m.parquet)). The scope-guard test blocks any Phase B PR that would alter this behavior.
 
 **Decommissioning plan**: `LegacyConfluenceStrategy` is a **transitional artifact**. Once Strategy #1 (Crypto Momentum) reaches Gate 4 Live Full (Roadmap §6.5), the legacy strategy is decommissioned per Playbook §10 (standard decommissioning protocol). The physical folder remains in git history; its Docker container is halted; its Redis state keys are archived.
 
@@ -285,7 +285,7 @@ Each strategy container can be independently:
 ### 3.1 Positive
 
 - **Crash isolation** at OS level per Citadel/Millennium pod model (Charter §5.1 rationale).
-- **Parallel development**: two Claude Code agents can work on Strategy A and Strategy B without git conflicts on shared source files. The current `services/s02_signal_engine/pipeline.py` hot spot is resolved by the LegacyConfluenceStrategy wrap.
+- **Parallel development**: two Claude Code agents can work on Strategy A and Strategy B without git conflicts on shared source files. The current `services/signal_engine/pipeline.py` hot spot is resolved by the LegacyConfluenceStrategy wrap.
 - **Independent deployment and rollback** per strategy.
 - **SOLID-S and SOLID-O**: each strategy is a single-responsibility unit; new strategies extend the platform without modifying existing code.
 - **Principle-6 compliant**: the LegacyConfluenceStrategy wraps current behavior; nothing functional is deleted.
@@ -358,7 +358,7 @@ Each strategy container can be independently:
 ### 5.1 Phase B tasks (Roadmap §3)
 
 1. Create `services/strategies/_base.py` with the `StrategyRunner` ABC (D3).
-2. Create `services/strategies/legacy_confluence/` folder with `LegacyConfluenceStrategy` (D4) wrapping the current `services/s02_signal_engine/pipeline.py`.
+2. Create `services/strategies/legacy_confluence/` folder with `LegacyConfluenceStrategy` (D4) wrapping the current `services/signal_engine/pipeline.py`.
 3. Migrate `LegacyConfluenceStrategy` publishing from `Topics.signal(symbol)` to `Topics.signal_for("default", symbol)` per D7.
 4. Add per-strategy Redis partitioning for `kelly:default:*` and `trades:default:all` (the legacy strategy is the first to exercise the per-strategy key pattern).
 5. Update `supervisor/orchestrator.py` startup order per D5.
@@ -414,8 +414,8 @@ Per strategy Gate 2 (Roadmap §6.3, §7.2.2, etc.):
 
 ### 7.4 Internal code references
 
-- [`services/s02_signal_engine/pipeline.py`](../../services/s02_signal_engine/pipeline.py) — current legacy single-path pipeline (487 LOC), wrapped as `LegacyConfluenceStrategy` per D4.
-- [`services/s04_fusion_engine/strategy.py`](../../services/s04_fusion_engine/strategy.py) — current `STRATEGY_REGISTRY` of regime-keyed profiles (124 LOC).
+- [`services/signal_engine/pipeline.py`](../../services/signal_engine/pipeline.py) — current legacy single-path pipeline (487 LOC), wrapped as `LegacyConfluenceStrategy` per D4.
+- [`services/fusion_engine/strategy.py`](../../services/fusion_engine/strategy.py) — current `STRATEGY_REGISTRY` of regime-keyed profiles (124 LOC).
 - [`core/base_service.py`](../../core/base_service.py) — `BaseService` that every strategy microservice inherits from.
 - [`core/topics.py`](../../core/topics.py) — `Topics` factory; extended with `signal_for` per Roadmap Phase A §2.2.2.
 - [`core/models/order.py`](../../core/models/order.py), [`core/models/signal.py`](../../core/models/signal.py) — Pydantic models gaining `strategy_id` in Phase A §2.2.1.

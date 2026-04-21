@@ -31,12 +31,12 @@ implémente l'entraînement baseline du Meta-Labeler per **ADR-0005 D3**
 Aucun module `features/meta_labeler/` n'existe aujourd'hui
 (`ls features/meta_labeler/` → absent). L'unique fichier lié au
 Meta-Labeler actuellement présent est
-`services/s04_fusion_engine/meta_labeler.py` : **rules-based deterministic
+`services/fusion_engine/meta_labeler.py` : **rules-based deterministic
 scorer, pas un classifieur entraîné**. PHASE_4_SPEC §2.3 le liste
 explicitement :
 
 > `features/meta_labeler/baseline.py` | 4.3 | Existing
-> `services/s04_fusion_engine/meta_labeler.py` is a deterministic rules
+> `services/fusion_engine/meta_labeler.py` is a deterministic rules
 > scorer, not a trained classifier. Phase 4 introduces the trained-
 > classifier path as a sibling module that will eventually replace the
 > deterministic scorer in Phase 5 wiring.
@@ -137,7 +137,7 @@ requirements.txt                    (scikit-learn added)
 
 ### 2.3 Assets explicitement **non touchés**
 
-- `services/s04_fusion_engine/meta_labeler.py` — le scorer rules-based
+- `services/fusion_engine/meta_labeler.py` — le scorer rules-based
   reste en place, non modifié ; Phase 5 décidera du remplacement.
 - `features/pipeline.py` — aucune consommation du nouveau module en
   Phase 4 MVP (entraînement offline).

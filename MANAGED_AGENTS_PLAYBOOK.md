@@ -1,6 +1,6 @@
 # APEX × Claude Managed Agents — Playbook
 
-Comment utiliser Claude Managed Agents (`platform.claude.com`) en complément du workflow Claude Code principal pour automatiser, paralléliser, et industrialiser le développement et l'opération d'APEX/CashMachine.
+Comment utiliser Claude Managed Agents (`platform.claude.com`) en complément du workflow Claude Code principal pour automatiser, paralléliser, et industrialiser le développement et l'opération d'APEX.
 
 **Date de rédaction** : Avril 2026  
 **Statut Managed Agents** : Beta publique  
@@ -52,7 +52,7 @@ Comment utiliser Claude Managed Agents (`platform.claude.com`) en complément du
 
 ## A.2 Architecture cible
 ┌─────────────────────────────────────────────────────────────┐
-│                      APEX/CashMachine                       │
+│                      APEX                       │
 │  ┌─────────────────────────────────────────────────────┐    │
 │  │  Repo principal (10 services S01-S10)               │    │
 │  │  Développement séquentiel via Claude Code           │    │
@@ -105,7 +105,7 @@ Tous les agents APEX doivent suivre cette convention pour rester organisés :
 - **Repo de configs** : créer un dossier `agents/` à la racine du repo qui contient un fichier YAML par agent (ex: `agents/veille_quant.yaml`) avec system prompt + outils + environment config. Versionnés dans git.
 
 ### Structure proposée
-CashMachine/
+APEX/
 ├── agents/
 │   ├── README.md                     # Inventaire des agents APEX
 │   ├── veille_quant.yaml             # Agent de veille recherche

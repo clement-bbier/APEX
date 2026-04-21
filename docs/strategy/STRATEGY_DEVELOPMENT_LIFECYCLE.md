@@ -236,7 +236,7 @@ No role makes ratification decisions outside its scope. Claude Code does not pro
 
 ### 1.7 The "default strategy" — backward-compatibility footprint
 
-During the multi-strat infrastructure lift (Charter §5.10, scheduled in Document 3), the legacy single-strategy signal path in [`services/s02_signal_engine/pipeline.py`](../../services/s02_signal_engine/pipeline.py) is wrapped as a concrete `StrategyRunner` subclass called `LegacyConfluenceStrategy`. This strategy carries `strategy_id = "default"` (the Pydantic backward-compatibility default per Charter §5.5).
+During the multi-strat infrastructure lift (Charter §5.10, scheduled in Document 3), the legacy single-strategy signal path in [`services/signal_engine/pipeline.py`](../../services/signal_engine/pipeline.py) is wrapped as a concrete `StrategyRunner` subclass called `LegacyConfluenceStrategy`. This strategy carries `strategy_id = "default"` (the Pydantic backward-compatibility default per Charter §5.5).
 
 For Playbook purposes:
 
@@ -501,7 +501,7 @@ Each of the six boot strategies (Charter §4) gets a per-strategy Charter at Gat
 | Execution bars | Daily |
 | Academic basis | Lustig, Roussanov & Verdelhan (2011), *Review of Financial Studies* 24, 3731-3777 |
 | Expected Sharpe | 0.6 – 1.2 (no carry-crash hedge); 0.8 – 1.5 (with hedge) |
-| Required features | Central-bank policy rates (FRED + ECB/BoE/BoJ scrapers per [`services/s01_data_ingestion/connectors/`](../../services/s01_data_ingestion/)); FX spot vol per pair; global risk indicator (VIX or composite) |
+| Required features | Central-bank policy rates (FRED + ECB/BoE/BoJ scrapers per [`services/data_ingestion/connectors/`](../../services/data_ingestion/)); FX spot vol per pair; global risk indicator (VIX or composite) |
 | Data sources | Yahoo + FRED + CB scrapers (free); Phase 3 OANDA/IBKR for execution |
 | Budget overrides | None at boot — Low Vol Sharpe bar (1.0) deliberately tight to force regime overlay efficacy |
 | Deployment order | 5 of 6 |
@@ -528,7 +528,7 @@ Three rules govern per-strategy Charter authoring:
 
 1. **Specificity over generality**. "Reasonable position sizing" is forbidden; "max 10% of strategy allocation per symbol, max 5 simultaneous open positions, max 0.7 inter-position correlation within strategy" is mandatory.
 
-2. **Citation over assertion**. Every academic claim cites a specific paper. Every code claim cites a specific path (`features/calculators/ofi.py`, `services/s05_risk_manager/chain_orchestrator.py:61`). Vague references ("our existing OFI module") are forbidden.
+2. **Citation over assertion**. Every academic claim cites a specific paper. Every code claim cites a specific path (`features/calculators/ofi.py`, `services/risk_manager/chain_orchestrator.py:61`). Vague references ("our existing OFI module") are forbidden.
 
 3. **Override-with-reason discipline**. Any deviation from category defaults (Charter §9.1) requires explicit justification. "Crypto Momentum overrides max-leverage to 2×" is forbidden as a bare statement; it requires either "(a) inherited from Medium Vol category defaults, no override" or "(b) override to 2× justified by [specific empirical / academic argument]".
 
@@ -567,7 +567,7 @@ The Gate 1 PR (the pull request that merges Gate 1 evidence into `main`) MUST co
 
 **Mandatory structure** — five sections in this order:
 
-1. **Setup and data loading**. Imports, deterministic random seeds (per CLAUDE.md §10 forbidden patterns: use `secrets.SystemRandom()` for any seed-controlled randomness in the production microservice; in research notebooks `numpy.random.default_rng(seed=42)` is acceptable for reproducibility), data fetch from the project's data layer (TimescaleDB via existing connectors per [`services/s01_data_ingestion/connectors/`](../../services/s01_data_ingestion/)).
+1. **Setup and data loading**. Imports, deterministic random seeds (per CLAUDE.md §10 forbidden patterns: use `secrets.SystemRandom()` for any seed-controlled randomness in the production microservice; in research notebooks `numpy.random.default_rng(seed=42)` is acceptable for reproducibility), data fetch from the project's data layer (TimescaleDB via existing connectors per [`services/data_ingestion/connectors/`](../../services/data_ingestion/)).
 2. **Feature computation**. Concrete feature calculation using existing [`features/calculators/`](../../features/) modules where applicable. Custom features for the strategy go in `features/calculators/<strategy_id>/<feature>.py`, are tested in unit tests, and are reused by the production microservice — no notebook-only feature code that the microservice later re-implements.
 3. **Backtest logic**. Either: (a) use the canonical [`backtesting/`](../../backtesting/) harness (preferred when applicable), or (b) for research-stage strategies whose semantics do not yet fit the canonical harness, a notebook-local backtest with explicit documentation of the deviations from the canonical harness. The canonical harness is the long-term target; notebook-local is acceptable transitional.
 4. **Metrics output**. Call `backtesting.metrics.full_report(trades, …)` ([`backtesting/metrics.py:1327`](../../backtesting/metrics.py)) on the trade list. The full report produces all ADR-0002-mandated metrics in one call: Sharpe, PSR, DSR, bootstrap CI, Sortino, Calmar, CAGR, max DD, max DD absolute, max DD duration, Ulcer Index, Martin ratio, return skew/kurtosis/tail-ratio, win rate, profit factor, trade count, by_session, by_regime, regime concentration HHI, by_signal, equity curve. The PBO field is populated when `strategy_returns_matrix` is supplied (Gate 2 work; not strictly required at Gate 1 but encouraged as preview).
@@ -756,7 +756,7 @@ This subsection walks through the Gate 1 evidence package for Crypto Momentum. T
 >
 > A cross-sectional long-short basket — long the top-quintile 14-day performers, short the bottom quintile — captures the edge while partially neutralizing broad market beta. This is critical because BTC dominance shifts rapidly (a pure long-only momentum strategy in crypto is largely a levered BTC bet).
 >
-> Edge decay risk: well-documented and active. The strategy includes drift monitoring (planned via `services/research/feedback_loop/` — see [`drift_detector.py`](../../services/s09_feedback_loop/drift_detector.py:35), 10% relative win-rate drop alert + 50-trade minimum) so that decay triggers Kelly reduction (Charter §8.1.1) before capital damage compounds.
+> Edge decay risk: well-documented and active. The strategy includes drift monitoring (planned via `services/research/feedback_loop/` — see [`drift_detector.py`](../../services/feedback_loop/drift_detector.py:35), 10% relative win-rate drop alert + 50-trade minimum) so that decay triggers Kelly reduction (Charter §8.1.1) before capital damage compounds.
 >
 > Comparison to existing platform strategies: first of kind. Once Strategy #2 (Trend Following Multi-Asset) deploys, the two will be partially correlated (~0.3–0.5 expected per Charter §4.7) because BTC and ETH appear in both universes; the diversification value remains positive.
 
@@ -902,7 +902,7 @@ The Charter §7.2 requires "10 stress-test scenarios passed". The Playbook fixes
 | 6 | **Liquidity evaporation (bid-ask spread × 10)** | 2008-10 (peak credit crisis, spreads 5× normal); 2020-03 (Treasury market liquidity drying up) | DD within category max; strategy throttles or pauses on widened spreads |
 | 7 | **Correlation breakdown (cross-asset correlation spike to ≥ 0.9)** | 2008-10; 2020-03; 2022-06 (everything-correlated risk-off) | DD within category max; multi-asset strategies (Trend Following, News-driven) show diversification breakdown but bounded loss |
 | 8 | **Crypto-specific tail event** | 2022-05-09 → 2022-05-12 (LUNA / UST collapse); 2022-11-08 → 2022-11-11 (FTX collapse) | DD within category max; crypto strategies (Crypto Momentum, News-driven crypto-side) show bounded loss |
-| 9 | **Single-symbol gap (-30% overnight)** | Isolated equity examples (e.g., earnings miss with -25% gap); applied as synthetic single-name shock to equity strategies | DD within category max; per-position max-loss controls fire (Charter §8.1.1 implicitly via per-strategy position rules — STEP 5 of the chain — see [`services/s05_risk_manager/chain_orchestrator.py:191-221`](../../services/s05_risk_manager/chain_orchestrator.py)) |
+| 9 | **Single-symbol gap (-30% overnight)** | Isolated equity examples (e.g., earnings miss with -25% gap); applied as synthetic single-name shock to equity strategies | DD within category max; per-position max-loss controls fire (Charter §8.1.1 implicitly via per-strategy position rules — STEP 5 of the chain — see [`services/risk_manager/chain_orchestrator.py:191-221`](../../services/risk_manager/chain_orchestrator.py)) |
 | 10 | **Data feed outage (90 minutes mid-session)** | Synthetic; emulates a venue WebSocket disconnect during active trading | Strategy enters fail-closed (Charter §5.8 / [ADR-0006](../adr/ADR-0006-fail-closed-risk-controls.md)); no orders submitted on stale data; resumes cleanly when feed restores |
 
 **Methodology** for each scenario:
@@ -985,7 +985,7 @@ The strategy microservice (and any new feature calculators introduced for it) mu
 3. Verify the service heartbeats every 5 seconds to its Redis key (per `BaseService` convention, [CLAUDE.md](../../CLAUDE.md) §8).
 4. Verify the service subscribes to its panel topics (or current-state tick topics until `services/data/panels/` lands per Charter §5.3).
 5. Inject a synthetic panel/tick that should produce a signal; verify an `order.candidate` with `strategy_id == "<strategy_id>"` is published.
-6. Verify the message is observed by the (current) Risk Manager (`services/s05_risk_manager/`, soon `services/portfolio/risk_manager/`) via subscription on the bus.
+6. Verify the message is observed by the (current) Risk Manager (`services/risk_manager/`, soon `services/portfolio/risk_manager/`) via subscription on the bus.
 7. Run for ≥ 10 minutes with no crashes, no unhandled exceptions, no heartbeat misses.
 
 **Artifact**: `reports/<strategy_id>/gate2/smoke_test.log` containing the structured-log lines from the smoke test, with explicit timestamps and a final "SMOKE TEST PASSED" line.
@@ -1220,7 +1220,7 @@ There is **no upper bound** on Gate 3 duration. The CIO may extend paper to accu
 
 - **Monitor the dashboard daily**. Per-strategy panel (see §7.1) shows: live Sharpe (rolling), live max DD, live win rate, position log, alert log, heartbeat status.
 - **Document anomalies in real time**. Anything unexpected — a regime the strategy was not designed for, an unusually large position, a slow signal computation, a heartbeat blip — gets logged in `docs/strategy/per_strategy/<strategy_id>_paper_log.md` (a paper-period running log distinct from the Charter).
-- **Confirm baseline win-rate capture by Day 30**. The drift detector (see [`services/s09_feedback_loop/drift_detector.py:35`](../../services/s09_feedback_loop/drift_detector.py)) needs ≥ 50 trades and a 3-month baseline to fire alerts; the operator confirms by Day 30 (week 4) that the baseline is being captured per the running paper trade log.
+- **Confirm baseline win-rate capture by Day 30**. The drift detector (see [`services/feedback_loop/drift_detector.py:35`](../../services/feedback_loop/drift_detector.py)) needs ≥ 50 trades and a 3-month baseline to fire alerts; the operator confirms by Day 30 (week 4) that the baseline is being captured per the running paper trade log.
 
 **Active prohibitions** (do not):
 
@@ -1230,7 +1230,7 @@ There is **no upper bound** on Gate 3 duration. The CIO may extend paper to accu
 
 #### 5.2.3 Drift detection during paper
 
-The platform's drift detector ([`services/s09_feedback_loop/drift_detector.py`](../../services/s09_feedback_loop/drift_detector.py)) operates in paper exactly as it will in live:
+The platform's drift detector ([`services/feedback_loop/drift_detector.py`](../../services/feedback_loop/drift_detector.py)) operates in paper exactly as it will in live:
 
 - **Minimum sample**: 50 trades before any drift alert fires (line 43, `MIN_TRADES = 50`).
 - **Threshold**: 10% relative drop in win rate vs baseline triggers `DriftAlert` (line 42, `DRIFT_THRESHOLD = 0.10`).
@@ -1672,7 +1672,7 @@ Once a strategy is at full allocation (Live Full post Day-60 promotion), it ente
 
 Per Charter §6.5, every Sunday at 23:00 UTC:
 
-1. The allocator (`services/portfolio/strategy_allocator/`) fetches per-strategy 60-day rolling realized volatility from the research feedback loop (`services/research/feedback_loop/`, currently `services/s09_feedback_loop/`).
+1. The allocator (`services/portfolio/strategy_allocator/`) fetches per-strategy 60-day rolling realized volatility from the research feedback loop (`services/research/feedback_loop/`, currently `services/feedback_loop/`).
 2. Computes target weights via Phase 1 Risk Parity formula (Phase 2 Sharpe overlay if active per Charter §6.2.1 trigger conditions).
 3. Applies floors (5% per active strategy) and ceilings (40% standard; 45% for elevated performers per Charter §6.2.3); redistributes overflow.
 4. Applies turnover dampening (±25% per strategy max weekly weight change).
@@ -1684,7 +1684,7 @@ The rebalance does **not** generate trades directly — it updates the **capacit
 
 #### 7.1.2 Drift detector (continuous)
 
-The drift detector (`services/research/feedback_loop/drift_detector.py`, currently [`services/s09_feedback_loop/drift_detector.py`](../../services/s09_feedback_loop/drift_detector.py)) runs on every closed trade for every active strategy:
+The drift detector (`services/research/feedback_loop/drift_detector.py`, currently [`services/feedback_loop/drift_detector.py`](../../services/feedback_loop/drift_detector.py)) runs on every closed trade for every active strategy:
 
 - Reads the strategy's per-strategy trade history from `trades:<strategy_id>:all` (per-strategy partition per Charter §5.5).
 - Computes rolling win rate over last 50 trades.
@@ -1702,7 +1702,7 @@ Per Charter §8.1.2, the hard CBs operate continuously at the portfolio level. T
 
 #### 7.1.5 Pod-health monitoring (continuous)
 
-Each strategy microservice publishes a heartbeat to its Redis key every 5 seconds. The `services/ops/monitor_dashboard/` (currently `services/s10_monitor/`) subscribes; misses > 60 seconds trigger an alert AND a soft pause per Charter §8.1.1.
+Each strategy microservice publishes a heartbeat to its Redis key every 5 seconds. The `services/ops/monitor_dashboard/` (currently `services/command_center/`) subscribes; misses > 60 seconds trigger an alert AND a soft pause per Charter §8.1.1.
 
 ### 7.2 Weekly review (CIO)
 
@@ -1802,7 +1802,7 @@ This subsection defines the canonical state machine that all strategy microservi
 
 **Persistence**: Each strategy's current state is persisted in Redis at `strategy_health:<strategy_id>:state`; transitions are logged to structlog with event `strategy_health.transition` carrying `{from, to, trigger, timestamp}`. The dashboard subscribes and surfaces current state per strategy.
 
-**Implementation note**: Until the multi-strat infrastructure lift Phase B lands `services/portfolio/risk_manager/strategy_health_check.py`, the state machine is implemented inside the current `services/s05_risk_manager/chain_orchestrator.py` STEP 3 handler; the Redis key namespace is already established (per Charter §5.5 per-strategy partitioning).
+**Implementation note**: Until the multi-strat infrastructure lift Phase B lands `services/portfolio/risk_manager/strategy_health_check.py`, the state machine is implemented inside the current `services/risk_manager/chain_orchestrator.py` STEP 3 handler; the Redis key namespace is already established (per Charter §5.5 per-strategy partitioning).
 
 ### 8.1 Strategy DD > 8% / 24h → Kelly × 0.5
 
@@ -1812,7 +1812,7 @@ This subsection defines the canonical state machine that all strategy microservi
 2. The feedback loop computes 24-hour drawdown for the strategy and detects threshold cross.
 3. `feedback.strategy_dd_alert` event publishes on the ZMQ bus with `strategy_id`, `drawdown = 0.08+`, `threshold_triggered = "soft_dd_24h_8pct"`.
 4. The allocator subscribes; sets `kelly_adjust = 0.5` for the strategy, persisted to `kelly:<strategy_id>:adjust` (per-strategy partition).
-5. The `MetaLabelGate` (STEP 4 of the VETO chain — `services/s05_risk_manager/meta_label_gate.py`) and the strategy's own sizing logic both read `kelly_adjust` and apply it as a multiplier on the strategy's nominal Kelly fraction.
+5. The `MetaLabelGate` (STEP 4 of the VETO chain — `services/risk_manager/meta_label_gate.py`) and the strategy's own sizing logic both read `kelly_adjust` and apply it as a multiplier on the strategy's nominal Kelly fraction.
 6. Subsequent orders from this strategy are sized at half their normal Kelly. Other strategies are unaffected (per-strategy partitioning per Charter §5.5).
 7. Dashboard surfaces an "Strategy DD 8% — Kelly halved" alert.
 
@@ -1920,7 +1920,7 @@ If the 90-day decision window elapses **without** an explicit CIO decision (clea
 
 #### 8.4.1 Mechanical sequence
 
-1. The drift detector evaluates the strategy's last-50-trades win rate (per [`services/s09_feedback_loop/drift_detector.py:43`](../../services/s09_feedback_loop/drift_detector.py) `MIN_TRADES = 50`).
+1. The drift detector evaluates the strategy's last-50-trades win rate (per [`services/feedback_loop/drift_detector.py:43`](../../services/feedback_loop/drift_detector.py) `MIN_TRADES = 50`).
 2. If win rate < 25%, the soft CB fires.
 3. `kelly:<strategy_id>:adjust` is set to `0.75` (a milder reduction than the DD-based 0.5 reduction).
 4. A `feedback.win_rate_alert` event publishes; dashboard surfaces.
@@ -1990,7 +1990,7 @@ This section operationalizes Charter §8.1.2. Hard CBs are **portfolio-wide**; f
 1. Aggregate portfolio drawdown computed continuously across all active strategies (allocator + feedback loop joint computation).
 2. Threshold cross detected (-12.0% over rolling 24h window).
 3. `portfolio.circuit.hard_tripped` event publishes on the ZMQ bus.
-4. STEP 2 of the VETO chain (`PortfolioCircuitBreaker` — see [`services/s05_risk_manager/circuit_breaker.py`](../../services/s05_risk_manager/) and [`chain_orchestrator.py:165-179`](../../services/s05_risk_manager/chain_orchestrator.py)) starts rejecting **all** incoming `OrderCandidate` across all strategies with `BlockReason.CIRCUIT_BREAKER_HARD_TRIP`.
+4. STEP 2 of the VETO chain (`PortfolioCircuitBreaker` — see [`services/risk_manager/circuit_breaker.py`](../../services/risk_manager/) and [`chain_orchestrator.py:165-179`](../../services/risk_manager/chain_orchestrator.py)) starts rejecting **all** incoming `OrderCandidate` across all strategies with `BlockReason.CIRCUIT_BREAKER_HARD_TRIP`.
 5. The allocator suspends further rebalancing (the portfolio is in halt state).
 6. **Existing positions are not auto-closed.** The execution engine's stop-loss and take-profit logic continues to manage them; new entries are blocked.
 7. The dashboard surfaces a critical alert: **"PORTFOLIO HALT — -12% DD 24h"**. The alert engine pages the operator (per [CLAUDE.md](../../CLAUDE.md) §14 alerting expectations).
@@ -2004,7 +2004,7 @@ The CIO must convene an emergency review **within 4 hours** of the trip. The rev
 | Per-strategy PnL contribution to the 12% drawdown | `pnl:<strategy_id>:24h` Redis keys |
 | Per-strategy active-positions snapshot | per-strategy positions tables |
 | Cross-strategy correlation in past 24h vs baseline | `correlation:matrix` + historical |
-| Market regime indicators in past 24h (VIX, BTC vol, equity-bond correl) | `services/s08_macro_intelligence/` (now `services/data/macro_intelligence/`) |
+| Market regime indicators in past 24h (VIX, BTC vol, equity-bond correl) | `services/macro_intelligence/` (now `services/data/macro_intelligence/`) |
 | Allocator most recent rebalance log | structlog stream |
 | Soft CB trip history in past 7 days | dashboard alert log |
 
@@ -2783,7 +2783,7 @@ Implementation authority is held by:
 
 ### 17.1 Ratification
 
-This Playbook was ratified as **v1.0** on **2026-04-20** via PR #186 (merged commit e92c13b) into the main branch of the APEX / CashMachine repository by Clement Barbier (CIO).
+This Playbook was ratified as **v1.0** on **2026-04-20** via PR #186 (merged commit e92c13b) into the main branch of the APEX repository by Clement Barbier (CIO).
 
 Upon ratification (completed 2026-04-20):
 

@@ -26,7 +26,7 @@ This is not a fatal situation — it is a deliberate Phase 1 contract-complete-f
 - **Centralized ZMQ topics** (`core/topics.py` — 30 constants + 4 factory helpers). Clean single source of truth. Factories enable per-strategy suffixes (`signal.technical.strat1.BTCUSDT`) without breaking consumers.
 - **Feature layer is multi-strategy-ready today** — `FeatureCalculator` ABC (features/base.py:19), `FeaturePipeline` accepts `calculators: list[FeatureCalculator]` via constructor injection (pipeline.py:53–63), each calculator is a pure function with no global state, `FeatureRegistry` + `FeatureStore` support point-in-time per-strategy feature subsets. Strategy A (HAR-RV + Rough Vol) and Strategy B (OFI + CVD) can coexist with zero code change in features/.
 - **CPCV walk-forward with embargo/purging** exists in `backtesting/walk_forward.py:374` (CombinatorialPurgedCV) with PBO and deployment-gate recommendation (DEPLOY / INVESTIGATE / DISCARD) already in place — ready to validate each strategy independently.
-- **Risk Manager Chain-of-Responsibility decomposition post-Batch D** (6 guards in `services/s05_risk_manager/chain_orchestrator.py`) is the correct structural shape to later host a `PerStrategyExposureGuard`.
+- **Risk Manager Chain-of-Responsibility decomposition post-Batch D** (6 guards in `services/risk_manager/chain_orchestrator.py`) is the correct structural shape to later host a `PerStrategyExposureGuard`.
 - **Data layer breadth** — S01 already connects Alpaca (equities), Binance (crypto), Yahoo (ETFs/FX/indices), FRED (macro), EDGAR+SimFin (fundamentals). Multi-asset NormalizedBar schema is consistent across asset classes via `AssetClass` enum and `Bar` model.
 - **Core infrastructure** — BaseService ABC, StateStore, MessageBus (ZMQ XSUB/XPUB broker per ADR-0001), Redis/fakeredis seam, Rust FFI (`apex_mc`, `apex_risk`), mypy strict, 75% coverage gate, 1,833+ unit tests.
 
@@ -35,14 +35,14 @@ This is not a fatal situation — it is a deliberate Phase 1 contract-complete-f
 - **`strategy_id` field missing on Signal, OrderCandidate, ApprovedOrder, ExecutedOrder, TradeRecord.** Single field addition on 5 frozen models + allow-list migration in downstream consumers. ~1 day.
 - **Topic factory for per-strategy suffix** — add `Topics.signal_for(strategy_id, symbol)` → `signal.technical.{strategy_id}.{symbol}` in `core/topics.py` + update S02/S04 subscribe/publish to use it. ~0.5 day.
 - **Per-strategy Redis key partitioning in S09** — `trades:all` → `trades:{strategy_id}:all`; `kelly:{symbol}` → `kelly:{strategy_id}:{symbol}`. DriftDetector already per-symbol-capable, add strategy dimension. ~1 day.
-- **S10 dashboard per-strategy panels** — add strategy filter to `services/s10_monitor/dashboard.py` (0 current hits for "strategy"). ~1 day.
+- **S10 dashboard per-strategy panels** — add strategy filter to `services/command_center/dashboard.py` (0 current hits for "strategy"). ~1 day.
 - **CI `backtest-gate` still muzzled** (`continue-on-error: true`, .github/workflows/ci.yml:130). Issue #102 in-flight on current branch `fix/ci-backtest-gate-sharpe`. Unblocks Sharpe ≥ 0.8 / DD ≤ 8% enforcement per CLAUDE.md §6. ~done-in-flight.
 - **`docs/STRATEGY_LIFECYCLE.md` does not exist.** No "how to add a strategy" guide. Agents handed Strategy #2 tomorrow would reverse-engineer from code. ~1 day to write.
 
 ### 🔴 What has fundamental gaps (architectural refactor before multi-strat begins)
 
-- **S02 Signal Engine is single-path and non-pluggable.** `services/s02_signal_engine/pipeline.py` has a 290-LOC `_run()` method hardcoded around a 5-component `SignalComponent` list. No ABC for signal generators. No registry. Adding Strategy #2 (mean-reversion intraday equities) requires modifying `pipeline.py` + `signal_scorer.py` directly, which will Git-conflict with Strategy #1 work. **Fix**: introduce `StrategyRunner` ABC + registry pattern, make each of the 6 strategies a plug-in that S02 loads by config. ~1–2 weeks. Principle-2 critical for multi-strat.
-- **S04 Fusion Engine is fundamentally single-strategy-per-signal.** `services/s04_fusion_engine/service.py` selects ONE strategy per signal via `StrategyRegistry` (4 hardcoded strategies: momentum_scalp, mean_reversion, spike_scalp, short_momentum), determined by **current regime**, not by signal provenance. If Strategy A and Strategy B both emit on `signal.technical.BTCUSDT`, they produce two independent `OrderCandidate`s with no portfolio aggregation, no position netting, no cross-strategy capital allocation. **No allocator abstraction exists anywhere in the codebase** (zero grep hits for `StrategyAllocator`, `PortfolioAllocator`, `RiskParity`, `BlackLitterman`). **Fix**: extract S04 into (signal-level fusion per strategy) + new `S11 StrategyAllocator` service that consumes per-strategy OrderCandidates and publishes portfolio-netted candidates. ~2–3 weeks. Principle-2 critical.
+- **S02 Signal Engine is single-path and non-pluggable.** `services/signal_engine/pipeline.py` has a 290-LOC `_run()` method hardcoded around a 5-component `SignalComponent` list. No ABC for signal generators. No registry. Adding Strategy #2 (mean-reversion intraday equities) requires modifying `pipeline.py` + `signal_scorer.py` directly, which will Git-conflict with Strategy #1 work. **Fix**: introduce `StrategyRunner` ABC + registry pattern, make each of the 6 strategies a plug-in that S02 loads by config. ~1–2 weeks. Principle-2 critical for multi-strat.
+- **S04 Fusion Engine is fundamentally single-strategy-per-signal.** `services/fusion_engine/service.py` selects ONE strategy per signal via `StrategyRegistry` (4 hardcoded strategies: momentum_scalp, mean_reversion, spike_scalp, short_momentum), determined by **current regime**, not by signal provenance. If Strategy A and Strategy B both emit on `signal.technical.BTCUSDT`, they produce two independent `OrderCandidate`s with no portfolio aggregation, no position netting, no cross-strategy capital allocation. **No allocator abstraction exists anywhere in the codebase** (zero grep hits for `StrategyAllocator`, `PortfolioAllocator`, `RiskParity`, `BlackLitterman`). **Fix**: extract S04 into (signal-level fusion per strategy) + new `S11 StrategyAllocator` service that consumes per-strategy OrderCandidates and publishes portfolio-netted candidates. ~2–3 weeks. Principle-2 critical.
 - **Backtest engine cannot replay a portfolio.** `BacktestEngine.run(ticks)` returns `list[TradeRecord]`. No `Strategy` ABC, no `run_portfolio(strategies, allocator, data)`, no per-strategy breakdown in `full_report()`. Multi-strategy validation (required for Charter sign-off on Strategy #1) is impossible today. ~1–2 weeks.
 - **S05 Chain Orchestrator violates Open/Closed.** Guards are wired by constructor injection in `RiskChainOrchestrator.__init__()` (chain_orchestrator.py:81–96) with `process()` linking them in hardcoded order. Adding `PerStrategyExposureGuard` requires modifying the orchestrator. **Fix**: make the chain data-driven (list of guards passed in, ordered). ~2–3 days.
 
@@ -235,11 +235,11 @@ All enums: `Direction`, `SignalType`, `OrderStatus`, `OrderType`, `TrendRegime`,
 | features/cv/base.py:58 | `BacktestSplitter` | `split()`, `n_splits` |
 | features/cv/base.py:90 | `FeatureValidator` | `validate()` |
 | features/ic/base.py:87 | `ICMetric` | `compute()` |
-| services/s01_data_ingestion/quality/base.py:41 | `QualityCheck` | `check()` |
-| services/s01_data_ingestion/connectors/base.py | `Connector` (name approximated) | `fetch()` |
-| services/s01_data_ingestion/connectors/calendar_base.py | `CalendarConnector` | source-specific methods |
-| services/s01_data_ingestion/normalizers/base.py | `Normalizer` | `normalize()` |
-| services/s06_execution/broker_base.py | `Broker` | `submit_order()`, `cancel_order()`, `get_positions()` |
+| services/data_ingestion/quality/base.py:41 | `QualityCheck` | `check()` |
+| services/data_ingestion/connectors/base.py | `Connector` (name approximated) | `fetch()` |
+| services/data_ingestion/connectors/calendar_base.py | `CalendarConnector` | source-specific methods |
+| services/data_ingestion/normalizers/base.py | `Normalizer` | `normalize()` |
+| services/execution/broker_base.py | `Broker` | `submit_order()`, `cancel_order()`, `get_positions()` |
 
 **Missing ABCs that multi-strat would need**: `StrategyRunner`, `SignalGenerator`, `StrategyAllocator`, `RiskGuard` (s05 uses duck-typed `RuleResult` return only, no ABC — chain_orchestrator is concrete).
 
@@ -247,11 +247,11 @@ All enums: `Direction`, `SignalType`, `OrderStatus`, `OrderType`, `TrendRegime`,
 
 | Name | File | Purpose | Plug-in? |
 |---|---|---|---|
-| `STRATEGY_REGISTRY` | services/s04_fusion_engine/strategy.py | 4 hardcoded regime-profile strategies | Data-driven, but strategies are regime-keyed not strategy-keyed |
-| `ConnectorFactory` | services/s01_data_ingestion/orchestrator/connector_factory.py | Dispatch to connector by type | if-chain, see STRATEGIC_AUDIT §2.1 O/C violation |
+| `STRATEGY_REGISTRY` | services/fusion_engine/strategy.py | 4 hardcoded regime-profile strategies | Data-driven, but strategies are regime-keyed not strategy-keyed |
+| `ConnectorFactory` | services/data_ingestion/orchestrator/connector_factory.py | Dispatch to connector by type | if-chain, see STRATEGIC_AUDIT §2.1 O/C violation |
 | `FeatureRegistry` | features/registry.py:204 | TimescaleDB metadata catalog of computed features | Point-in-time catalog, NOT a code plug-in registry |
-| `NormalizerRouter` | services/s01_data_ingestion/normalizers/router.py | Dispatch by connector source | Router pattern |
-| `BrokerFactory` (implicit in s06) | services/s06_execution/broker_factory.py | Paper / Alpaca / Binance selection | Data-driven if CFG_BROKER env |
+| `NormalizerRouter` | services/data_ingestion/normalizers/router.py | Dispatch by connector source | Router pattern |
+| `BrokerFactory` (implicit in s06) | services/execution/broker_factory.py | Paper / Alpaca / Binance selection | Data-driven if CFG_BROKER env |
 
 **No strategy registry. No `StrategyRunner` plug-in mechanism.**
 
@@ -262,18 +262,18 @@ All enums: `Direction`, `SignalType`, `OrderStatus`, `OrderType`, `TrendRegime`,
 ### Q1 — Service Isolation: can a new strategy be developed in isolation?
 
 **Evidence**:
-- Agent S02 probe: "No plugin/registry keywords found" for `register`, `Registry`, `Plugin`, `Factory`, `add_signal`, `SignalTrigger` in services/s02_signal_engine.
-- `services/s02_signal_engine/pipeline.py:237–328` — `build_components()` hardcodes 5 signal types (OFI, Bollinger, EMA, RSI, VWAP).
-- `services/s02_signal_engine/signal_scorer.py:43–49` — `WEIGHTS` dict (ClassVar) is a fixed map of component → weight.
-- `services/s04_fusion_engine/strategy.py:STRATEGY_REGISTRY` — 4 strategies baked in (momentum_scalp / mean_reversion / spike_scalp / short_momentum), each keyed by *regime profile*, not by strategy identity.
+- Agent S02 probe: "No plugin/registry keywords found" for `register`, `Registry`, `Plugin`, `Factory`, `add_signal`, `SignalTrigger` in services/signal_engine.
+- `services/signal_engine/pipeline.py:237–328` — `build_components()` hardcodes 5 signal types (OFI, Bollinger, EMA, RSI, VWAP).
+- `services/signal_engine/signal_scorer.py:43–49` — `WEIGHTS` dict (ClassVar) is a fixed map of component → weight.
+- `services/fusion_engine/strategy.py:STRATEGY_REGISTRY` — 4 strategies baked in (momentum_scalp / mean_reversion / spike_scalp / short_momentum), each keyed by *regime profile*, not by strategy identity.
 - No grep hits for `class StrategyRunner`, `class BaseStrategy`, `StrategyProtocol` anywhere in repo.
 
 **Files that MUST be modified to add Strategy #1 (cross-sectional momentum crypto)**:
-- `services/s02_signal_engine/pipeline.py` (new stage for cross-sectional rank)
-- `services/s02_signal_engine/signal_scorer.py` (new WEIGHTS entry)
-- `services/s02_signal_engine/technical.py` or new module (cross-sectional computation spanning multiple symbols — currently each symbol has its own `TechnicalAnalyzer` instance)
-- `services/s04_fusion_engine/strategy.py` (new `StrategyProfile` entry)
-- `services/s04_fusion_engine/fusion.py` or `service.py` (selector logic)
+- `services/signal_engine/pipeline.py` (new stage for cross-sectional rank)
+- `services/signal_engine/signal_scorer.py` (new WEIGHTS entry)
+- `services/signal_engine/technical.py` or new module (cross-sectional computation spanning multiple symbols — currently each symbol has its own `TechnicalAnalyzer` instance)
+- `services/fusion_engine/strategy.py` (new `StrategyProfile` entry)
+- `services/fusion_engine/fusion.py` or `service.py` (selector logic)
 - `core/models/signal.py` (if new `SignalType` enum value needed)
 
 **Verdict: BLOCKER.**
@@ -292,7 +292,7 @@ All enums: `Direction`, `SignalType`, `OrderStatus`, `OrderType`, `TrendRegime`,
 - Zero grep hits for `StrategyAllocator`, `CapitalAllocator`, `PortfolioAllocator`, `RiskParity`, `BlackLitterman` across the entire repo.
 - No skeleton, no stub, no placeholder.
 
-**Verbatim evidence** — `services/s04_fusion_engine/fusion.py:compute_final_score`:
+**Verbatim evidence** — `services/fusion_engine/fusion.py:compute_final_score`:
 ```
 final = |signal.strength|
         × regime.macro_mult
@@ -392,8 +392,8 @@ Effort: **L (1–2 weeks)**.
 
 **Evidence** (from s05-probe agent):
 - 12 files, 2,036 LOC post Batch D.
-- `services/s05_risk_manager/chain_orchestrator.py:81–96`: chain wiring via constructor injection with hardcoded order (6 steps).
-- Zero grep hits for `strategy` or `strat_` across `services/s05_risk_manager/`.
+- `services/risk_manager/chain_orchestrator.py:81–96`: chain wiring via constructor injection with hardcoded order (6 steps).
+- Zero grep hits for `strategy` or `strat_` across `services/risk_manager/`.
 - All `RuleResult` signatures lack `strategy_id`. No per-strategy context field.
 - `CircuitBreaker`, `ExposureMonitor`, `PositionRules`: all thresholds are global constants in `models.py:161–180`.
 - Redis keys: `portfolio:capital`, `pnl:daily`, `portfolio:positions` — all single-book.
@@ -449,7 +449,7 @@ Effort: **M–L (3–5 days for the refactor, +2 days per-strategy state)**.
 - `core/config.py`: single `Settings` class via Pydantic Settings (env vars + `.env`). Global scope.
 - No `config/strategies/*.yaml` or `*.toml` anywhere. `ls config/` returns no results (the top-level `config/` directory does not exist; config is a Python module at `core/config.py`).
 - `.env.example` (2,921 bytes) contains broker keys, Redis URL, ZMQ ports, trading mode — all **global**, single-strategy assumptions.
-- `services/s04_fusion_engine/strategy.py:STRATEGY_REGISTRY` — strategy profile parameters hardcoded in Python (not config).
+- `services/fusion_engine/strategy.py:STRATEGY_REGISTRY` — strategy profile parameters hardcoded in Python (not config).
 - Kelly sizer constants, fusion weights, risk thresholds (`models.py:161–180`): all hardcoded.
 
 **Verdict: GAP.**
@@ -477,7 +477,7 @@ Wire into `StrategyRunner` constructor. YAML schema validated by Pydantic on loa
 ### Q8 — Metrics & Observability Per Strategy
 
 **Evidence** (from core/observability probe agent):
-- `services/s09_feedback_loop/service.py`:
+- `services/feedback_loop/service.py`:
 ```python
 raw_trades = await self.state.lrange("trades:all", 0, KELLY_ROLLING_WINDOW - 1)
 # ...
@@ -486,8 +486,8 @@ for symbol in symbols:
     await self.state.hset(f"kelly:{symbol}", "win_rate", ...)
 ```
 Trades are pooled **globally** under `trades:all`. Kelly stats keyed by **symbol only**, not by `(strategy_id, symbol)`.
-- `services/s09_feedback_loop/drift_detector.py:DriftDetector`: single `DRIFT_THRESHOLD = 0.10`, single `MIN_TRADES = 50`. No per-strategy baseline tracking.
-- `services/s10_monitor/dashboard.py`: **zero grep hits for "strategy"**. Panels: system health grid, live equity curve, open positions, signals feed, circuit breaker, regime, Sharpe/DD/win rate — all global.
+- `services/feedback_loop/drift_detector.py:DriftDetector`: single `DRIFT_THRESHOLD = 0.10`, single `MIN_TRADES = 50`. No per-strategy baseline tracking.
+- `services/command_center/dashboard.py`: **zero grep hits for "strategy"**. Panels: system health grid, live equity curve, open positions, signals feed, circuit breaker, regime, Sharpe/DD/win rate — all global.
 - `backtesting/metrics.py:full_report` produces `by_session_breakdown`, `by_regime_breakdown`, `by_signal_breakdown` — **no `by_strategy_breakdown`**.
 - No correlation matrix across strategies (would need per-strategy equity curves to compute).
 
@@ -609,7 +609,7 @@ Based on the evidence above, this audit maps to **Scenario B (READY-WITH-GAPS) w
 
 ### Phase B — Pluggable signal layer (1–2 weeks)
 
-4. **Agent δ**: Introduce `StrategyRunner` ABC at `features/strategies/base.py` + test contract at `tests/unit/contracts/test_strategy_runner_contract.py`. Refactor S02 service.py to hold `self._strategies: list[StrategyRunner]` loaded from config. Migrate the current hardcoded 5-component pipeline into a `StrategyRunner` subclass called `LegacyConfluenceStrategy` (preserves all current behavior; Principle 6). File paths: `features/strategies/base.py` (new), `features/strategies/legacy_confluence.py` (new, wraps current pipeline.py), `services/s02_signal_engine/service.py` (modify). (P0-2.)
+4. **Agent δ**: Introduce `StrategyRunner` ABC at `features/strategies/base.py` + test contract at `tests/unit/contracts/test_strategy_runner_contract.py`. Refactor S02 service.py to hold `self._strategies: list[StrategyRunner]` loaded from config. Migrate the current hardcoded 5-component pipeline into a `StrategyRunner` subclass called `LegacyConfluenceStrategy` (preserves all current behavior; Principle 6). File paths: `features/strategies/base.py` (new), `features/strategies/legacy_confluence.py` (new, wraps current pipeline.py), `services/signal_engine/service.py` (modify). (P0-2.)
 5. **Agent ε**: Write `docs/STRATEGY_LIFECYCLE.md` + `docs/adr/ADR-0007-strategy-as-plugin.md`. (P1-5.)
 
 ### Phase C — Allocator + per-strategy risk (2–3 weeks)
@@ -649,10 +649,10 @@ pyproject.toml (5.2 KB)    requirements.txt (1.3 KB)    Makefile (1 KB)
 - `grep -r "strategy_id" core/ services/ features/ backtesting/` → **0 matches**.
 - `grep -r "class StrategyRunner\|class BaseStrategy\|StrategyProtocol" .` → **0 matches**.
 - `grep -r "StrategyAllocator\|PortfolioAllocator\|RiskParity\|BlackLitterman" .` → **0 matches**.
-- `grep -r "class RiskGuard\|class RiskRule" services/s05_risk_manager/` → **0 matches** (ABCs absent).
-- `grep -r "strategy" services/s10_monitor/` → **0 matches**.
+- `grep -r "class RiskGuard\|class RiskRule" services/risk_manager/` → **0 matches** (ABCs absent).
+- `grep -r "strategy" services/command_center/` → **0 matches**.
 - `grep -r "run_portfolio\|multi_strategy" backtesting/` → **0 matches**.
-- `grep "register\|Registry\|Plugin\|Factory" services/s02_signal_engine/` → **0 matches**.
+- `grep "register\|Registry\|Plugin\|Factory" services/signal_engine/` → **0 matches**.
 
 ### 7.3 CI workflow summary (.github/workflows/ci.yml)
 

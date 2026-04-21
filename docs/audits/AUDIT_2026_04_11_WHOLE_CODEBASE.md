@@ -4,7 +4,7 @@
 > [STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md](STRATEGIC_AUDIT_2026-04-17_PHASE_5_AND_GLOBAL.md).
 >
 > **Resolved by Phase 5.1 implementation (superseded findings):**
-> - **Finding A-7** (S05 `StateStore` abstraction leak via `_ensure_connected()`) — fixed by `services/s05_risk_manager/fail_closed.py` + `SystemRiskMonitor` / `FailClosedGuard` pattern.
+> - **Finding A-7** (S05 `StateStore` abstraction leak via `_ensure_connected()`) — fixed by `services/risk_manager/fail_closed.py` + `SystemRiskMonitor` / `FailClosedGuard` pattern.
 > - **Finding A-8** (duplicated `_build_blocked` pattern) — partially refactored during the 5.1 chain rewrite; residual SOLID-S debt on `service.py` (530 LOC) is tracked for resolution in Batch D of the post-audit execution.
 >
 > **Other findings below remain valid** unless explicitly marked otherwise; reconcile against the 2026-04-17 strategic audit before acting on any remaining P1/P2 items.
@@ -59,40 +59,40 @@ S01 is the largest and most mature service. It follows SOLID principles well:
 - **ISP** ✅ — Interfaces are focused: `DataQualityCheck` has a single `check()` method, connectors have `fetch_bars()`.
 - **DIP** ✅ — Consumers depend on abstract interfaces, not concrete implementations.
 
-**Finding A-1 (P2)**: `services/s01_data_ingestion/orchestrator/cli.py` — CLI class handles both display formatting AND business logic (fetching state, triggering runs). Minor SRP violation. Could split into a CLI formatter + a service layer.
+**Finding A-1 (P2)**: `services/data_ingestion/orchestrator/cli.py` — CLI class handles both display formatting AND business logic (fetching state, triggering runs). Minor SRP violation. Could split into a CLI formatter + a service layer.
 
 ### S02 Signal Engine (8 files, 1,759 LOC) — **NEEDS ATTENTION**
 
 - **SRP** ⚠️ — `_process_tick` in `service.py` is a 270-line monolith performing 7 distinct operations.
 - **OCP** ⚠️ — `technical.py` mixes bar building + indicator computation.
 
-**Finding A-2 (P1)**: `services/s02_signal_engine/service.py` — `_process_tick()` is 270 lines handling lazy-init, VPIN refresh, 5 indicator families, scorer components, ATR levels, MTFContext, and Signal construction/publishing. This is the hottest path in the system and hard to unit-test. **Recommendation**: Extract sub-methods (`_compute_indicators()`, `_build_signal()`) or a `SignalPipeline` class. Issue #73.
+**Finding A-2 (P1)**: `services/signal_engine/service.py` — `_process_tick()` is 270 lines handling lazy-init, VPIN refresh, 5 indicator families, scorer components, ATR levels, MTFContext, and Signal construction/publishing. This is the hottest path in the system and hard to unit-test. **Recommendation**: Extract sub-methods (`_compute_indicators()`, `_build_signal()`) or a `SignalPipeline` class. Issue #73.
 
-**Finding A-3 (P2)**: `services/s02_signal_engine/technical.py` — `TechnicalAnalyzer` has two responsibilities: bar construction from ticks AND indicator computation (RSI, BB, EMA, VWAP, ATR, etc.). Extract a `BarBuilder` class for testability.
+**Finding A-3 (P2)**: `services/signal_engine/technical.py` — `TechnicalAnalyzer` has two responsibilities: bar construction from ticks AND indicator computation (RSI, BB, EMA, VWAP, ATR, etc.). Extract a `BarBuilder` class for testability.
 
 ### S03 Regime Detector (5 files, 893 LOC) — **NEEDS CLEANUP**
 
-**Finding A-4 (P1)**: `services/s03_regime_detector/service.py` — `_update_regime()` writes to `regime:current:v2` Redis key but is never called. Dead code in a critical service introduces confusion. Issue #74.
+**Finding A-4 (P1)**: `services/regime_detector/service.py` — `_update_regime()` writes to `regime:current:v2` Redis key but is never called. Dead code in a critical service introduces confusion. Issue #74.
 
-**Finding A-5 (P1)**: `services/s03_regime_detector/regime_engine.py` — Defines local `VolRegime` and `RiskMode` enums that shadow `core.models.regime.VolRegime` and `core.models.regime.RiskMode`. Risk of drift between canonical and local definitions. Issue #74.
+**Finding A-5 (P1)**: `services/regime_detector/regime_engine.py` — Defines local `VolRegime` and `RiskMode` enums that shadow `core.models.regime.VolRegime` and `core.models.regime.RiskMode`. Risk of drift between canonical and local definitions. Issue #74.
 
 ### S04 Fusion Engine (8 files, 1,107 LOC) — **MOSTLY CLEAN**
 
 Well-structured with separate modules for fusion, Kelly sizing, meta-labeling, hedge triggers, feature logging.
 
-**Finding A-6 (P1)**: `services/s04_fusion_engine/strategy.py` — `StrategySelector.is_active()` and `get_size_multiplier()` use hardcoded if/elif chains for strategy names. Adding a new strategy requires modifying both methods. **Recommendation**: Use Strategy Pattern with a registry dict. Issue #75.
+**Finding A-6 (P1)**: `services/fusion_engine/strategy.py` — `StrategySelector.is_active()` and `get_size_multiplier()` use hardcoded if/elif chains for strategy names. Adding a new strategy requires modifying both methods. **Recommendation**: Use Strategy Pattern with a registry dict. Issue #75.
 
 ### S05 Risk Manager (8 files, 1,628 LOC) — **MOSTLY CLEAN**
 
 Circuit breaker, position rules, meta-label gate, exposure monitor, and CB event guard are properly separated. Risk Manager as VETO layer is correctly implemented. Position rules and exposure monitor are pure functions (excellent SRP).
 
-**Finding A-7 (P1)**: `services/s05_risk_manager/service.py:74` — `on_start()` accesses `self.state._ensure_connected()` (private method) to extract raw Redis, then passes it to CircuitBreaker, CBEventGuard, and MetaLabelGate. Breaks StateStore abstraction (DIP violation). Issue #76.
+**Finding A-7 (P1)**: `services/risk_manager/service.py:74` — `on_start()` accesses `self.state._ensure_connected()` (private method) to extract raw Redis, then passes it to CircuitBreaker, CBEventGuard, and MetaLabelGate. Breaks StateStore abstraction (DIP violation). Issue #76.
 
-**Finding A-8 (P2)**: `services/s05_risk_manager/service.py` — `process_order_candidate()` is 135 lines with 10x duplicated `_build_blocked` pattern. **Recommendation**: Implement Chain of Responsibility properly with a `RiskChain` list of callables.
+**Finding A-8 (P2)**: `services/risk_manager/service.py` — `process_order_candidate()` is 135 lines with 10x duplicated `_build_blocked` pattern. **Recommendation**: Implement Chain of Responsibility properly with a `RiskChain` list of callables.
 
 ### S06 Execution (7 files, 1,325 LOC) — **NEEDS REFACTOR**
 
-**Finding A-9 (P1)**: `services/s06_execution/` — `AlpacaBroker`, `BinanceBroker`, and `PaperTrader` share **no common interface/ABC**. They have overlapping methods (`connect`, `disconnect`, `place_order`, `cancel_order`) with different signatures. `ExecutionService._execute()` uses config-based branching. Adding IBKR would require multi-file modification. **Recommendation**: Extract a `Broker` ABC. Create a `BrokerFactory` for config-based instantiation. Issue #72. (Note: This blocks Phase 7, not Phase 3.)
+**Finding A-9 (P1)**: `services/execution/` — `AlpacaBroker`, `BinanceBroker`, and `PaperTrader` share **no common interface/ABC**. They have overlapping methods (`connect`, `disconnect`, `place_order`, `cancel_order`) with different signatures. `ExecutionService._execute()` uses config-based branching. Adding IBKR would require multi-file modification. **Recommendation**: Extract a `Broker` ABC. Create a `BrokerFactory` for config-based instantiation. Issue #72. (Note: This blocks Phase 7, not Phase 3.)
 
 ### S07 Quant Analytics (9 files, 1,745 LOC) — **GOOD**
 
@@ -148,11 +148,11 @@ vulture analysis: No significant dead code detected with confidence > 80%.
 ### TODOs/FIXMEs
 
 Only 1 TODO in production code:
-- `services/s05_risk_manager/cb_event_guard.py:129` — `TODO(APEX-CB-API-V2)`: tracked, intentional.
+- `services/risk_manager/cb_event_guard.py:129` — `TODO(APEX-CB-API-V2)`: tracked, intentional.
 
 ### `print()` in Production Code
 
-**Finding B-2 (P2)**: `services/s01_data_ingestion/orchestrator/cli.py` uses `print()` (10 instances) instead of structlog. Acceptable for CLI tools but violates CLAUDE.md Section 10 which mandates structlog only.
+**Finding B-2 (P2)**: `services/data_ingestion/orchestrator/cli.py` uses `print()` (10 instances) instead of structlog. Acceptable for CLI tools but violates CLAUDE.md Section 10 which mandates structlog only.
 
 ### Long Functions
 
@@ -221,7 +221,7 @@ All 33 are justified. No gratuitous suppressions.
 - `core.models.*` — **concerning**: these are the immutable data pipeline models, the backbone of the system
 - `core.config` — acceptable (Pydantic settings)
 - `tests.*` — acceptable
-- `services.s10_monitor.dashboard` — acceptable (HTML templates)
+- `services.command_center.dashboard` — acceptable (HTML templates)
 
 The `core.models.*` exclusion means type errors in data models are silently ignored. This undermines the "mypy strict zero errors" claim for the most critical module.
 
@@ -267,18 +267,18 @@ However, the effective coverage denominator is significantly reduced by 25 omit 
 
 | Omitted Zone | LOC Estimate | Impact |
 |---|---|---|
-| `services/s01_data_ingestion/*.py` (wildcard) | ~9,583 | **Entire S01 excluded** (except quality/ and serving/) |
-| `services/s10_monitor/*` | ~1,739 | Entire S10 excluded |
-| `services/s06_execution/broker_*.py`, `order_manager.py` | ~500 | Broker and order management excluded |
-| `services/s07_quant_analytics/monte_carlo.py`, `performance.py`, `microstructure_adv.py` | ~600 | Key quant modules excluded |
-| `services/s08_macro_intelligence/geopolitical.py`, `sector_rotation.py` | ~200 | Macro modules excluded |
+| `services/data_ingestion/*.py` (wildcard) | ~9,583 | **Entire S01 excluded** (except quality/ and serving/) |
+| `services/command_center/*` | ~1,739 | Entire S10 excluded |
+| `services/execution/broker_*.py`, `order_manager.py` | ~500 | Broker and order management excluded |
+| `services/quant_analytics/monte_carlo.py`, `performance.py`, `microstructure_adv.py` | ~600 | Key quant modules excluded |
+| `services/macro_intelligence/geopolitical.py`, `sector_rotation.py` | ~200 | Macro modules excluded |
 | `core/base_service.py`, `core/bus.py` | ~400 | Infrastructure excluded |
 | `backtesting/engine.py`, `backtesting/data_loader.py` | ~300 | Backtest engine excluded |
 | Other (service.py entrypoints, supervisor/, scripts/) | ~800 | Operational code excluded |
 
 **Finding E-1 (P1)**: The true coverage including all omitted files is estimated at **~40-50%**, not 83%. The CI gate is set to `--cov-fail-under=40` (line 88 of ci.yml), which is far below the documented 85% standard in CLAUDE.md.
 
-The omit list serves a legitimate purpose (network-dependent code can't be unit-tested), but it's overly broad. For example, `services/s01_data_ingestion/*.py` excludes connectors that could have their parsing logic tested without network calls.
+The omit list serves a legitimate purpose (network-dependent code can't be unit-tested), but it's overly broad. For example, `services/data_ingestion/*.py` excludes connectors that could have their parsing logic tested without network calls.
 
 **Recommendation**: Narrow the omit list. Extract pure parsing/transformation logic from connectors into testable utility functions. Raise the CI gate to at least 60% as an intermediate step toward the documented 85%.
 
@@ -505,31 +505,31 @@ None. No blocking issues found.
 | P1-7 | mypy `ignore_errors=true` for `core.models.*` | `pyproject.toml:83-92` | M | #69 |
 | P1-8 | Coverage omit too broad — S01 entirely excluded, true coverage ~40-50% | `pyproject.toml:112-147` | L | #70 |
 | P1-9 | Broker API keys (Alpaca, Binance) use `str` instead of `SecretStr` | `core/config.py:41-42,53-54` | S | #71 |
-| P1-10 | S06: No Broker ABC — 3 brokers share no interface (DIP+OCP) | `services/s06_execution/` | M | #72 |
-| P1-11 | S02: `_process_tick` is 270-line monolith (SRP) | `services/s02_signal_engine/service.py` | M | #73 |
-| P1-12 | S03: Dead `_update_regime` v2 + duplicated enums | `services/s03_regime_detector/` | S | #74 |
-| P1-13 | S04: StrategySelector hardcoded if/elif (OCP) | `services/s04_fusion_engine/strategy.py` | S | #75 |
-| P1-14 | S05: Accesses StateStore private `_ensure_connected()` (DIP) | `services/s05_risk_manager/service.py:74` | S | #76 |
-| P1-15 | S01: Connectors directly import normalizers (layering violation) | `services/s01_data_ingestion/connectors/` | M | #77 |
+| P1-10 | S06: No Broker ABC — 3 brokers share no interface (DIP+OCP) | `services/execution/` | M | #72 |
+| P1-11 | S02: `_process_tick` is 270-line monolith (SRP) | `services/signal_engine/service.py` | M | #73 |
+| P1-12 | S03: Dead `_update_regime` v2 + duplicated enums | `services/regime_detector/` | S | #74 |
+| P1-13 | S04: StrategySelector hardcoded if/elif (OCP) | `services/fusion_engine/strategy.py` | S | #75 |
+| P1-14 | S05: Accesses StateStore private `_ensure_connected()` (DIP) | `services/risk_manager/service.py:74` | S | #76 |
+| P1-15 | S01: Connectors directly import normalizers (layering violation) | `services/data_ingestion/connectors/` | M | #77 |
 
 ### P2 (cosmetic — address when convenient)
 
 | # | Finding | File(s) | Effort |
 |---|---|---|---|
-| P2-1 | CLI uses `print()` instead of structlog | `services/s01_data_ingestion/orchestrator/cli.py` | S |
-| P2-2 | S01 CLI minor SRP violation (display + business logic) | `services/s01_data_ingestion/orchestrator/cli.py` | S |
-| P2-3 | `cb_watcher.py` at 57% coverage | `services/s08_macro_intelligence/cb_watcher.py` | M |
+| P2-1 | CLI uses `print()` instead of structlog | `services/data_ingestion/orchestrator/cli.py` | S |
+| P2-2 | S01 CLI minor SRP violation (display + business logic) | `services/data_ingestion/orchestrator/cli.py` | S |
+| P2-3 | `cb_watcher.py` at 57% coverage | `services/macro_intelligence/cb_watcher.py` | M |
 | P2-4 | `apex_risk` Rust crate has 0 tests | `rust/apex_risk/` | S |
 | P2-5 | No `requirements-lock.txt` for reproducible builds | `requirements.txt` | S |
-| P2-6 | `technical.py` monolithic indicators (52% coverage) | `services/s02_signal_engine/technical.py` | M |
+| P2-6 | `technical.py` monolithic indicators (52% coverage) | `services/signal_engine/technical.py` | M |
 
 ### P3 (nice-to-have)
 
 | # | Finding | File(s) | Effort |
 |---|---|---|---|
 | P3-1 | Duplicate code in backfill scripts (3 instances, 5-6 lines each) | `scripts/backfill_*.py` | S |
-| P3-2 | `technical.py` could be split into per-indicator modules | `services/s02_signal_engine/technical.py` | M |
-| P3-3 | S10 dashboard inline HTML/JS templates | `services/s10_monitor/dashboard.py` | L |
+| P3-2 | `technical.py` could be split into per-indicator modules | `services/signal_engine/technical.py` | M |
+| P3-3 | S10 dashboard inline HTML/JS templates | `services/command_center/dashboard.py` | L |
 
 ---
 
