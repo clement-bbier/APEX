@@ -1,0 +1,147 @@
+# APEX Continuous Deployment — DISABLED
+#
+# This workflow is intentionally disabled (filename ends with .disabled
+# so GitHub does not parse or schedule it). Rename to cd.yml and
+# configure the secrets below to activate.
+#
+# Activation prerequisite: Phase B Gate 3 (live paper trading) infra
+# ready per the Multi-Strat Aligned Roadmap.
+#
+# Currently blocked because:
+#   - No production deployment target configured
+#   - Broker credentials not provisioned in GitHub secrets
+#   - Smoke test suite for deployed images not yet written
+#   - ghcr.io push credentials unverified against the target registry
+#
+# Activation checklist (when ready):
+#   1. Configure secrets: GHCR_TOKEN (or rely on GITHUB_TOKEN with
+#      packages:write), STAGING_DEPLOY_KEY, PROD_DEPLOY_KEY,
+#      STAGING_DEPLOY_HOST, PROD_DEPLOY_HOST.
+#   2. Write tests/smoke/ directory with image-level health checks
+#      (at minimum: one smoke test per Dockerfile.service entrypoint
+#      that boots, heartbeats, and exits clean within 30s).
+#   3. Rename this file to cd.yml.
+#   4. Re-verify branch-protection still passes with CD in the mix
+#      (CD should NOT be a required PR check; it gates on push to main).
+#   5. Test workflow_dispatch path on staging FIRST before any push to
+#      main triggers production.
+#   6. Add `environment: production` protection rule in GitHub settings
+#      so the prod deploy requires manual approval even in solo-dev mode.
+
+name: CD
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: "Deployment environment (staging | production)"
+        required: true
+        default: "staging"
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_BASE: ghcr.io/clement-bbier/apex
+
+concurrency:
+  group: cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-images:
+    name: Build & tag service image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+          fetch-depth: 0
+
+      - name: Compute image reference (lowercase owner)
+        id: img
+        run: |
+          owner_repo="${GITHUB_REPOSITORY,,}"
+          echo "image=ghcr.io/${owner_repo}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      # Uncomment once GHCR_TOKEN or GITHUB_TOKEN scope is verified on
+      # the target registry.
+      # - uses: docker/login-action@v3
+      #   with:
+      #     registry: ${{ env.REGISTRY }}
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build service image (local only; push disabled)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.service
+          push: false
+          load: true
+          provenance: false
+          tags: |
+            ${{ steps.img.outputs.image }}:${{ github.sha }}
+            ${{ steps.img.outputs.image }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  smoke-tests:
+    name: Smoke tests on built image
+    needs: build-images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run smoke suite
+        run: |
+          if [ -d tests/smoke ]; then
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt pytest
+            pytest tests/smoke -v --timeout=60
+          else
+            echo "::warning::tests/smoke/ not present — smoke suite is an activation prerequisite. Skipping."
+          fi
+
+  deploy-staging:
+    name: Deploy to staging
+    needs: smoke-tests
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.target_env == 'staging'
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+    steps:
+      - name: Announce staging deploy
+        run: |
+          echo "Would deploy ${{ github.sha }} to staging."
+          echo "Wire: ssh / kubectl / fly deploy / (whichever target lands) goes here."
+
+  deploy-production:
+    name: Deploy to production
+    needs: smoke-tests
+    if: >-
+      (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.target_env == 'production')
+    runs-on: ubuntu-latest
+    # Manual approval via environment protection rule. Solo-dev still
+    # produces a self-approval decision log.
+    environment:
+      name: production
+    steps:
+      - name: Announce production deploy
+        run: |
+          echo "Would deploy ${{ github.sha }} to production after approval."
+          echo "Wire: prod rollout command goes here. Ensure health-check + rollback on failure."

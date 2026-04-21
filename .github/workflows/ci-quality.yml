@@ -1,0 +1,106 @@
+# APEX CI — Quality gate
+#
+# Static analysis and supply-chain surface for every push / PR.
+# Runs in parallel with ci-rust.yml and ci-unit-tests.yml (no artifact
+# dependencies). Required status: `quality`.
+#
+# Composition:
+#   - ruff check + ruff format (lint + formatter drift)
+#   - mypy strict (per pyproject.toml [tool.mypy])
+#   - bandit (security lint, config in pyproject.toml [tool.bandit])
+#   - pip-audit (CVE surface on requirements.txt, non-blocking initially —
+#     writes findings to the GitHub Step Summary. Promote to blocking once
+#     we have a clean baseline.)
+#
+# Known debt: backtesting/data_loader.py:116 (write_table untyped-call).
+# Tracked as separate cleanup — not addressed here (see
+# CICD_RESET_AUDIT_2026-04-21.md §7). mypy strict fails on main when any
+# PR touches that file; this is pre-existing.
+
+name: quality
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+concurrency:
+  group: ci-quality-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    # Structured as a matrix so adding 3.13 later is a one-line change.
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml', 'requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pip-audit
+
+      - name: ruff check
+        run: ruff check .
+
+      - name: ruff format --check
+        run: ruff format --check .
+
+      - name: mypy strict
+        run: mypy . --strict
+
+      - name: bandit
+        run: bandit -r core supervisor services backtesting -c pyproject.toml
+
+      - name: pip-audit (non-blocking)
+        id: pip_audit
+        continue-on-error: true
+        run: |
+          set +e
+          pip-audit --requirement requirements.txt --progress-spinner=off --format columns | tee pip-audit.txt
+          status=$?
+          echo "status=${status}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: pip-audit summary
+        if: always()
+        run: |
+          {
+            echo "## pip-audit — CVE surface on requirements.txt"
+            echo ""
+            if [ -s pip-audit.txt ]; then
+              echo '```'
+              cat pip-audit.txt
+              echo '```'
+            else
+              echo "_No output captured._"
+            fi
+            echo ""
+            echo "Status: non-blocking. Graduate to blocking once baseline is clean."
+          } >> "$GITHUB_STEP_SUMMARY"

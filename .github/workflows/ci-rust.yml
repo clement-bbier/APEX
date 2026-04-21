@@ -1,0 +1,75 @@
+# APEX CI — Rust toolchain gate
+#
+# Builds + tests the two PyO3 crates (apex_mc, apex_risk) and publishes
+# the release wheels as an artifact consumed by ci-unit-tests.yml.
+# Runs in parallel with ci-quality.yml (no artifact dependencies in
+# either direction on that side).
+#
+# Required status: `rust`.
+
+name: rust
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHONUNBUFFERED: "1"
+
+concurrency:
+  group: ci-rust-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Rust stable + clippy
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache cargo registry, index, target
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+
+      - name: cargo check (workspace)
+        working-directory: rust
+        run: cargo check --workspace --locked
+
+      - name: cargo test (workspace)
+        working-directory: rust
+        run: cargo test --workspace --locked
+
+      - name: cargo clippy (workspace)
+        working-directory: rust
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+        continue-on-error: true
+
+      - name: Build PyO3 wheels (maturin release)
+        run: |
+          python -m pip install --upgrade pip
+          pip install "maturin>=1.9.4"
+          (cd rust/apex_mc && maturin build --release)
+          (cd rust/apex_risk && maturin build --release)
+
+      - name: Upload wheels artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-wheels
+          path: rust/target/wheels/*.whl
+          retention-days: 1
+          if-no-files-found: error

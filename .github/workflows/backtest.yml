@@ -3,10 +3,10 @@ name: Nightly Backtest Regression
 on:
   schedule:
     - cron: '0 6 * * 1-5'  # 6 AM UTC Mon-Fri (before US market open)
-  workflow_dispatch:  # manual trigger
+  workflow_dispatch:
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PYTHONUNBUFFERED: "1"
 
 jobs:
   backtest:
@@ -15,11 +15,19 @@ jobs:
       - uses: actions/checkout@v4
         with:
           lfs: true
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml', 'requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py3.12-
 
       - name: Install dependencies
         run: pip install -r requirements.txt
