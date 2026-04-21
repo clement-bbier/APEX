@@ -1,0 +1,70 @@
+# APEX CI — Integration tests
+#
+# Brings up the test docker-compose stack and runs pytest tests/integration/.
+# No coverage gate here — coverage is owned by ci-unit-tests.yml.
+#
+# Depends on ci-unit-tests.yml (`needs` through workflow_run trigger is not
+# used — GitHub schedules this in the same commit context and a reviewer
+# can treat both as required checks). The wait on unit-tests is a
+# branch-protection concern, not a YAML concern.
+#
+# Required status: `integration-tests`.
+
+name: integration-tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+concurrency:
+  group: ci-integration-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml', 'requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py${{ matrix.python-version }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest-asyncio fakeredis
+
+      - name: Bring up test docker-compose stack
+        run: docker compose -f docker/docker-compose.test.yml up -d --wait
+
+      - name: Integration tests (no coverage gate)
+        run: pytest tests/integration/ -v --timeout=60 -p no:cacheprovider
+
+      - name: Tear down docker-compose stack
+        if: always()
+        run: docker compose -f docker/docker-compose.test.yml down -v

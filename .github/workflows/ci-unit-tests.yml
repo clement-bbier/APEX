@@ -1,0 +1,109 @@
+# APEX CI — Unit tests + coverage gate
+#
+# Runs pytest tests/unit/ against an ephemeral Redis service container.
+# Consumes the rust-wheels artifact produced by ci-rust.yml so the PyO3
+# extensions are importable at test time.
+#
+# Parallelism:
+#   - quality, rust, unit-tests can all start in parallel on the same
+#     commit. unit-tests calls `actions/download-artifact` which will
+#     block until ci-rust.yml's upload step completes.
+#
+# Coverage gate: currently --cov-fail-under=75 (configured here, mirrors
+# pyproject.toml [tool.pytest.ini_options] default). Target is 85% per
+# CLAUDE.md §6 — see CICD_RESET_AUDIT_2026-04-21.md §3 for the ramp plan
+# and [phase-A.13] tracker.
+#
+# Required status: `unit-tests`.
+
+name: unit-tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  PYTHONPATH: ${{ github.workspace }}
+  PYTHONUNBUFFERED: "1"
+  FORCE_COLOR: "1"
+
+concurrency:
+  group: ci-unit-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12"]
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - "6379:6379"
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-py${{ matrix.python-version }}-${{ hashFiles('pyproject.toml', 'requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-py${{ matrix.python-version }}-
+
+      - name: Wait for Rust wheels
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-wheels
+          path: ./wheels
+
+      - name: Install dependencies (incl. local Rust wheels)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest-asyncio fakeredis
+          pip install ./wheels/*.whl
+
+      - name: Unit tests with coverage gate
+        env:
+          REDIS_URL: "redis://localhost:6379/0"
+          APEX_REDIS_TTL_SECONDS: "60"
+        run: |
+          pytest tests/unit/ -v \
+            --cov=services --cov=core --cov=backtesting \
+            --cov-report=xml --cov-report=term-missing \
+            --cov-fail-under=75 --timeout=30
+
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml-${{ matrix.python-version }}
+          path: coverage.xml
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload coverage to Codecov
+        if: always()
+        uses: codecov/codecov-action@v5
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: false
