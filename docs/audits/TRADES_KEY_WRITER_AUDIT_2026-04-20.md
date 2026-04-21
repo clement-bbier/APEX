@@ -31,12 +31,12 @@ All commands executed on branch `main` at commit
 
 | # | File | Line | Operation | Context |
 |---|------|------|-----------|---------|
-| 1 | [`services/feedback_loop/service.py`](../../services/feedback_loop/service.py) | 57 | `lrange("trades:all", 0, KELLY_ROLLING_WINDOW - 1)` | `_fast_analysis` — drift + Kelly refresh every 5 min |
-| 2 | [`services/feedback_loop/service.py`](../../services/feedback_loop/service.py) | 111 | `lrange("trades:all", 0, -1)` | `_slow_analysis` — post-market signal-quality compute |
-| 3 | [`services/command_center/command_api.py`](../../services/command_center/command_api.py) | 244 | `lrange("trades:all", 0, -1)` | `/performance` endpoint aggregation |
-| 4 | [`services/command_center/command_api.py`](../../services/command_center/command_api.py) | 423 | `lrange("trades:all", 0, -1)` | `/trades` endpoint export |
-| 5 | [`services/command_center/pnl_tracker.py`](../../services/command_center/pnl_tracker.py) | 26 | `lrange("trades:all", 0, -1)` | Dashboard daily/intraday PnL roll-up |
-| 6 | [`services/command_center/pnl_tracker.py`](../../services/command_center/pnl_tracker.py) | 72 | `lrange("trades:all", 0, -1)` | Dashboard equity-curve roll-up |
+| 1 | [`services/feedback_loop/service.py`](../../services/feedback_loop/service.py#L57) | [57](../../services/feedback_loop/service.py#L57) | `lrange("trades:all", 0, KELLY_ROLLING_WINDOW - 1)` | `_fast_analysis` — drift + Kelly refresh every 5 min |
+| 2 | [`services/feedback_loop/service.py`](../../services/feedback_loop/service.py#L111) | [111](../../services/feedback_loop/service.py#L111) | `lrange("trades:all", 0, -1)` | `_slow_analysis` — post-market signal-quality compute |
+| 3 | [`services/command_center/command_api.py`](../../services/command_center/command_api.py#L244) | [244](../../services/command_center/command_api.py#L244) | `lrange("trades:all", 0, -1)` | `/performance` endpoint aggregation |
+| 4 | [`services/command_center/command_api.py`](../../services/command_center/command_api.py#L423) | [423](../../services/command_center/command_api.py#L423) | `lrange("trades:all", 0, -1)` | `/trades` endpoint export |
+| 5 | [`services/command_center/pnl_tracker.py`](../../services/command_center/pnl_tracker.py#L26) | [26](../../services/command_center/pnl_tracker.py#L26) | `lrange("trades:all", 0, -1)` | Dashboard daily/intraday PnL roll-up |
+| 6 | [`services/command_center/pnl_tracker.py`](../../services/command_center/pnl_tracker.py#L72) | [72](../../services/command_center/pnl_tracker.py#L72) | `lrange("trades:all", 0, -1)` | Dashboard equity-curve roll-up |
 
 Storage structure implied by the reader: **Redis LIST** (all six readers use `lrange`).
 No consumer uses `xread`, `hgetall`, `smembers`, or `get`, so the structure cannot be
@@ -46,10 +46,10 @@ a stream, hash, set, or JSON-string-encoded list.
 
 | Primitive | Target key | File | Line |
 |-----------|------------|------|------|
-| `lpush`   | `equity_curve` | `services/command_center/pnl_tracker.py` | 117 |
-| `lpush`   | `REDIS_DECISION_HISTORY_KEY` (= `risk:decision_history`) | `services/risk_manager/decision_builder.py` | 101 |
-| `lpush`   | `self.REDIS_KEY` (= `meta_label_history`) | `services/fusion_engine/feature_logger.py` | 133 |
-| `xadd`    | orchestrator history stream | `services/data_ingestion/orchestrator/state.py` | 152 |
+| `lpush`   | `equity_curve` | [`services/command_center/pnl_tracker.py`](../../services/command_center/pnl_tracker.py#L117) | [117](../../services/command_center/pnl_tracker.py#L117) |
+| `lpush`   | `REDIS_DECISION_HISTORY_KEY` (= `risk:decision_history`) | [`services/risk_manager/decision_builder.py`](../../services/risk_manager/decision_builder.py#L101) | [101](../../services/risk_manager/decision_builder.py#L101) |
+| `lpush`   | `self.REDIS_KEY` (= `meta_label_history`) | [`services/fusion_engine/feature_logger.py`](../../services/fusion_engine/feature_logger.py#L133) | [133](../../services/fusion_engine/feature_logger.py#L133) |
+| `xadd`    | orchestrator history stream | [`services/data_ingestion/orchestrator/state.py`](../../services/data_ingestion/orchestrator/state.py#L152) | [152](../../services/data_ingestion/orchestrator/state.py#L152) |
 
 **No production code writes `trades:all`.**
 
