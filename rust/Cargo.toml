@@ -1,6 +1,13 @@
 [workspace]
-members = ["apex_mc", "apex_risk"]
+members = ["apex_mc", "apex_risk", "benches"]
 resolver = "2"
+
+[workspace.dependencies]
+# Criterion is the Rust micro-benchmark harness. Added at the workspace
+# level so that any crate's `[dev-dependencies]` can just say
+#   criterion = { workspace = true }
+# without re-pinning the version.
+criterion = { version = "0.5", features = ["html_reports"] }
 
 [profile.release]
 opt-level = 3

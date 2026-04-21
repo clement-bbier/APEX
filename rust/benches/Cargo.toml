@@ -1,0 +1,31 @@
+[package]
+name = "apex_benches"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# This crate is a scaffolding container for criterion benchmark stubs
+# that target future Rust ports (Phase B). It has no library code of its
+# own yet -- each `benches/<name>.rs` file documents the Python baseline
+# that the Rust port must beat.
+#
+# Run with:
+#   cd rust && cargo bench -p apex_benches
+# (currently a no-op until benches are filled in during Phase B).
+
+[dependencies]
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "kyle_lambda"
+harness = false
+
+[[bench]]
+name = "ofi"
+harness = false
+
+[[bench]]
+name = "cvd"
+harness = false
