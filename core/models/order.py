@@ -162,6 +162,38 @@ class ApprovedOrder(BaseModel):
     )
     order_type: OrderType = Field(default=OrderType.LIMIT)
     notes: list[str] = Field(default_factory=list)
+    strategy_id: str = Field(
+        default="default",
+        description="Per-strategy identifier (Charter §5.5, ADR-0007 §D6).",
+    )
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Mirrors the Signal.validate_strategy_id and OrderCandidate.validate_strategy_id
+        validators per Charter §5.5 and ADR-0007 §D6. Rejects empty, Unicode whitespace
+        (via c.isspace()), slashes, quotes, and length > 64 so downstream Redis keys
+        (kelly:{strategy_id}:{symbol} etc.) and filesystem paths
+        (services/strategies/{strategy_id}/) stay bounded and safe.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; whitespace (ASCII or Unicode) is not permitted"
+            )
+        forbidden = set("/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "slashes and quotes are not permitted"
+            )
+        return v
 
     @property
     def order_id(self) -> str:
@@ -192,6 +224,38 @@ class ExecutedOrder(BaseModel):
         default=Decimal("0"), description="Commission charged in quote currency"
     )
     is_paper: bool = Field(default=True, description="True if simulated paper trade")
+    strategy_id: str = Field(
+        default="default",
+        description="Per-strategy identifier (Charter §5.5, ADR-0007 §D6).",
+    )
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Mirrors the Signal.validate_strategy_id and OrderCandidate.validate_strategy_id
+        validators per Charter §5.5 and ADR-0007 §D6. Rejects empty, Unicode whitespace
+        (via c.isspace()), slashes, quotes, and length > 64 so downstream Redis keys
+        (kelly:{strategy_id}:{symbol} etc.) and filesystem paths
+        (services/strategies/{strategy_id}/) stay bounded and safe.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; whitespace (ASCII or Unicode) is not permitted"
+            )
+        forbidden = set("/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "slashes and quotes are not permitted"
+            )
+        return v
 
     @property
     def order_id(self) -> str:
@@ -239,6 +303,39 @@ class TradeRecord(BaseModel):
     exit_reason: str = Field(
         default="", description="stop_loss / take_profit_scalp / take_profit_swing / manual"
     )
+
+    strategy_id: str = Field(
+        default="default",
+        description="Per-strategy identifier (Charter §5.5, ADR-0007 §D6).",
+    )
+
+    @field_validator("strategy_id")
+    @classmethod
+    def validate_strategy_id(cls, v: str) -> str:
+        """Reject strategy_ids that break ZMQ topics, Redis keys, or filesystem paths.
+
+        Mirrors the Signal.validate_strategy_id and OrderCandidate.validate_strategy_id
+        validators per Charter §5.5 and ADR-0007 §D6. Rejects empty, Unicode whitespace
+        (via c.isspace()), slashes, quotes, and length > 64 so downstream Redis keys
+        (kelly:{strategy_id}:{symbol} etc.) and filesystem paths
+        (services/strategies/{strategy_id}/) stay bounded and safe.
+        """
+        if not v:
+            raise ValueError("strategy_id must be non-empty")
+        if len(v) > 64:
+            raise ValueError(f"strategy_id length {len(v)} exceeds max 64 characters")
+        if any(c.isspace() for c in v):
+            raise ValueError(
+                "strategy_id contains whitespace; whitespace (ASCII or Unicode) is not permitted"
+            )
+        forbidden = set("/\\'\"")
+        bad = sorted(set(v) & forbidden)
+        if bad:
+            raise ValueError(
+                f"strategy_id contains forbidden characters {bad!r}; "
+                "slashes and quotes are not permitted"
+            )
+        return v
 
     @property
     def is_winner(self) -> bool:
