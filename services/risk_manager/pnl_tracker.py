@@ -122,6 +122,11 @@ class PnLTracker:
             satisfies it in unit tests.
     """
 
+    # TODO(Phase B): Add staleness check once the S09 FeedbackLoop writer
+    # defines its cadence. The reader will verify Redis TTL or a sidecar
+    # timestamp key (pnl:{strategy_id}:daily:ts) and raise PnLStale if
+    # data is older than the writer's expected refresh interval.
+
     def __init__(self, state: _StateReader) -> None:
         self._state = state
 
