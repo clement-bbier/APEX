@@ -11,8 +11,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
-from services.s01_data_ingestion.observability import metrics
-from services.s01_data_ingestion.serving.middleware import ObservabilityMiddleware
+from services.data_ingestion.observability import metrics
+from services.data_ingestion.serving.middleware import ObservabilityMiddleware
 
 
 @pytest.fixture

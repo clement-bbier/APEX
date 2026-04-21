@@ -16,17 +16,17 @@ import pytest
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType
 from core.models.tick import Market, NormalizedTick, Session, TradeSide
-from services.s01_data_ingestion.normalizers.alpaca_tick import AlpacaTickNormalizer
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
-from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
-from services.s01_data_ingestion.normalizers.binance_tick import BinanceTickNormalizer
-from services.s01_data_ingestion.normalizers.calendar_event import (
+from services.data_ingestion.normalizers.alpaca_tick import AlpacaTickNormalizer
+from services.data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
+from services.data_ingestion.normalizers.binance_tick import BinanceTickNormalizer
+from services.data_ingestion.normalizers.calendar_event import (
     CalendarEventNormalizer,
 )
-from services.s01_data_ingestion.normalizers.fred_macro import FREDMacroNormalizer
-from services.s01_data_ingestion.normalizers.ibkr_bar import IBKRBarNormalizer
-from services.s01_data_ingestion.normalizers.polygon_bar import PolygonBarNormalizer
-from services.s01_data_ingestion.normalizers.router import NormalizerRouter
+from services.data_ingestion.normalizers.fred_macro import FREDMacroNormalizer
+from services.data_ingestion.normalizers.ibkr_bar import IBKRBarNormalizer
+from services.data_ingestion.normalizers.polygon_bar import PolygonBarNormalizer
+from services.data_ingestion.normalizers.router import NormalizerRouter
 
 
 def _make_asset(
@@ -275,7 +275,7 @@ class TestBackwardCompatibility:
     """Verify legacy imports from normalizer.py still work."""
 
     def test_import_binance_normalizer(self) -> None:
-        from services.s01_data_ingestion.normalizer import BinanceNormalizer
+        from services.data_ingestion.normalizer import BinanceNormalizer
 
         norm = BinanceNormalizer()
         payload: dict[str, Any] = {
@@ -291,7 +291,7 @@ class TestBackwardCompatibility:
         assert tick.price == Decimal("45000.50")
 
     def test_import_alpaca_normalizer(self) -> None:
-        from services.s01_data_ingestion.normalizer import AlpacaNormalizer
+        from services.data_ingestion.normalizer import AlpacaNormalizer
 
         norm = AlpacaNormalizer()
         payload: dict[str, Any] = {
@@ -305,13 +305,13 @@ class TestBackwardCompatibility:
         assert tick.symbol == "AAPL"
 
     def test_import_normalizer_factory(self) -> None:
-        from services.s01_data_ingestion.normalizer import NormalizerFactory
+        from services.data_ingestion.normalizer import NormalizerFactory
 
         norm = NormalizerFactory.create(Market.CRYPTO)
         assert isinstance(norm, object)
 
     def test_import_session_tagger(self) -> None:
-        from services.s01_data_ingestion.normalizer import SessionTagger
+        from services.data_ingestion.normalizer import SessionTagger
 
         tagger = SessionTagger()
         ts = datetime(2024, 1, 8, 14, 30, tzinfo=UTC)

@@ -25,13 +25,13 @@ from core.models.signal import (
 )
 from core.models.tick import NormalizedTick
 from core.state import StateStore
-from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
-from services.s02_signal_engine.mtf_aligner import MTFAligner
-from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
-from services.s02_signal_engine.technical import TechnicalAnalyzer
-from services.s02_signal_engine.vpin import VPINCalculator
+from services.signal_engine.microstructure import MicrostructureAnalyzer
+from services.signal_engine.mtf_aligner import MTFAligner
+from services.signal_engine.signal_scorer import SignalComponent, SignalScorer
+from services.signal_engine.technical import TechnicalAnalyzer
+from services.signal_engine.vpin import VPINCalculator
 
-logger = get_logger("s02_signal_engine.pipeline")
+logger = get_logger("signal_engine.pipeline")
 
 # OFI magnitude threshold for triggering an OFI signal.
 _OFI_THRESHOLD: float = 0.3

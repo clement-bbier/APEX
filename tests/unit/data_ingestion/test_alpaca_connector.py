@@ -16,14 +16,14 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType, DbTick
-from services.s01_data_ingestion.connectors.alpaca_historical import (
+from services.data_ingestion.connectors.alpaca_historical import (
     AlpacaFetchError,
     AlpacaHistoricalConnector,
     _bar_size_to_timeframe,
     _placeholder_asset,
 )
-from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
-from services.s01_data_ingestion.normalizers.alpaca_trade import AlpacaTradeNormalizer
+from services.data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
+from services.data_ingestion.normalizers.alpaca_trade import AlpacaTradeNormalizer
 
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "alpaca_aapl_1m_2024-01-02.json"
 
@@ -168,7 +168,7 @@ class TestAlpacaHistoricalConnector:
 
     def test_connector_name(self) -> None:
         with patch(
-            "services.s01_data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient"
+            "services.data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient"
         ):
             from core.config import Settings
 
@@ -212,7 +212,7 @@ class TestAlpacaHistoricalConnector:
         mock_client.get_stock_bars = MagicMock(return_value=mock_response)
 
         with patch(
-            "services.s01_data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
+            "services.data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
             return_value=mock_client,
         ):
             from core.config import Settings
@@ -243,7 +243,7 @@ class TestAlpacaHistoricalConnector:
         mock_client.get_stock_bars = MagicMock(return_value=mock_response)
 
         with patch(
-            "services.s01_data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
+            "services.data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
             return_value=mock_client,
         ):
             from core.config import Settings
@@ -269,7 +269,7 @@ class TestAlpacaHistoricalConnector:
         mock_client.get_stock_bars = MagicMock(side_effect=RuntimeError("API down"))
 
         with patch(
-            "services.s01_data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
+            "services.data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
             return_value=mock_client,
         ):
             from core.config import Settings
@@ -298,7 +298,7 @@ class TestAlpacaHistoricalConnector:
         mock_client.get_stock_trades = MagicMock(return_value=mock_response)
 
         with patch(
-            "services.s01_data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
+            "services.data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
             return_value=mock_client,
         ):
             from core.config import Settings
@@ -336,7 +336,7 @@ class TestAlpacaHistoricalConnector:
         mock_client.get_stock_bars = MagicMock(side_effect=[resp_page1, resp_page2])
 
         with patch(
-            "services.s01_data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
+            "services.data_ingestion.connectors.alpaca_historical.StockHistoricalDataClient",
             return_value=mock_client,
         ):
             from core.config import Settings

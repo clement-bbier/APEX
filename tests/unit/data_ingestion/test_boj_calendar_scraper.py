@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from core.models.data import EconomicEvent
-from services.s01_data_ingestion.connectors.boj_calendar_scraper import (
+from services.data_ingestion.connectors.boj_calendar_scraper import (
     BoJCalendarFetchError,
     BoJCalendarScraper,
 )

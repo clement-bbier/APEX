@@ -34,7 +34,7 @@ import polars as pl
 import structlog
 
 from features.base import FeatureCalculator
-from services.s07_quant_analytics.realized_vol import RealizedVolEstimator
+from services.quant_analytics.realized_vol import RealizedVolEstimator
 
 logger: structlog.stdlib.BoundLogger = structlog.get_logger(__name__)
 

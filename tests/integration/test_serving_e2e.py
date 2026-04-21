@@ -56,8 +56,8 @@ async def repo():
 @pytest.fixture
 async def e2e_client(repo):
     """Async httpx client wired to the FastAPI app with a real repo."""
-    from services.s01_data_ingestion.serving.app import app
-    from services.s01_data_ingestion.serving.deps import get_repo
+    from services.data_ingestion.serving.app import app
+    from services.data_ingestion.serving.deps import get_repo
 
     app.dependency_overrides[get_repo] = lambda: repo
     async with httpx.AsyncClient(

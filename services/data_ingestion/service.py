@@ -17,12 +17,12 @@ from typing import Any
 from core.base_service import BaseService
 from core.config import get_settings
 from core.logger import get_logger
-from services.s01_data_ingestion.alpaca_feed import AlpacaFeed
-from services.s01_data_ingestion.binance_feed import BinanceFeed
-from services.s01_data_ingestion.macro_feed import MacroFeed
-from services.s01_data_ingestion.normalizer import AlpacaNormalizer, BinanceNormalizer
+from services.data_ingestion.alpaca_feed import AlpacaFeed
+from services.data_ingestion.binance_feed import BinanceFeed
+from services.data_ingestion.macro_feed import MacroFeed
+from services.data_ingestion.normalizer import AlpacaNormalizer, BinanceNormalizer
 
-logger = get_logger("s01_data_ingestion.service")
+logger = get_logger("data_ingestion.service")
 
 _DEFAULT_CRYPTO_SYMBOLS: list[str] = ["BTCUSDT", "ETHUSDT"]
 _DEFAULT_EQUITY_SYMBOLS: list[str] = ["AAPL", "SPY", "QQQ"]
@@ -45,7 +45,7 @@ class DataIngestionService(BaseService):
     XSUB/XPUB broker (see :mod:`core.zmq_broker`).
     """
 
-    service_id: str = "s01_data_ingestion"
+    service_id: str = "data_ingestion"
 
     def __init__(self) -> None:
         """Initialise feeds and normalisers (PUB socket created by BaseService.start)."""

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from core.models.data import Asset, AssetClass
-from services.s01_data_ingestion.normalizers.asset_resolver import AssetResolver
+from services.data_ingestion.normalizers.asset_resolver import AssetResolver
 
 
 def _make_asset(symbol: str = "BTCUSDT", exchange: str = "BINANCE") -> Asset:

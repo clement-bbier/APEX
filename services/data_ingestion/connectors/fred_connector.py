@@ -21,7 +21,7 @@ from fredapi import Fred
 
 from core.config import get_settings
 from core.models.data import MacroPoint, MacroSeriesMeta
-from services.s01_data_ingestion.connectors.macro_base import MacroConnector
+from services.data_ingestion.connectors.macro_base import MacroConnector
 
 logger = structlog.get_logger(__name__)
 

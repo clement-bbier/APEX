@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.models.data import Asset, Bar
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.normalizers.base import NormalizerStrategy
 
 
 class PolygonBarNormalizer(NormalizerStrategy[dict[str, Any], Bar]):

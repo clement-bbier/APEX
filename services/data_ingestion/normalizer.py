@@ -1,4 +1,4 @@
-"""DEPRECATED — Use services.s01_data_ingestion.normalizers instead.
+"""DEPRECATED — Use services.data_ingestion.normalizers instead.
 
 This module re-exports legacy classes for backward compatibility.
 All new code should import from the normalizers package directly.
@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.models.tick import Market, NormalizedTick
-from services.s01_data_ingestion.normalizers.session_tagger import (
+from services.data_ingestion.normalizers.session_tagger import (
     SessionTagger as SessionTagger,
 )
 
@@ -21,7 +21,7 @@ class BinanceNormalizer:
     """
 
     def __init__(self) -> None:
-        from services.s01_data_ingestion.normalizers.binance_tick import (
+        from services.data_ingestion.normalizers.binance_tick import (
             BinanceTickNormalizer,
         )
 
@@ -39,7 +39,7 @@ class AlpacaNormalizer:
     """
 
     def __init__(self) -> None:
-        from services.s01_data_ingestion.normalizers.alpaca_tick import (
+        from services.data_ingestion.normalizers.alpaca_tick import (
             AlpacaTickNormalizer,
         )
 

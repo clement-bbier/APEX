@@ -12,8 +12,8 @@ from decimal import Decimal
 import fakeredis.aioredis
 import pytest
 
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.models import (
+from services.risk_manager.circuit_breaker import CircuitBreaker
+from services.risk_manager.models import (
     HALF_OPEN_RECOVERY_MINUTES,
     BlockReason,
     CircuitBreakerState,
@@ -119,7 +119,7 @@ async def test_probe_success_transitions_to_closed() -> None:
     assert snap.state == CircuitBreakerState.OPEN
 
     # Force transition to HALF_OPEN by backdating tripped_at
-    from services.s05_risk_manager.models import (
+    from services.risk_manager.models import (
         REDIS_CB_KEY,
         CircuitBreakerSnapshot,
     )
@@ -170,7 +170,7 @@ async def test_probe_failure_stays_open() -> None:
     )
 
     # Force HALF_OPEN state
-    from services.s05_risk_manager.models import (
+    from services.risk_manager.models import (
         REDIS_CB_KEY,
         CircuitBreakerSnapshot,
     )

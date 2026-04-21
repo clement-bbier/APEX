@@ -1,4 +1,4 @@
-"""Unit tests for :class:`services.s05_risk_manager.portfolio_tracker.PortfolioTracker`.
+"""Unit tests for :class:`services.risk_manager.portfolio_tracker.PortfolioTracker`.
 
 Phase A.7 (issue #197). Validates the dual-key Redis read pattern:
 primary ``portfolio:{strategy_id}:capital`` with fallback to legacy
@@ -22,7 +22,7 @@ from hypothesis import given
 from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
 
-from services.s05_risk_manager.portfolio_tracker import (
+from services.risk_manager.portfolio_tracker import (
     DEFAULT_STRATEGY_ID,
     LEGACY_CAPITAL_KEY,
     PortfolioTracker,

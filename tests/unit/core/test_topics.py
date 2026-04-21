@@ -33,8 +33,8 @@ def test_signal_topic_format() -> None:
 
 
 def test_health_topic_format() -> None:
-    assert Topics.health("s01_data_ingestion") == "service.health.s01_data_ingestion"
-    assert Topics.health("s05_risk_manager") == "service.health.s05_risk_manager"
+    assert Topics.health("data_ingestion") == "service.health.data_ingestion"
+    assert Topics.health("risk_manager") == "service.health.risk_manager"
 
 
 def test_catalyst_topic_format() -> None:

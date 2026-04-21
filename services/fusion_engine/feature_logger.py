@@ -51,7 +51,7 @@ import structlog
 from core.bus import MessageBus
 from core.state import StateStore
 from core.topics import Topics
-from services.s04_fusion_engine.meta_labeler import MetaFeatures, MetaLabelDecision
+from services.fusion_engine.meta_labeler import MetaFeatures, MetaLabelDecision
 
 logger = structlog.get_logger(__name__)
 

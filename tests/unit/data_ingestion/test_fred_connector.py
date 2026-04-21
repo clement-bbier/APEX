@@ -49,14 +49,14 @@ class TestFREDConnectorInit:
     """Tests for FREDConnector initialization."""
 
     def test_init_with_explicit_key(self):
-        with patch("services.s01_data_ingestion.connectors.fred_connector.Fred"):
-            from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
+        with patch("services.data_ingestion.connectors.fred_connector.Fred"):
+            from services.data_ingestion.connectors.fred_connector import FREDConnector
 
             conn = FREDConnector(api_key="test-key-123")
             assert conn.connector_name == "fred"
 
     def test_init_raises_on_empty_key(self):
-        from services.s01_data_ingestion.connectors.fred_connector import (
+        from services.data_ingestion.connectors.fred_connector import (
             FREDConnector,
             FREDFetchError,
         )
@@ -74,8 +74,8 @@ class TestFREDFetchSeries:
 
     @pytest.fixture
     def connector(self):
-        with patch("services.s01_data_ingestion.connectors.fred_connector.Fred") as mock_fred_cls:
-            from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
+        with patch("services.data_ingestion.connectors.fred_connector.Fred") as mock_fred_cls:
+            from services.data_ingestion.connectors.fred_connector import FREDConnector
 
             mock_fred = MagicMock()
             mock_fred_cls.return_value = mock_fred
@@ -158,7 +158,7 @@ class TestFREDFetchSeries:
         conn, mock_fred = connector
         mock_fred.get_series.side_effect = ConnectionError("persistent failure")
 
-        from services.s01_data_ingestion.connectors.fred_connector import FREDFetchError
+        from services.data_ingestion.connectors.fred_connector import FREDFetchError
 
         start = datetime(2024, 1, 1, tzinfo=UTC)
         end = datetime(2024, 12, 31, tzinfo=UTC)
@@ -187,8 +187,8 @@ class TestFREDFetchMetadata:
 
     @pytest.fixture
     def connector(self):
-        with patch("services.s01_data_ingestion.connectors.fred_connector.Fred") as mock_fred_cls:
-            from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
+        with patch("services.data_ingestion.connectors.fred_connector.Fred") as mock_fred_cls:
+            from services.data_ingestion.connectors.fred_connector import FREDConnector
 
             mock_fred = MagicMock()
             mock_fred_cls.return_value = mock_fred

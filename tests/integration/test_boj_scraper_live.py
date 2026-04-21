@@ -27,7 +27,7 @@ class TestBoJScraperLive:
     @pytest.mark.asyncio
     async def test_fetch_boj_events(self) -> None:
         """Scrape BoJ calendar and verify events are returned."""
-        from services.s01_data_ingestion.connectors.boj_calendar_scraper import (
+        from services.data_ingestion.connectors.boj_calendar_scraper import (
             BoJCalendarScraper,
         )
 

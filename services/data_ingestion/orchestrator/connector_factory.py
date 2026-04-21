@@ -16,12 +16,12 @@ from typing import ClassVar
 import structlog
 
 from core.config import Settings
-from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.connectors.calendar_base import CalendarConnector
-from services.s01_data_ingestion.connectors.fundamentals_base import (
+from services.data_ingestion.connectors.base import DataConnector
+from services.data_ingestion.connectors.calendar_base import CalendarConnector
+from services.data_ingestion.connectors.fundamentals_base import (
     FundamentalsConnector,
 )
-from services.s01_data_ingestion.connectors.macro_base import MacroConnector
+from services.data_ingestion.connectors.macro_base import MacroConnector
 
 logger = structlog.get_logger(__name__)
 
@@ -95,20 +95,20 @@ class ConnectorFactory:
 
 
 def _register_binance_historical(settings: Settings) -> DataConnector:
-    from services.s01_data_ingestion.connectors.binance_historical import (
+    from services.data_ingestion.connectors.binance_historical import (
         BinanceHistoricalConnector,
     )
-    from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
+    from services.data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 
     return BinanceHistoricalConnector(bar_normalizer_factory=BinanceBarNormalizer)
 
 
 def _register_alpaca_historical(settings: Settings) -> DataConnector:
-    from services.s01_data_ingestion.connectors.alpaca_historical import (
+    from services.data_ingestion.connectors.alpaca_historical import (
         AlpacaHistoricalConnector,
     )
-    from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
-    from services.s01_data_ingestion.normalizers.alpaca_trade import (
+    from services.data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
+    from services.data_ingestion.normalizers.alpaca_trade import (
         AlpacaTradeNormalizer,
     )
 
@@ -120,56 +120,56 @@ def _register_alpaca_historical(settings: Settings) -> DataConnector:
 
 
 def _register_massive_historical(settings: Settings) -> DataConnector:
-    from services.s01_data_ingestion.connectors.massive_historical import (
+    from services.data_ingestion.connectors.massive_historical import (
         MassiveHistoricalConnector,
     )
-    from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
+    from services.data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
 
     return MassiveHistoricalConnector(settings, bar_normalizer_factory=MassiveBarNormalizer)
 
 
 def _register_yahoo_historical(settings: Settings) -> DataConnector:
-    from services.s01_data_ingestion.connectors.yahoo_historical import (
+    from services.data_ingestion.connectors.yahoo_historical import (
         YahooHistoricalConnector,
     )
-    from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
+    from services.data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
 
     return YahooHistoricalConnector(bar_normalizer_factory=YahooBarNormalizer)
 
 
 def _register_fred(settings: Settings) -> MacroConnector:
-    from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
+    from services.data_ingestion.connectors.fred_connector import FREDConnector
 
     api_key = settings.fred_api_key.get_secret_value() if settings.fred_api_key else None
     return FREDConnector(api_key=api_key)
 
 
 def _register_ecb_sdw(settings: Settings) -> MacroConnector:
-    from services.s01_data_ingestion.connectors.ecb_connector import ECBConnector
+    from services.data_ingestion.connectors.ecb_connector import ECBConnector
 
     return ECBConnector()
 
 
 def _register_boj(settings: Settings) -> MacroConnector:
-    from services.s01_data_ingestion.connectors.boj_connector import BoJConnector
+    from services.data_ingestion.connectors.boj_connector import BoJConnector
 
     return BoJConnector()
 
 
 def _register_fomc_scraper(settings: Settings) -> CalendarConnector:
-    from services.s01_data_ingestion.connectors.fomc_scraper import FOMCScraper
+    from services.data_ingestion.connectors.fomc_scraper import FOMCScraper
 
     return FOMCScraper()
 
 
 def _register_ecb_scraper(settings: Settings) -> CalendarConnector:
-    from services.s01_data_ingestion.connectors.ecb_scraper import ECBScraper
+    from services.data_ingestion.connectors.ecb_scraper import ECBScraper
 
     return ECBScraper()
 
 
 def _register_boj_calendar_scraper(settings: Settings) -> CalendarConnector:
-    from services.s01_data_ingestion.connectors.boj_calendar_scraper import (
+    from services.data_ingestion.connectors.boj_calendar_scraper import (
         BoJCalendarScraper,
     )
 
@@ -177,7 +177,7 @@ def _register_boj_calendar_scraper(settings: Settings) -> CalendarConnector:
 
 
 def _register_fred_releases(settings: Settings) -> CalendarConnector:
-    from services.s01_data_ingestion.connectors.fred_releases import (
+    from services.data_ingestion.connectors.fred_releases import (
         FREDReleasesConnector,
     )
 
@@ -186,13 +186,13 @@ def _register_fred_releases(settings: Settings) -> CalendarConnector:
 
 
 def _register_edgar(settings: Settings) -> FundamentalsConnector:
-    from services.s01_data_ingestion.connectors.edgar_connector import EDGARConnector
+    from services.data_ingestion.connectors.edgar_connector import EDGARConnector
 
     return EDGARConnector(user_agent=settings.edgar_user_agent)
 
 
 def _register_simfin(settings: Settings) -> FundamentalsConnector:
-    from services.s01_data_ingestion.connectors.simfin_connector import SimFinConnector
+    from services.data_ingestion.connectors.simfin_connector import SimFinConnector
 
     api_key = settings.simfin_api_key.get_secret_value() if settings.simfin_api_key else None
     return SimFinConnector(api_key=api_key)

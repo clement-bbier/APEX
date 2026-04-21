@@ -18,15 +18,15 @@ from fastapi.responses import JSONResponse
 
 from core.config import get_settings
 from core.data.timescale_repository import TimescaleRepository
-from services.s01_data_ingestion.observability.healthcheck import (
+from services.data_ingestion.observability.healthcheck import (
     DatabaseCheck,
     HealthChecker,
 )
-from services.s01_data_ingestion.observability.metrics import record_db_insert
-from services.s01_data_ingestion.observability.metrics_server import (
+from services.data_ingestion.observability.metrics import record_db_insert
+from services.data_ingestion.observability.metrics_server import (
     mount_metrics_endpoint,
 )
-from services.s01_data_ingestion.observability.tracing import init_tracing
+from services.data_ingestion.observability.tracing import init_tracing
 
 from .deps import get_repo
 from .middleware import ObservabilityMiddleware

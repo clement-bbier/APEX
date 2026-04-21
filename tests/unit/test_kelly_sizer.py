@@ -6,7 +6,7 @@ from decimal import Decimal
 
 import pytest
 
-from services.s04_fusion_engine.kelly_sizer import KellySizer
+from services.fusion_engine.kelly_sizer import KellySizer
 
 
 class TestKellySizer:

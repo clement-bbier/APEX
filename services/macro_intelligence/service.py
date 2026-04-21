@@ -7,19 +7,19 @@ import json
 from typing import Any
 
 from core.base_service import BaseService
-from services.s08_macro_intelligence.cb_watcher import CBWatcher
-from services.s08_macro_intelligence.geopolitical import GeopoliticalAnalyzer
-from services.s08_macro_intelligence.sector_rotation import SectorRotation
+from services.macro_intelligence.cb_watcher import CBWatcher
+from services.macro_intelligence.geopolitical import GeopoliticalAnalyzer
+from services.macro_intelligence.sector_rotation import SectorRotation
 
 
 class MacroIntelligenceService(BaseService):
     """Service that monitors macro economic signals and publishes catalyst events."""
 
-    service_id = "s08_macro_intelligence"
+    service_id = "macro_intelligence"
 
     def __init__(self) -> None:
         """Initialise macro sub-modules."""
-        super().__init__("s08_macro_intelligence")
+        super().__init__("macro_intelligence")
         self._cb_watcher = CBWatcher(state=self.state, bus=self.bus)
         self._geo = GeopoliticalAnalyzer()
         self._sector_rotation = SectorRotation()

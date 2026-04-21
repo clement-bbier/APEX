@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from decimal import Decimal
 
 from core.models.data import Asset, Bar, BarSize, BarType
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.normalizers.base import NormalizerStrategy
 
 
 class MassiveBarNormalizer(NormalizerStrategy[list[str], Bar]):

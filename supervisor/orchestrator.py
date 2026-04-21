@@ -59,16 +59,16 @@ logger = get_logger("supervisor.orchestrator")
 STARTUP_ORDER: list[str] = [
     "redis_check",
     "zmq_broker",
-    "s01_data_ingestion",
-    "s07_quant_analytics",
-    "s08_macro_intelligence",
-    "s02_signal_engine",
-    "s03_regime_detector",
-    "s04_fusion_engine",
-    "s05_risk_manager",
-    "s06_execution",
-    "s09_feedback_loop",
-    "s10_monitor",
+    "data_ingestion",
+    "quant_analytics",
+    "macro_intelligence",
+    "signal_engine",
+    "regime_detector",
+    "fusion_engine",
+    "risk_manager",
+    "execution",
+    "feedback_loop",
+    "command_center",
 ]
 
 

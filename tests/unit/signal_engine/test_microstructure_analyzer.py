@@ -12,7 +12,7 @@ from decimal import Decimal
 import pytest
 
 from core.models.tick import Market, NormalizedTick, TradeSide
-from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
+from services.signal_engine.microstructure import MicrostructureAnalyzer
 
 
 def _tick(

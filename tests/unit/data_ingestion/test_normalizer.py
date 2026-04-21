@@ -11,7 +11,7 @@ from decimal import Decimal
 import pytest
 
 from core.models.tick import Market, Session, TradeSide
-from services.s01_data_ingestion.normalizer import (
+from services.data_ingestion.normalizer import (
     AlpacaNormalizer,
     BinanceNormalizer,
     NormalizerFactory,

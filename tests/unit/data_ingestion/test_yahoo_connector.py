@@ -15,13 +15,13 @@ import pandas as pd
 import pytest
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType
-from services.s01_data_ingestion.connectors.yahoo_historical import (
+from services.data_ingestion.connectors.yahoo_historical import (
     YahooFetchError,
     YahooHistoricalConnector,
     _bar_size_to_yahoo_interval,
     _placeholder_asset,
 )
-from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
+from services.data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
 
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "fixtures" / "yahoo_spx_1d_2024-q1.json"
 
@@ -107,7 +107,7 @@ class TestYahooHistoricalConnector:
         mock_ticker = MagicMock()
         mock_ticker.history.return_value = df
 
-        with patch("services.s01_data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf:
+        with patch("services.data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf:
             mock_yf.return_value = mock_ticker
             connector = YahooHistoricalConnector(bar_normalizer_factory=YahooBarNormalizer)
             start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -130,9 +130,9 @@ class TestYahooHistoricalConnector:
         mock_ticker.history.return_value = pd.DataFrame()
 
         with (
-            patch("services.s01_data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf,
+            patch("services.data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf,
             patch(
-                "services.s01_data_ingestion.connectors.yahoo_historical.asyncio.sleep",
+                "services.data_ingestion.connectors.yahoo_historical.asyncio.sleep",
                 new=AsyncMock(),
             ),
         ):
@@ -156,9 +156,9 @@ class TestYahooHistoricalConnector:
         ]
 
         with (
-            patch("services.s01_data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf,
+            patch("services.data_ingestion.connectors.yahoo_historical.yf.Ticker") as mock_yf,
             patch(
-                "services.s01_data_ingestion.connectors.yahoo_historical.asyncio.sleep",
+                "services.data_ingestion.connectors.yahoo_historical.asyncio.sleep",
                 new=AsyncMock(),
             ),
         ):

@@ -13,7 +13,7 @@ from core.models.regime import (
     TrendRegime,
     VolRegime,
 )
-from services.s04_fusion_engine.strategy import StrategySelector
+from services.fusion_engine.strategy import StrategySelector
 
 
 def _macro() -> MacroContext:

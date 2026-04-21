@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from services.s01_data_ingestion.observability.healthcheck import (
+from services.data_ingestion.observability.healthcheck import (
     DatabaseCheck,
     HealthChecker,
     HealthCheckResult,

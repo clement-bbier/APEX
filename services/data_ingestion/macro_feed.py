@@ -19,7 +19,7 @@ import aiohttp
 
 from core.logger import get_logger
 
-logger = get_logger("s01_data_ingestion.macro_feed")
+logger = get_logger("data_ingestion.macro_feed")
 
 _FRED_BASE = "https://api.stlouisfed.org/fred/series/observations"
 _YAHOO_DXY_URL = "https://query1.finance.yahoo.com/v8/finance/chart/DX-Y.NYB?interval=1d&range=2d"

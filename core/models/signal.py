@@ -186,7 +186,7 @@ class Signal(BaseModel):
         strategy form: ZMQ publishes on ``signal.technical.{SYMBOL}``
         (``core.topics.Topics.signal``) and Kelly stats live at
         ``kelly:{symbol}`` / ``feedback:kelly_stats:{strategy_key}``
-        (``services/s04_fusion_engine/kelly_sizer.py``). Phase A.4 introduces
+        (``services/fusion_engine/kelly_sizer.py``). Phase A.4 introduces
         ``Topics.signal_for(strategy_id, symbol)`` →
         ``signal.technical.{strategy_id}.{symbol}`` and Phase A.5+ rewrites
         the Redis keys to ``kelly:{strategy_id}:{symbol}`` per Charter §5.5

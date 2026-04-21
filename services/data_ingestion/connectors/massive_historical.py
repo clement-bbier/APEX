@@ -25,8 +25,8 @@ from botocore.exceptions import ClientError
 
 from core.config import Settings
 from core.models.data import Asset, AssetClass, Bar, BarSize, DbTick
-from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.connectors.base import DataConnector
+from services.data_ingestion.normalizers.base import NormalizerStrategy
 
 logger = structlog.get_logger(__name__)
 

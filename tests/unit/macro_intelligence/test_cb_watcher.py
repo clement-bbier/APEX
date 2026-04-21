@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from services.s08_macro_intelligence.cb_watcher import CBWatcher
+from services.macro_intelligence.cb_watcher import CBWatcher
 
 
 class TestCBWatcher:

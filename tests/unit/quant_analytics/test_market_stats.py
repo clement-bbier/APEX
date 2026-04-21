@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from services.s07_quant_analytics.market_stats import MarketStats
+from services.quant_analytics.market_stats import MarketStats
 
 
 class TestMarketStats:

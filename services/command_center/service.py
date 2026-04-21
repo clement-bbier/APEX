@@ -9,12 +9,12 @@ from core.base_service import BaseService
 from core.config import get_settings
 from core.logger import get_logger
 from core.topics import Topics
-from services.s10_monitor.alert_engine import AlertEngine
-from services.s10_monitor.dashboard import DashboardServer
-from services.s10_monitor.health_checker import HealthChecker
-from services.s10_monitor.pnl_tracker import PnLTracker
+from services.command_center.alert_engine import AlertEngine
+from services.command_center.dashboard import DashboardServer
+from services.command_center.health_checker import HealthChecker
+from services.command_center.pnl_tracker import PnLTracker
 
-logger = get_logger("s10_monitor")
+logger = get_logger("command_center")
 
 REDIS_RISK_SYSTEM_STATE_LATEST_KEY = "risk:system:state_change:latest"
 REDIS_RISK_SYSTEM_STATE_LATEST_TTL_SECONDS = 300
@@ -29,7 +29,7 @@ class MonitorService(BaseService):
     """
 
     def __init__(self) -> None:
-        super().__init__("s10_monitor")
+        super().__init__("command_center")
         self._health = HealthChecker()
         self._pnl = PnLTracker()
         self._alert = AlertEngine(get_settings())

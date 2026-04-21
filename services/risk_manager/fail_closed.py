@@ -3,8 +3,8 @@
 Wraps every :class:`~core.models.order.OrderCandidate` with a synchronous
 :class:`~core.state.SystemRiskState` check. When the system risk state is
 not ``HEALTHY``, emits a critical structlog rejection event and returns a
-:meth:`~services.s05_risk_manager.models.RuleResult.fail` carrying
-:attr:`~services.s05_risk_manager.models.BlockReason.SYSTEM_UNAVAILABLE`.
+:meth:`~services.risk_manager.models.RuleResult.fail` carrying
+:attr:`~services.risk_manager.models.BlockReason.SYSTEM_UNAVAILABLE`.
 
 See docs/adr/ADR-0006-fail-closed-risk-controls.md §D3 and §D8.
 
@@ -21,7 +21,7 @@ from datetime import UTC, datetime
 import structlog
 
 from core.state import SystemRiskMonitor, SystemRiskState
-from services.s05_risk_manager.models import BlockReason, RuleResult
+from services.risk_manager.models import BlockReason, RuleResult
 
 logger = structlog.get_logger(__name__)
 

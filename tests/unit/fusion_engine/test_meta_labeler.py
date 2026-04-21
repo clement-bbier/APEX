@@ -21,7 +21,7 @@ from unittest.mock import AsyncMock, MagicMock
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from services.s04_fusion_engine.meta_labeler import (
+from services.fusion_engine.meta_labeler import (
     MetaFeatures,
     MetaLabeler,
 )
@@ -222,7 +222,7 @@ class TestGetFeaturesFromRedis:
 class TestMetaFeatureLogger:
     def _make_logger(self) -> tuple[Any, Any, Any]:
         """Return (logger, mock_bus, mock_state)."""
-        from services.s04_fusion_engine.feature_logger import MetaFeatureLogger
+        from services.fusion_engine.feature_logger import MetaFeatureLogger
 
         bus = MagicMock()
         bus.publish = AsyncMock(return_value=None)
@@ -245,7 +245,7 @@ class TestMetaFeatureLogger:
         state.ltrim.assert_called_once()
 
     def test_zmq_failure_does_not_raise(self) -> None:
-        from services.s04_fusion_engine.feature_logger import MetaFeatureLogger
+        from services.fusion_engine.feature_logger import MetaFeatureLogger
 
         bus = MagicMock()
         bus.publish = AsyncMock(side_effect=RuntimeError("ZMQ down"))
@@ -258,7 +258,7 @@ class TestMetaFeatureLogger:
         asyncio.run(flogger.log("BTCUSDT", _good_features(), decision))
 
     def test_redis_failure_does_not_raise(self) -> None:
-        from services.s04_fusion_engine.feature_logger import MetaFeatureLogger
+        from services.fusion_engine.feature_logger import MetaFeatureLogger
 
         bus = MagicMock()
         bus.publish = AsyncMock(return_value=None)
@@ -294,7 +294,7 @@ class TestMetaFeatureLogger:
         assert topic == Topics.ANALYTICS_META_FEATURES
 
     def test_ltrim_caps_at_max_len(self) -> None:
-        from services.s04_fusion_engine.feature_logger import MetaFeatureLogger
+        from services.fusion_engine.feature_logger import MetaFeatureLogger
 
         logger, _bus, state = self._make_logger()
         decision = MetaLabeler().score(_good_features())

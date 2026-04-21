@@ -18,10 +18,10 @@ from core.config import get_settings
 from core.models.order import OrderCandidate
 from core.models.regime import Regime
 from core.models.signal import Signal, TechnicalFeatures
-from services.s04_fusion_engine.fusion import FusionEngine
-from services.s04_fusion_engine.hedge_trigger import HedgeTrigger
-from services.s04_fusion_engine.kelly_sizer import KellySizer
-from services.s04_fusion_engine.strategy import StrategySelector
+from services.fusion_engine.fusion import FusionEngine
+from services.fusion_engine.hedge_trigger import HedgeTrigger
+from services.fusion_engine.kelly_sizer import KellySizer
+from services.fusion_engine.strategy import StrategySelector
 
 _SIGNAL_TOPICS: list[str] = ["signal.technical."]
 _ORDER_CANDIDATE_TOPIC = "order.candidate"
@@ -46,7 +46,7 @@ class FusionEngineService(BaseService):
     7. Publishes the :class:`~core.models.order.OrderCandidate` on ZMQ.
     """
 
-    service_id = "s04_fusion_engine"
+    service_id = "fusion_engine"
 
     def __init__(self) -> None:
         """Initialize fusion components (PUB socket created by BaseService.start)."""

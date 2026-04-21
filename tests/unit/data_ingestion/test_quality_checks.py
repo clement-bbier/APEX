@@ -11,15 +11,15 @@ from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType, DbTick
-from services.s01_data_ingestion.quality.base import CheckResult
-from services.s01_data_ingestion.quality.checker import DataQualityChecker
-from services.s01_data_ingestion.quality.config import QualityConfig
-from services.s01_data_ingestion.quality.gap_check import GapCheck
-from services.s01_data_ingestion.quality.outlier_check import OutlierCheck
-from services.s01_data_ingestion.quality.price_check import PriceCheck
-from services.s01_data_ingestion.quality.stale_check import StaleCheck
-from services.s01_data_ingestion.quality.timestamp_check import TimestampCheck
-from services.s01_data_ingestion.quality.volume_check import VolumeCheck
+from services.data_ingestion.quality.base import CheckResult
+from services.data_ingestion.quality.checker import DataQualityChecker
+from services.data_ingestion.quality.config import QualityConfig
+from services.data_ingestion.quality.gap_check import GapCheck
+from services.data_ingestion.quality.outlier_check import OutlierCheck
+from services.data_ingestion.quality.price_check import PriceCheck
+from services.data_ingestion.quality.stale_check import StaleCheck
+from services.data_ingestion.quality.timestamp_check import TimestampCheck
+from services.data_ingestion.quality.volume_check import VolumeCheck
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 

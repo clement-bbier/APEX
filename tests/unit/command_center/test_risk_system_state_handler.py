@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from core.topics import Topics
-from services.s10_monitor.service import MonitorService
+from services.command_center.service import MonitorService
 
 
 @pytest.fixture

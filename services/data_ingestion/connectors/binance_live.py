@@ -1,7 +1,7 @@
 """Binance live data connector stub.
 
 Placeholder for interface coherence. The actual live streaming is handled
-by :mod:`services.s01_data_ingestion.binance_feed` (WebSocket-based).
+by :mod:`services.data_ingestion.binance_feed` (WebSocket-based).
 Full implementation planned for Phase 2.6.
 """
 
@@ -11,7 +11,7 @@ from collections.abc import AsyncIterator
 from datetime import datetime
 
 from core.models.data import Bar, BarSize, DbTick
-from services.s01_data_ingestion.connectors.base import DataConnector
+from services.data_ingestion.connectors.base import DataConnector
 
 
 class BinanceLiveConnector(DataConnector):

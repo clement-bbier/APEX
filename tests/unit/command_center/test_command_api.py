@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock
 import pytest
 from fastapi import HTTPException
 
-from services.s10_monitor.command_api import (
+from services.command_center.command_api import (
     ActionResult,
     AlertEntry,
     CBEventInfo,
@@ -145,7 +145,7 @@ class TestResponseModels:
 class TestGetSystemStatusMocked:
     @pytest.mark.asyncio
     async def test_dead_services_mark_unhealthy(self) -> None:
-        from services.s10_monitor.command_api import get_system_status
+        from services.command_center.command_api import get_system_status
 
         state = AsyncMock()
         state.get.return_value = None  # all services return None = dead
@@ -156,7 +156,7 @@ class TestGetSystemStatusMocked:
 
     @pytest.mark.asyncio
     async def test_healthy_service_detected(self) -> None:
-        from services.s10_monitor.command_api import get_system_status
+        from services.command_center.command_api import get_system_status
 
         now_ms = int(time.time() * 1000)
         state = AsyncMock()
@@ -166,7 +166,7 @@ class TestGetSystemStatusMocked:
 
     @pytest.mark.asyncio
     async def test_cb_state_read_from_redis(self) -> None:
-        from services.s10_monitor.command_api import get_system_status
+        from services.command_center.command_api import get_system_status
 
         state = AsyncMock()
         state.get.side_effect = lambda key: {"circuit_breaker:state": "open"}.get(key)
@@ -177,7 +177,7 @@ class TestGetSystemStatusMocked:
 class TestGetPnLMocked:
     @pytest.mark.asyncio
     async def test_empty_trades_returns_zeros(self) -> None:
-        from services.s10_monitor.command_api import get_pnl
+        from services.command_center.command_api import get_pnl
 
         state = AsyncMock()
         state.lrange.return_value = []
@@ -188,7 +188,7 @@ class TestGetPnLMocked:
 
     @pytest.mark.asyncio
     async def test_winning_trades_positive_win_rate(self) -> None:
-        from services.s10_monitor.command_api import get_pnl
+        from services.command_center.command_api import get_pnl
 
         state = AsyncMock()
         state.get.return_value = None
@@ -202,7 +202,7 @@ class TestGetPnLMocked:
 class TestGetRegimeMocked:
     @pytest.mark.asyncio
     async def test_empty_regime_returns_defaults(self) -> None:
-        from services.s10_monitor.command_api import get_regime
+        from services.command_center.command_api import get_regime
 
         state = AsyncMock()
         state.get.return_value = {}
@@ -214,7 +214,7 @@ class TestGetRegimeMocked:
 class TestResetCBMocked:
     @pytest.mark.asyncio
     async def test_reset_requires_confirmation(self) -> None:
-        from services.s10_monitor.command_api import reset_circuit_breaker
+        from services.command_center.command_api import reset_circuit_breaker
 
         state = AsyncMock()
         with pytest.raises(HTTPException) as exc:
@@ -223,7 +223,7 @@ class TestResetCBMocked:
 
     @pytest.mark.asyncio
     async def test_reset_with_confirmation_succeeds(self) -> None:
-        from services.s10_monitor.command_api import reset_circuit_breaker
+        from services.command_center.command_api import reset_circuit_breaker
 
         state = AsyncMock()
         state.set.return_value = None
@@ -235,7 +235,7 @@ class TestResetCBMocked:
 class TestGetConfigMocked:
     @pytest.mark.asyncio
     async def test_config_never_exposes_secrets(self) -> None:
-        from services.s10_monitor.command_api import get_config
+        from services.command_center.command_api import get_config
 
         result = await get_config()
         assert "api_key" not in str(result).lower()

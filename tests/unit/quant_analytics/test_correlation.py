@@ -6,7 +6,7 @@ import math
 
 import numpy as np
 
-from services.s07_quant_analytics.market_stats import MarketStatsEngine
+from services.quant_analytics.market_stats import MarketStatsEngine
 
 
 class TestCorrelation:

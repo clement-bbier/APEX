@@ -29,12 +29,12 @@ allowed-confusables = ["\u00d7","\u2212","\u03b1","\u03b2","\u03b3","\u03bc","\u
 # Dashboard contains a large HTML/JS template string. Long lines and
 # trailing whitespace inside that template are intentional and must be
 # preserved for the JS to keep working.
-"services/s10_monitor/dashboard.py" = ["E501", "S104", "W291", "W293"]
+"services/command_center/dashboard.py" = ["E501", "S104", "W291", "W293"]
 # Backtesting walk-forward: helper variables are kept for clarity even
 # when not consumed downstream by every code path.
 "backtesting/walk_forward.py" = ["F841"]
 # FastAPI endpoints use Query() and Depends() in function defaults by design.
-"services/s01_data_ingestion/serving/routers/**" = ["B008"]
+"services/data_ingestion/serving/routers/**" = ["B008"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -86,7 +86,7 @@ ignore_missing_imports = true
 module = [
     "core.config",
     "tests.*",
-    "services.s10_monitor.dashboard",
+    "services.command_center.dashboard",
 ]
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
@@ -127,30 +127,30 @@ omit = [
     "backtesting/engine.py",
     "backtesting/data_loader.py",
     # S01: only live connectors and serving entry point (not the whole package)
-    "services/s01_data_ingestion/connectors/binance_live.py",
-    "services/s01_data_ingestion/serving/main.py",
+    "services/data_ingestion/connectors/binance_live.py",
+    "services/data_ingestion/serving/main.py",
     # Brokers (require live API connections)
-    "services/s06_execution/broker_alpaca.py",
-    "services/s06_execution/broker_binance.py",
-    "services/s06_execution/order_manager.py",
+    "services/execution/broker_alpaca.py",
+    "services/execution/broker_binance.py",
+    "services/execution/order_manager.py",
     # Complex signal modules not yet unit-tested
-    "services/s02_signal_engine/crowd_behavior.py",
-    "services/s02_signal_engine/mtf_aligner.py",
+    "services/signal_engine/crowd_behavior.py",
+    "services/signal_engine/mtf_aligner.py",
     # Calendar and guard modules (integration-level)
-    "services/s03_regime_detector/cb_calendar.py",
-    "services/s05_risk_manager/cb_event_guard.py",
-    "services/s05_risk_manager/exposure_monitor.py",
+    "services/regime_detector/cb_calendar.py",
+    "services/risk_manager/cb_event_guard.py",
+    "services/risk_manager/exposure_monitor.py",
     # Heavy analytics (Monte Carlo, GARCH) - require special deps
-    "services/s07_quant_analytics/monte_carlo.py",
-    "services/s07_quant_analytics/performance.py",
-    "services/s07_quant_analytics/microstructure_adv.py",
+    "services/quant_analytics/monte_carlo.py",
+    "services/quant_analytics/performance.py",
+    "services/quant_analytics/microstructure_adv.py",
     # Macro intel - geopolitical and sector rotation (data-source dependent)
-    "services/s08_macro_intelligence/geopolitical.py",
-    "services/s08_macro_intelligence/sector_rotation.py",
+    "services/macro_intelligence/geopolitical.py",
+    "services/macro_intelligence/sector_rotation.py",
     # S10: specific UI/API modules only (not wildcard)
-    "services/s10_monitor/dashboard.py",
-    "services/s10_monitor/command_api.py",
-    "services/s10_monitor/alert_engine.py",
+    "services/command_center/dashboard.py",
+    "services/command_center/command_api.py",
+    "services/command_center/alert_engine.py",
 ]
 branch = true
 

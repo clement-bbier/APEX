@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from core.models.order import TradeRecord
-from services.s09_feedback_loop.trade_analyzer import TradeAnalyzer
+from services.feedback_loop.trade_analyzer import TradeAnalyzer
 
 
 def make_trade(net_pnl: float = 100.0, pnl_pct: float = 0.05) -> MagicMock:

@@ -17,7 +17,7 @@ from core.models.regime import (
     VolRegime,
 )
 from core.models.signal import Direction, Signal, SignalType, TechnicalFeatures
-from services.s04_fusion_engine.hedge_trigger import HedgeTrigger
+from services.fusion_engine.hedge_trigger import HedgeTrigger
 
 
 def _macro(event_active: bool = False) -> MacroContext:

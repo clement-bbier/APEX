@@ -53,7 +53,7 @@ class BaseService(ABC):
         """Initialize the base service.
 
         Args:
-            service_id: Unique human-readable identifier, e.g. 's01_data_ingestion'.
+            service_id: Unique human-readable identifier, e.g. 'data_ingestion'.
         """
         self.service_id = service_id
         self._settings = get_settings()

@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from services.s01_data_ingestion.orchestrator.gap_detector import Gap, detect_gaps
+from services.data_ingestion.orchestrator.gap_detector import Gap, detect_gaps
 
 _INTERVAL = timedelta(minutes=1)
 _BASE = datetime(2025, 1, 1, tzinfo=UTC)

@@ -17,14 +17,14 @@ import httpx
 import pytest
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType, DbTick
-from services.s01_data_ingestion.connectors.binance_historical import (
+from services.data_ingestion.connectors.binance_historical import (
     BinanceFetchError,
     BinanceHistoricalConnector,
     _bar_size_to_binance_interval,
     _placeholder_asset,
 )
-from services.s01_data_ingestion.connectors.binance_live import BinanceLiveConnector
-from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
+from services.data_ingestion.connectors.binance_live import BinanceLiveConnector
+from services.data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parents[2] / "fixtures" / "binance_btcusdt_1m_2024-01-01.zip"
@@ -125,7 +125,7 @@ class TestBinanceHistoricalConnector:
         rows = BinanceHistoricalConnector._extract_csv_from_zip(content)
         assert len(rows) == 1440
 
-        from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
+        from services.data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 
         normalizer = BinanceBarNormalizer(BarSize.M1)
         placeholder = _placeholder_asset("BTCUSDT")
@@ -208,7 +208,7 @@ class TestBinanceHistoricalConnector:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(side_effect=[resp_429, resp_ok])
 
-        with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+        with patch("services.data_ingestion.connectors.binance_historical.asyncio.sleep"):
             result = await connector._download_zip_csv(mock_client, "https://example.com/test.zip")
         assert result is not None
         assert len(result) == 1
@@ -232,7 +232,7 @@ class TestBinanceHistoricalConnector:
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+            with patch("services.data_ingestion.connectors.binance_historical.asyncio.sleep"):
                 start = datetime(2024, 1, 1, tzinfo=UTC)
                 end = datetime(2024, 1, 2, tzinfo=UTC)
                 batches: list[list[Bar]] = []
@@ -311,7 +311,7 @@ class TestBackfillScript:
             patch("scripts.backfill_binance.get_settings") as mock_settings,
             patch("scripts.backfill_binance.TimescaleRepository", return_value=mock_repo),
             patch("httpx.AsyncClient") as mock_cls,
-            patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"),
+            patch("services.data_ingestion.connectors.binance_historical.asyncio.sleep"),
         ):
             mock_settings.return_value.timescale_dsn = "postgresql://test:test@localhost/test"
             mock_client = AsyncMock()
@@ -329,7 +329,7 @@ class TestBackfillScript:
 
     def test_backfill_pipeline_imports(self) -> None:
         """Verify the full import chain works."""
-        from services.s01_data_ingestion.connectors import (
+        from services.data_ingestion.connectors import (
             BinanceHistoricalConnector,
             BinanceLiveConnector,
             DataConnector,
@@ -367,7 +367,7 @@ class TestCopilotFixes:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(return_value=resp_429)
 
-        with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+        with patch("services.data_ingestion.connectors.binance_historical.asyncio.sleep"):
             with pytest.raises(BinanceFetchError, match="max retries exceeded"):
                 await connector._download_zip_csv(mock_client, "https://example.com/test.zip")
 
@@ -398,7 +398,7 @@ class TestCopilotFixes:
         mock_client = AsyncMock(spec=httpx.AsyncClient)
         mock_client.get = AsyncMock(side_effect=[resp1, resp2, resp_empty])
 
-        with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+        with patch("services.data_ingestion.connectors.binance_historical.asyncio.sleep"):
             start = datetime(2024, 1, 1, tzinfo=UTC)
             end = datetime(2024, 1, 2, tzinfo=UTC)
             rows = await connector._fallback_rest_klines(mock_client, "BTCUSDT", "1m", start, end)
@@ -432,7 +432,7 @@ class TestCopilotFixes:
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+            with patch("services.data_ingestion.connectors.binance_historical.asyncio.sleep"):
                 start = datetime(2024, 1, 1, tzinfo=UTC)
                 end = datetime(2024, 1, 2, tzinfo=UTC)
                 batches = []
@@ -477,7 +477,7 @@ class TestCopilotFixes:
             mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_cls.return_value = mock_client
 
-            with patch("services.s01_data_ingestion.connectors.binance_historical.asyncio.sleep"):
+            with patch("services.data_ingestion.connectors.binance_historical.asyncio.sleep"):
                 start = datetime(2024, 1, 1, tzinfo=UTC)
                 end = datetime(2024, 1, 2, tzinfo=UTC)
                 batches = []

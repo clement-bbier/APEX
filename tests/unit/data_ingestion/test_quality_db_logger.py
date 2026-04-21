@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from core.models.data import DataQualityEntry
-from services.s01_data_ingestion.quality.base import CheckResult, QualityIssue
-from services.s01_data_ingestion.quality.checker import BarQualityReport
-from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
+from services.data_ingestion.quality.base import CheckResult, QualityIssue
+from services.data_ingestion.quality.checker import BarQualityReport
+from services.data_ingestion.quality.db_logger import QualityDbLogger
 
 
 def _make_issue(check_type: str = "test", severity: CheckResult = CheckResult.WARN) -> QualityIssue:

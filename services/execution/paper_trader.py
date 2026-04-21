@@ -16,10 +16,10 @@ from core.logger import get_logger
 from core.models.order import ApprovedOrder, ExecutedOrder
 from core.models.tick import Market, NormalizedTick
 from core.state import StateStore
-from services.s06_execution.broker_base import Broker
-from services.s06_execution.optimal_execution import MarketImpactModel
+from services.execution.broker_base import Broker
+from services.execution.optimal_execution import MarketImpactModel
 
-_logger = get_logger("s06_execution.paper_trader")
+_logger = get_logger("execution.paper_trader")
 
 _rng = secrets.SystemRandom()
 

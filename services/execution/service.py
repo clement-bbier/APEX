@@ -13,9 +13,9 @@ from typing import Any
 from core.base_service import BaseService
 from core.config import TradingMode, get_settings
 from core.models.order import ApprovedOrder, ExecutedOrder
-from services.s06_execution.broker_base import Broker
-from services.s06_execution.broker_factory import BrokerFactory
-from services.s06_execution.order_manager import OrderManager
+from services.execution.broker_base import Broker
+from services.execution.broker_factory import BrokerFactory
+from services.execution.order_manager import OrderManager
 
 _APPROVED_TOPIC = "order.approved"
 _FILLED_TOPIC = "order.filled"
@@ -41,7 +41,7 @@ class ExecutionService(BaseService):
     and cancels them automatically.
     """
 
-    service_id = "s06_execution"
+    service_id = "execution"
 
     def __init__(self) -> None:
         """Initialize execution components and ZMQ pub/sub."""

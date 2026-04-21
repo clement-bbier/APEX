@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 import yaml
 
-from services.s01_data_ingestion.orchestrator.cli import (
+from services.data_ingestion.orchestrator.cli import (
     GapsCommand,
     ListCommand,
     ResetCommand,

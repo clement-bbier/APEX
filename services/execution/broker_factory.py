@@ -11,10 +11,10 @@ from __future__ import annotations
 
 from core.config import Settings, TradingMode
 from core.state import StateStore
-from services.s06_execution.broker_alpaca import AlpacaBroker
-from services.s06_execution.broker_base import Broker
-from services.s06_execution.broker_binance import BinanceBroker
-from services.s06_execution.paper_trader import PaperTrader
+from services.execution.broker_alpaca import AlpacaBroker
+from services.execution.broker_base import Broker
+from services.execution.broker_binance import BinanceBroker
+from services.execution.paper_trader import PaperTrader
 
 # Crypto symbols share a common suffix pattern.
 _CRYPTO_SUFFIXES = ("USDT", "BUSD", "BTC", "ETH", "USDC")

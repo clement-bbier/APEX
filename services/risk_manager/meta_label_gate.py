@@ -35,7 +35,7 @@ import json
 import structlog
 from redis.asyncio import Redis
 
-from services.s05_risk_manager.models import (
+from services.risk_manager.models import (
     MIN_KELLY_FRACTION,
     MIN_META_CONFIDENCE_TO_TRADE,
     BlockReason,

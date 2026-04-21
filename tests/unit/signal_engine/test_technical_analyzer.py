@@ -10,7 +10,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from core.models.tick import Market, NormalizedTick, TradeSide
-from services.s02_signal_engine.technical import TechnicalAnalyzer
+from services.signal_engine.technical import TechnicalAnalyzer
 
 _5M_MS = 300_000  # milliseconds per 5-minute bar
 

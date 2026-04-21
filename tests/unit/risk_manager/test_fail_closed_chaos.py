@@ -22,8 +22,8 @@ import fakeredis.aioredis
 import pytest
 
 from core.state import REDIS_HEARTBEAT_KEY, SystemRiskMonitor, SystemRiskState
-from services.s05_risk_manager.fail_closed import FailClosedGuard
-from services.s05_risk_manager.models import BlockReason
+from services.risk_manager.fail_closed import FailClosedGuard
+from services.risk_manager.models import BlockReason
 
 
 def _make_redis() -> fakeredis.aioredis.FakeRedis:

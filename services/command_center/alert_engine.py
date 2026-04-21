@@ -11,7 +11,7 @@ import aiohttp
 from core.config import Settings
 from core.logger import get_logger
 
-logger = get_logger("s10_monitor.alert_engine")
+logger = get_logger("command_center.alert_engine")
 
 
 class AlertEngine:

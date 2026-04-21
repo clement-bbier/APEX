@@ -14,9 +14,9 @@ from datetime import UTC, datetime
 
 import numpy as np
 
-from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
-from services.s03_regime_detector.regime_engine import RegimeEngine
-from services.s03_regime_detector.session_tracker import SessionTracker
+from services.signal_engine.signal_scorer import SignalComponent, SignalScorer
+from services.regime_detector.regime_engine import RegimeEngine
+from services.regime_detector.session_tracker import SessionTracker
 
 
 class TestComputationLatency:

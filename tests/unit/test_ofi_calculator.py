@@ -5,7 +5,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from core.models.tick import Market, NormalizedTick, Session, TradeSide
-from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
+from services.signal_engine.microstructure import MicrostructureAnalyzer
 
 
 def _make_tick(

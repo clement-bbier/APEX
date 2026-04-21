@@ -5,7 +5,7 @@ from __future__ import annotations
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
+from services.signal_engine.signal_scorer import SignalComponent, SignalScorer
 
 
 def make_component(name: str, score: float, triggered: bool = True) -> SignalComponent:

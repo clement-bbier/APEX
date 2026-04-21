@@ -30,12 +30,12 @@ from core.state import (
     SystemRiskMonitor,
     SystemRiskState,
 )
-from services.s05_risk_manager.cb_event_guard import CBEventGuard
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.fail_closed import FailClosedGuard
-from services.s05_risk_manager.meta_label_gate import MetaLabelGate
-from services.s05_risk_manager.models import BlockReason, RuleResult
-from services.s05_risk_manager.service import RiskManagerService
+from services.risk_manager.cb_event_guard import CBEventGuard
+from services.risk_manager.circuit_breaker import CircuitBreaker
+from services.risk_manager.fail_closed import FailClosedGuard
+from services.risk_manager.meta_label_gate import MetaLabelGate
+from services.risk_manager.models import BlockReason, RuleResult
+from services.risk_manager.service import RiskManagerService
 
 
 def _make_redis() -> fakeredis.aioredis.FakeRedis:
@@ -56,7 +56,7 @@ def _make_service(redis: fakeredis.aioredis.FakeRedis) -> RiskManagerService:
 
     svc = _TestableRiskManagerService.__new__(_TestableRiskManagerService)
     svc.logger = get_logger("s05_test")
-    svc.service_id = "s05_risk_manager"
+    svc.service_id = "risk_manager"
 
     svc.state = StateStore.__new__(StateStore)
     svc.state._service_id = "s05_test"
@@ -117,7 +117,7 @@ def test_sd3_no_safe_helper_defined_in_service() -> None:
     A belt-and-braces complement to the CI grep audit; catches any renamed
     reintroduction like ``_safe_default`` or ``_safe_v2`` at the AST level.
     """
-    import services.s05_risk_manager.service as svc_mod
+    import services.risk_manager.service as svc_mod
 
     source = inspect.getsource(svc_mod)
     tree = ast.parse(source)
@@ -136,13 +136,13 @@ def test_sd3_no_safe_helper_defined_in_service() -> None:
     )
     assert offenders == [], (
         f"ADR-0006 §D4 violation: found helper(s) matching ``_safe*`` in "
-        f"services/s05_risk_manager/service.py: {offenders}"
+        f"services/risk_manager/service.py: {offenders}"
     )
 
 
 def test_sd3_no_safe_call_expression_in_service() -> None:
     """SD-3: No ``_safe(...)`` call expression remains in service.py source."""
-    import services.s05_risk_manager.service as svc_mod
+    import services.risk_manager.service as svc_mod
 
     source = inspect.getsource(svc_mod)
     tree = ast.parse(source)
@@ -245,7 +245,7 @@ async def test_sd5_eager_heartbeat_write_before_subscribe(
 
     svc = RiskManagerService.__new__(RiskManagerService)
     svc.logger = get_logger("s05_sd5")
-    svc.service_id = "s05_risk_manager"
+    svc.service_id = "risk_manager"
     svc.state = StateStore.__new__(StateStore)
     svc.state._service_id = "s05_sd5"
     svc.state._settings = MagicMock()

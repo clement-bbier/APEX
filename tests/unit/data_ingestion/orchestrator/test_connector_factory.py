@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.s01_data_ingestion.orchestrator.connector_factory import ConnectorFactory
+from services.data_ingestion.orchestrator.connector_factory import ConnectorFactory
 
 
 class _IsolatedFactory:

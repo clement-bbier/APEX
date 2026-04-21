@@ -75,7 +75,7 @@ services:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s01_data_ingestion.service
+      SERVICE_MODULE: services.data_ingestion.service
 
   s01-serving:
     <<: *svc
@@ -90,7 +90,7 @@ services:
         condition: service_healthy
       zmq-broker:
         condition: service_started
-    command: ["uvicorn", "services.s01_data_ingestion.serving.main:app", "--host", "0.0.0.0", "--port", "8001"]
+    command: ["uvicorn", "services.data_ingestion.serving.main:app", "--host", "0.0.0.0", "--port", "8001"]
 
   s01-orchestrator:
     <<: *svc
@@ -101,61 +101,61 @@ services:
         condition: service_healthy
       timescaledb:
         condition: service_healthy
-    command: ["python", "-m", "services.s01_data_ingestion.orchestrator.main"]
+    command: ["python", "-m", "services.data_ingestion.orchestrator.main"]
 
   s07-analytics:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s07_quant_analytics.service
+      SERVICE_MODULE: services.quant_analytics.service
 
   s08-macro:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s08_macro_intelligence.service
+      SERVICE_MODULE: services.macro_intelligence.service
 
   s02-signal:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s02_signal_engine.service
+      SERVICE_MODULE: services.signal_engine.service
 
   s03-regime:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s03_regime_detector.service
+      SERVICE_MODULE: services.regime_detector.service
 
   s04-fusion:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s04_fusion_engine.service
+      SERVICE_MODULE: services.fusion_engine.service
 
   s05-risk:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s05_risk_manager.service
+      SERVICE_MODULE: services.risk_manager.service
 
   s06-execution:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s06_execution.service
+      SERVICE_MODULE: services.execution.service
 
   s09-feedback:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s09_feedback_loop.service
+      SERVICE_MODULE: services.feedback_loop.service
 
   s10-monitor:
     <<: *svc
     environment:
       <<: *svc-env
-      SERVICE_MODULE: services.s10_monitor.service
+      SERVICE_MODULE: services.command_center.service
     ports:
       - "8080:8080"
 

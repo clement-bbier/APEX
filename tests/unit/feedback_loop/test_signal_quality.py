@@ -11,7 +11,7 @@ import pytest
 
 from core.models.order import TradeRecord
 from core.models.signal import Direction
-from services.s09_feedback_loop.signal_quality import SignalQuality
+from services.feedback_loop.signal_quality import SignalQuality
 
 
 def _trade(

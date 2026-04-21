@@ -15,8 +15,8 @@ from hypothesis import strategies as st
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from core.models.tick import Session
-from services.s05_risk_manager.models import BlockReason
-from services.s05_risk_manager.position_rules import (
+from services.risk_manager.models import BlockReason
+from services.risk_manager.position_rules import (
     apply_crypto_multiplier,
     apply_session_multiplier,
     check_max_risk_per_trade,

@@ -6,10 +6,10 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.s06_execution.broker_alpaca import AlpacaBroker
-from services.s06_execution.broker_base import Broker, BrokerConnectionError, BrokerRejectedError
-from services.s06_execution.broker_binance import BinanceBroker
-from services.s06_execution.paper_trader import PaperTrader
+from services.execution.broker_alpaca import AlpacaBroker
+from services.execution.broker_base import Broker, BrokerConnectionError, BrokerRejectedError
+from services.execution.broker_binance import BinanceBroker
+from services.execution.paper_trader import PaperTrader
 
 # ── ABC contract tests ───────────────────────────────────────────────────────
 
@@ -90,7 +90,7 @@ class TestBrokerFactory:
         mock_settings.trading_mode = TradingMode.PAPER
         state = MagicMock(spec=StateStore)
 
-        from services.s06_execution.broker_factory import BrokerFactory
+        from services.execution.broker_factory import BrokerFactory
 
         factory = BrokerFactory(mock_settings, state)
         broker = factory.for_symbol("BTCUSDT")
@@ -103,7 +103,7 @@ class TestBrokerFactory:
         mock_settings.trading_mode = TradingMode.PAPER
         state = MagicMock(spec=StateStore)
 
-        from services.s06_execution.broker_factory import BrokerFactory
+        from services.execution.broker_factory import BrokerFactory
 
         factory = BrokerFactory(mock_settings, state)
         broker = factory.for_symbol("AAPL")
@@ -116,7 +116,7 @@ class TestBrokerFactory:
         mock_settings.trading_mode = TradingMode.LIVE
         state = MagicMock(spec=StateStore)
 
-        from services.s06_execution.broker_factory import BrokerFactory
+        from services.execution.broker_factory import BrokerFactory
 
         factory = BrokerFactory(mock_settings, state)
         broker = factory.for_symbol("BTCUSDT")
@@ -129,7 +129,7 @@ class TestBrokerFactory:
         mock_settings.trading_mode = TradingMode.LIVE
         state = MagicMock(spec=StateStore)
 
-        from services.s06_execution.broker_factory import BrokerFactory
+        from services.execution.broker_factory import BrokerFactory
 
         factory = BrokerFactory(mock_settings, state)
         broker = factory.for_symbol("AAPL")
@@ -144,7 +144,7 @@ class TestBrokerFactory:
         mock_settings.trading_mode = TradingMode.LIVE
         state = MagicMock(spec=StateStore)
 
-        from services.s06_execution.broker_factory import BrokerFactory
+        from services.execution.broker_factory import BrokerFactory
 
         factory = BrokerFactory(mock_settings, state)
         b1 = factory.for_symbol("AAPL")

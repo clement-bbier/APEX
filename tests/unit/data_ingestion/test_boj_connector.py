@@ -13,7 +13,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.models.data import MacroPoint, MacroSeriesMeta
-from services.s01_data_ingestion.connectors.boj_connector import (
+from services.data_ingestion.connectors.boj_connector import (
     BoJConnector,
     BoJFetchError,
     _first_numeric,
@@ -82,7 +82,7 @@ class TestBoJFetchSeries:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "services.s01_data_ingestion.connectors.boj_connector.httpx.AsyncClient",
+            "services.data_ingestion.connectors.boj_connector.httpx.AsyncClient",
             return_value=mock_client,
         ):
             start = datetime(2024, 1, 1, tzinfo=UTC)

@@ -12,9 +12,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from scripts.backfill_calendar import _ALL_PROVIDERS, _build_connector, run_backfill
-from services.s01_data_ingestion.connectors.boj_calendar_scraper import BoJCalendarScraper
-from services.s01_data_ingestion.connectors.ecb_scraper import ECBScraper
-from services.s01_data_ingestion.connectors.fomc_scraper import FOMCScraper
+from services.data_ingestion.connectors.boj_calendar_scraper import BoJCalendarScraper
+from services.data_ingestion.connectors.ecb_scraper import ECBScraper
+from services.data_ingestion.connectors.fomc_scraper import FOMCScraper
 
 
 class TestBuildConnector:
@@ -34,16 +34,16 @@ class TestBuildConnector:
 
     def test_provider_dispatch_fred_releases(self) -> None:
         with (
-            patch("services.s01_data_ingestion.connectors.fred_releases.Fred"),
+            patch("services.data_ingestion.connectors.fred_releases.Fred"),
             patch(
-                "services.s01_data_ingestion.connectors.fred_releases.get_settings",
+                "services.data_ingestion.connectors.fred_releases.get_settings",
             ) as mock_settings,
         ):
             mock_secret = MagicMock()
             mock_secret.get_secret_value.return_value = "test-key"
             mock_settings.return_value.fred_api_key = mock_secret
 
-            from services.s01_data_ingestion.connectors.fred_releases import (
+            from services.data_ingestion.connectors.fred_releases import (
                 FREDReleasesConnector,
             )
 

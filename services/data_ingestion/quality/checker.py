@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 
 from core.logger import get_logger
 from core.models.data import Asset, Bar, DbTick
-from services.s01_data_ingestion.observability.metrics import (
+from services.data_ingestion.observability.metrics import (
     record_quality_issue,
     record_quality_records,
 )

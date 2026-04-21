@@ -45,8 +45,8 @@ def _build_mock_releases_df(dates: list[str]) -> pd.DataFrame:
 
 class TestFREDReleasesConnectorName:
     def test_connector_name(self) -> None:
-        with patch("services.s01_data_ingestion.connectors.fred_releases.Fred"):
-            from services.s01_data_ingestion.connectors.fred_releases import (
+        with patch("services.data_ingestion.connectors.fred_releases.Fred"):
+            from services.data_ingestion.connectors.fred_releases import (
                 FREDReleasesConnector,
             )
 
@@ -56,7 +56,7 @@ class TestFREDReleasesConnectorName:
 
 class TestFREDReleasesInit:
     def test_init_raises_on_empty_key(self) -> None:
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
             FREDReleasesFetchError,
         )
@@ -72,8 +72,8 @@ class TestFREDReleasesFetch:
 
     @pytest.fixture
     def connector(self) -> object:
-        with patch("services.s01_data_ingestion.connectors.fred_releases.Fred") as mock_cls:
-            from services.s01_data_ingestion.connectors.fred_releases import (
+        with patch("services.data_ingestion.connectors.fred_releases.Fred") as mock_cls:
+            from services.data_ingestion.connectors.fred_releases import (
                 FREDReleasesConnector,
             )
 
@@ -87,7 +87,7 @@ class TestFREDReleasesFetch:
     async def test_fetch_payems_releases(
         self, connector: object, fixture_data: dict[str, object]
     ) -> None:
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
         )
 
@@ -109,7 +109,7 @@ class TestFREDReleasesFetch:
 
     @pytest.mark.asyncio
     async def test_fetch_cpi_releases(self, connector: object) -> None:
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
         )
 
@@ -129,7 +129,7 @@ class TestFREDReleasesFetch:
 
     @pytest.mark.asyncio
     async def test_release_dates_have_timezones(self, connector: object) -> None:
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
         )
 
@@ -146,7 +146,7 @@ class TestFREDReleasesFetch:
 
     @pytest.mark.asyncio
     async def test_event_importance_classification(self, connector: object) -> None:
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
         )
 
@@ -170,14 +170,14 @@ class TestFREDReleasesFetch:
 
     def test_settings_loaded(self) -> None:
         """Verify connector reads from Settings when no key is passed."""
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
         )
 
         with (
-            patch("services.s01_data_ingestion.connectors.fred_releases.Fred"),
+            patch("services.data_ingestion.connectors.fred_releases.Fred"),
             patch(
-                "services.s01_data_ingestion.connectors.fred_releases.get_settings"
+                "services.data_ingestion.connectors.fred_releases.get_settings"
             ) as mock_settings,
         ):
             mock_secret = MagicMock()
@@ -189,7 +189,7 @@ class TestFREDReleasesFetch:
 
     @pytest.mark.asyncio
     async def test_date_range_filtering(self, connector: object) -> None:
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
         )
 

@@ -1,7 +1,7 @@
 """Phase 3.13 -- Integration of validated features with S02 Signal Engine.
 
 Scaffolding only: the :class:`S02FeatureAdapter` is implemented and
-tested end-to-end but NOT yet wired into ``services/s02_signal_engine/``.
+tested end-to-end but NOT yet wired into ``services/signal_engine/``.
 Wiring is deferred to a later phase (Phase 5 or an explicit decision
 point) so that S02's live pipeline remains untouched while Phase 4
 (Fusion + Meta-Labeler) is built on top of Phase 3 outputs.

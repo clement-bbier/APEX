@@ -5,11 +5,11 @@ Uses the Command pattern: each sub-command is an isolated Command object.
 
 Usage::
 
-    python -m services.s01_data_ingestion.orchestrator.cli list
-    python -m services.s01_data_ingestion.orchestrator.cli run --job binance_btcusdt_1m
-    python -m services.s01_data_ingestion.orchestrator.cli status --job binance_btcusdt_1m
-    python -m services.s01_data_ingestion.orchestrator.cli reset --job binance_btcusdt_1m
-    python -m services.s01_data_ingestion.orchestrator.cli gaps
+    python -m services.data_ingestion.orchestrator.cli list
+    python -m services.data_ingestion.orchestrator.cli run --job binance_btcusdt_1m
+    python -m services.data_ingestion.orchestrator.cli status --job binance_btcusdt_1m
+    python -m services.data_ingestion.orchestrator.cli reset --job binance_btcusdt_1m
+    python -m services.data_ingestion.orchestrator.cli gaps
 """
 
 from __future__ import annotations

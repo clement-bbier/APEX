@@ -29,7 +29,7 @@ class KellySizer:
     safe defaults ``win_rate=0.5``, ``avg_rr=1.5`` are used.
 
     Storage shape: each key is a Redis HASH with fields ``win_rate`` and
-    ``avg_rr`` (see ``services/s09_feedback_loop/service.py`` _fast_analysis).
+    ``avg_rr`` (see ``services/feedback_loop/service.py`` _fast_analysis).
     The reader therefore issues ``hgetall`` — issuing a plain ``GET`` against
     the same key would raise ``WRONGTYPE`` at runtime.
 

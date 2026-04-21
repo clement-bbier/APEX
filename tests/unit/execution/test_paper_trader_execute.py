@@ -15,7 +15,7 @@ import pytest
 from core.models.order import ApprovedOrder, OrderCandidate, OrderType
 from core.models.signal import Direction, Signal, SignalType
 from core.models.tick import Market, NormalizedTick, TradeSide
-from services.s06_execution.paper_trader import PaperTrader
+from services.execution.paper_trader import PaperTrader
 
 
 def _make_signal(direction: Direction = Direction.LONG, entry: str = "50000") -> Signal:

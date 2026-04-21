@@ -20,7 +20,7 @@ from fredapi import Fred
 
 from core.config import get_settings
 from core.models.data import EconomicEvent
-from services.s01_data_ingestion.connectors.calendar_base import CalendarConnector
+from services.data_ingestion.connectors.calendar_base import CalendarConnector
 
 logger = structlog.get_logger(__name__)
 

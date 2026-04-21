@@ -25,23 +25,23 @@ class TestBuildConnector:
 
     def test_provider_dispatch_edgar(self) -> None:
         with patch(
-            "services.s01_data_ingestion.connectors.edgar_connector.get_settings"
+            "services.data_ingestion.connectors.edgar_connector.get_settings"
         ) as mock_settings:
             mock_settings.return_value.edgar_user_agent = "Test test@test.com"
-            from services.s01_data_ingestion.connectors.edgar_connector import EDGARConnector
+            from services.data_ingestion.connectors.edgar_connector import EDGARConnector
 
             conn = _build_connector("edgar")
             assert isinstance(conn, EDGARConnector)
 
     def test_provider_dispatch_simfin(self) -> None:
         with patch(
-            "services.s01_data_ingestion.connectors.simfin_connector.get_settings"
+            "services.data_ingestion.connectors.simfin_connector.get_settings"
         ) as mock_settings:
             mock_secret = MagicMock()
             mock_secret.get_secret_value.return_value = "test_key"
             mock_settings.return_value.simfin_api_key = mock_secret
 
-            from services.s01_data_ingestion.connectors.simfin_connector import SimFinConnector
+            from services.data_ingestion.connectors.simfin_connector import SimFinConnector
 
             conn = _build_connector("simfin")
             assert isinstance(conn, SimFinConnector)

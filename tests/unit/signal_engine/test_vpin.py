@@ -1,4 +1,4 @@
-"""Unit tests for services/s02_signal_engine/vpin.py.
+"""Unit tests for services/signal_engine/vpin.py.
 
 Covers: balanced/imbalanced flow, ADV EMA update, extreme hard-block,
 bucket completion, property tests via Hypothesis.
@@ -13,7 +13,7 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from core.models.tick import Market, NormalizedTick, TradeSide
-from services.s02_signal_engine.vpin import VPINCalculator, VPINMetrics
+from services.signal_engine.vpin import VPINCalculator, VPINMetrics
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 

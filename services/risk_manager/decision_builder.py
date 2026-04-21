@@ -15,7 +15,7 @@ from typing import Any
 
 from core.logger import get_logger
 from core.models.order import OrderCandidate
-from services.s05_risk_manager.models import (
+from services.risk_manager.models import (
     REDIS_DECISION_HISTORY_KEY,
     REDIS_DECISION_HISTORY_MAX,
     REDIS_RISK_DECISION_TTL,
@@ -24,7 +24,7 @@ from services.s05_risk_manager.models import (
     RuleResult,
 )
 
-logger = get_logger("s05_risk_manager.decision_builder")
+logger = get_logger("risk_manager.decision_builder")
 
 
 class RiskDecisionBuilder:

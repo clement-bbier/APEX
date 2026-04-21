@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from core.models.data import Asset
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.normalizers.base import NormalizerStrategy
 
 
 class NormalizerRouter:

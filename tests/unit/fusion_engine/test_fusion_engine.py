@@ -16,7 +16,7 @@ from core.models.regime import (
     VolRegime,
 )
 from core.models.signal import Direction, MTFContext, Signal, SignalType
-from services.s04_fusion_engine.fusion import FusionEngine
+from services.fusion_engine.fusion import FusionEngine
 
 
 def _macro(event_active: bool = False) -> MacroContext:

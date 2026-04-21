@@ -11,8 +11,8 @@ from hypothesis import given
 from hypothesis import settings as hyp_settings
 from hypothesis import strategies as st
 
-from services.s05_risk_manager.meta_label_gate import MetaLabelGate
-from services.s05_risk_manager.models import BlockReason
+from services.risk_manager.meta_label_gate import MetaLabelGate
+from services.risk_manager.models import BlockReason
 
 _SYMBOL = "BTCUSDT"
 

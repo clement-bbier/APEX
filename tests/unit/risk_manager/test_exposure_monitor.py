@@ -9,13 +9,13 @@ from decimal import Decimal
 
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
-from services.s05_risk_manager.exposure_monitor import (
+from services.risk_manager.exposure_monitor import (
     check_correlation,
     check_max_positions,
     check_per_class_exposure,
     check_total_exposure,
 )
-from services.s05_risk_manager.models import BlockReason, Position
+from services.risk_manager.models import BlockReason, Position
 
 _CAPITAL = Decimal("100_000")
 

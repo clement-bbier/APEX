@@ -7,21 +7,21 @@ import json
 from typing import Any
 
 from core.base_service import BaseService
-from services.s07_quant_analytics.market_stats import MarketStats
-from services.s07_quant_analytics.microstructure_adv import AdvancedMicrostructure
-from services.s07_quant_analytics.performance import PerformanceAnalyzer
-from services.s07_quant_analytics.realized_vol import RealizedVolEstimator
-from services.s07_quant_analytics.rough_vol import RoughVolAnalyzer
+from services.quant_analytics.market_stats import MarketStats
+from services.quant_analytics.microstructure_adv import AdvancedMicrostructure
+from services.quant_analytics.performance import PerformanceAnalyzer
+from services.quant_analytics.realized_vol import RealizedVolEstimator
+from services.quant_analytics.rough_vol import RoughVolAnalyzer
 
 
 class QuantAnalyticsService(BaseService):
     """Service that periodically computes quant analytics and stores results in Redis."""
 
-    service_id = "s07_quant_analytics"
+    service_id = "quant_analytics"
 
     def __init__(self) -> None:
         """Initialise analytics sub-modules."""
-        super().__init__("s07_quant_analytics")
+        super().__init__("quant_analytics")
         self._market_stats = MarketStats()
         self._microstructure = AdvancedMicrostructure()
         self._performance = PerformanceAnalyzer()

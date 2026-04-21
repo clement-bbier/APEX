@@ -16,7 +16,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from services.s01_data_ingestion.connectors.edgar_connector import (
+from services.data_ingestion.connectors.edgar_connector import (
     EDGARConnector,
     EDGARFetchError,
 )
@@ -223,7 +223,7 @@ class TestUserAgent:
 
     def test_default_user_agent_from_settings(self) -> None:
         with patch(
-            "services.s01_data_ingestion.connectors.edgar_connector.get_settings"
+            "services.data_ingestion.connectors.edgar_connector.get_settings"
         ) as mock_settings:
             mock_settings.return_value.edgar_user_agent = "APEX/Test test@test.com"
             conn = EDGARConnector(client=httpx.AsyncClient())

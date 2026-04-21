@@ -27,7 +27,7 @@ class TestFOMCScraperLive:
     @pytest.mark.asyncio
     async def test_fetch_fomc_events(self) -> None:
         """Scrape FOMC calendar and verify events are returned."""
-        from services.s01_data_ingestion.connectors.fomc_scraper import FOMCScraper
+        from services.data_ingestion.connectors.fomc_scraper import FOMCScraper
 
         scraper = FOMCScraper()
         start = datetime(2024, 1, 1, tzinfo=UTC)

@@ -22,12 +22,12 @@ from core.models.data import (
     MacroPoint,
     MacroSeriesMeta,
 )
-from services.s01_data_ingestion.observability.healthcheck import (
+from services.data_ingestion.observability.healthcheck import (
     DatabaseCheck,
     HealthChecker,
 )
-from services.s01_data_ingestion.serving.app import app
-from services.s01_data_ingestion.serving.deps import get_repo
+from services.data_ingestion.serving.app import app
+from services.data_ingestion.serving.deps import get_repo
 
 _ASSET_ID = uuid.UUID("00000000-0000-0000-0000-000000000001")
 _EVENT_ID = uuid.UUID("00000000-0000-0000-0000-000000000010")

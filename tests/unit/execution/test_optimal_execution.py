@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from services.s06_execution.optimal_execution import MarketImpactModel
+from services.execution.optimal_execution import MarketImpactModel
 
 
 class TestSqrtImpact:

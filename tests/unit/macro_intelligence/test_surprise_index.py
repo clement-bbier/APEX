@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from services.s08_macro_intelligence.surprise_index import EconRelease, SurpriseIndexEngine
+from services.macro_intelligence.surprise_index import EconRelease, SurpriseIndexEngine
 
 
 class TestSurpriseIndexEngine:

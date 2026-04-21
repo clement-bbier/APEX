@@ -6,7 +6,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from services.s09_feedback_loop.drift_detector import DriftDetector
+from services.feedback_loop.drift_detector import DriftDetector
 
 
 def make_trades(n_wins: int, n_losses: int) -> list[MagicMock]:

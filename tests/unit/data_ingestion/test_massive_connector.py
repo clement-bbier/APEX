@@ -19,12 +19,12 @@ import pytest
 from botocore.exceptions import ClientError
 
 from core.models.data import Asset, AssetClass, Bar, BarSize, BarType
-from services.s01_data_ingestion.connectors.massive_historical import (
+from services.data_ingestion.connectors.massive_historical import (
     MassiveFetchError,
     MassiveHistoricalConnector,
     _placeholder_asset,
 )
-from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
+from services.data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
 
 FIXTURE_PATH = (
     Path(__file__).resolve().parents[2] / "fixtures" / "massive_aapl_minute_2024-01-02.csv.gz"

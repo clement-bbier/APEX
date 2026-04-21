@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from prometheus_client import CollectorRegistry, Counter
 
-from services.s01_data_ingestion.observability.metrics_server import (
+from services.data_ingestion.observability.metrics_server import (
     mount_metrics_endpoint,
 )
 

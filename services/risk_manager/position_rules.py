@@ -25,7 +25,7 @@ from decimal import Decimal
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from core.models.tick import Session
-from services.s05_risk_manager.models import (
+from services.risk_manager.models import (
     CRYPTO_SIZE_MULTIPLIER,
     MAX_POSITION_SIZE_PCT,
     MAX_RISK_PER_TRADE_PCT,

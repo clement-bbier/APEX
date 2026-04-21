@@ -24,9 +24,9 @@ from typing import Any
 
 from core.logger import get_logger
 from core.models.tick import Session
-from services.s05_risk_manager.models import Position
+from services.risk_manager.models import Position
 
-logger = get_logger("s05_risk_manager.context_loader")
+logger = get_logger("risk_manager.context_loader")
 
 REQUIRED_KEYS: tuple[str, ...] = (
     "portfolio:capital",

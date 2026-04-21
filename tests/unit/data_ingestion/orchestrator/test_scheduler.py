@@ -8,12 +8,12 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from services.s01_data_ingestion.orchestrator.config import JobConfig
-from services.s01_data_ingestion.orchestrator.scheduler import (
+from services.data_ingestion.orchestrator.config import JobConfig
+from services.data_ingestion.orchestrator.scheduler import (
     BackfillScheduler,
     _seconds_until_next,
 )
-from services.s01_data_ingestion.orchestrator.state import JobRunResult
+from services.data_ingestion.orchestrator.state import JobRunResult
 
 
 def _make_job(name: str = "test_job", schedule: str = "* * * * *") -> JobConfig:

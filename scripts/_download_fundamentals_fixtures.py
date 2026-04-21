@@ -32,7 +32,7 @@ def download_company_tickers() -> None:
 
         resp = httpx.get(
             "https://www.sec.gov/files/company_tickers.json",
-            headers={"User-Agent": "APEX/CashMachine fixtures@example.com"},
+            headers={"User-Agent": "APEX fixtures@example.com"},
             timeout=30.0,
             follow_redirects=True,
         )
@@ -63,7 +63,7 @@ def download_aapl_submissions() -> None:
         cik_padded = f"{_AAPL_CIK:010d}"
         resp = httpx.get(
             f"https://data.sec.gov/submissions/CIK{cik_padded}.json",
-            headers={"User-Agent": "APEX/CashMachine fixtures@example.com"},
+            headers={"User-Agent": "APEX fixtures@example.com"},
             timeout=30.0,
             follow_redirects=True,
         )
@@ -105,7 +105,7 @@ def download_aapl_companyfacts() -> None:
         cik_padded = f"{_AAPL_CIK:010d}"
         resp = httpx.get(
             f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik_padded}.json",
-            headers={"User-Agent": "APEX/CashMachine fixtures@example.com"},
+            headers={"User-Agent": "APEX fixtures@example.com"},
             timeout=60.0,
             follow_redirects=True,
         )

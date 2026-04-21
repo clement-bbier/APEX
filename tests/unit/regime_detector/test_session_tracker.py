@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from services.s03_regime_detector.session_tracker import (
+from services.regime_detector.session_tracker import (
     SESSION_MULTIPLIERS,
     Session,
     SessionTracker,

@@ -8,7 +8,7 @@ from decimal import Decimal
 from core.logger import get_logger
 from core.state import StateStore
 
-logger = get_logger("s10_monitor.pnl_tracker")
+logger = get_logger("command_center.pnl_tracker")
 
 
 class PnLTracker:

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
-from services.s01_data_ingestion.serving.app import app
+from services.data_ingestion.serving.app import app
 
 
 def test_health_ok(client, mock_repo):
@@ -69,10 +69,10 @@ def test_lifespan_creates_and_closes_repo():
 
     with (
         patch(
-            "services.s01_data_ingestion.serving.app.TimescaleRepository",
+            "services.data_ingestion.serving.app.TimescaleRepository",
             return_value=mock_repo,
         ),
-        patch("services.s01_data_ingestion.serving.app.init_tracing"),
+        patch("services.data_ingestion.serving.app.init_tracing"),
     ):
         with TestClient(app):
             mock_repo.connect.assert_called_once()

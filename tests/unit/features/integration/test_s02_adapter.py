@@ -7,7 +7,7 @@ The adapter tests are structured in layers:
 3. ``on_observation`` happy path and :class:`SignalComponent` shape.
 4. Batch-vs-streaming consistency (<1% drift, DoD requirement).
 5. Latency benchmark (honest measurement, no DoD overclaim).
-6. Scope check asserting zero diff in ``services/s02_signal_engine/``.
+6. Scope check asserting zero diff in ``services/signal_engine/``.
 
 Consistency and latency tests use the real :class:`OFICalculator`
 because (a) it is the fastest Phase 3 calculator, and (b) its
@@ -32,7 +32,7 @@ from features.base import FeatureCalculator
 from features.calculators.ofi import OFICalculator
 from features.integration.config import FeatureActivationConfig
 from features.integration.s02_adapter import S02FeatureAdapter
-from services.s02_signal_engine.signal_scorer import SignalComponent
+from services.signal_engine.signal_scorer import SignalComponent
 
 
 class _DummyCalculator(FeatureCalculator):
@@ -552,7 +552,7 @@ def _resolve_base_ref(repo_root: Path) -> str | None:
 
 
 class TestScope:
-    """Zero diff in services/s02_signal_engine/ is non-negotiable (DoD).
+    """Zero diff in services/signal_engine/ is non-negotiable (DoD).
 
     The test must not silently skip. If the base ref cannot be resolved
     (e.g. a CI runner with a shallow clone and no ``GITHUB_BASE_REF``),
@@ -578,7 +578,7 @@ class TestScope:
             "--stat",
             f"{base_ref}..HEAD",
             "--",
-            "services/s02_signal_engine/",
+            "services/signal_engine/",
         ]
         try:
             result = subprocess.run(
@@ -596,8 +596,8 @@ class TestScope:
             pytest.fail(f"git diff returned {result.returncode}: {result.stderr.strip()}")
 
         assert result.stdout.strip() == "", (
-            "DoD violation: services/s02_signal_engine/ has modifications "
+            "DoD violation: services/signal_engine/ has modifications "
             f"on this branch. Phase 3.13 is scaffolding-only.\n"
-            f"git diff --stat {base_ref}..HEAD -- services/s02_signal_engine/:\n"
+            f"git diff --stat {base_ref}..HEAD -- services/signal_engine/:\n"
             f"{result.stdout}"
         )

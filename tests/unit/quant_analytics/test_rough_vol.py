@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from services.s07_quant_analytics.rough_vol import RoughVolAnalyzer
+from services.quant_analytics.rough_vol import RoughVolAnalyzer
 
 
 class TestHurstEstimation:

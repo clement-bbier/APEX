@@ -33,10 +33,10 @@ from core.config import get_settings
 from core.data.timescale_repository import TimescaleRepository
 from core.models.data import IngestionStatus
 from scripts._backfill_common import _parse_utc_datetime
-from services.s01_data_ingestion.connectors.boj_connector import BoJConnector
-from services.s01_data_ingestion.connectors.ecb_connector import ECBConnector
-from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
-from services.s01_data_ingestion.connectors.macro_base import MacroConnector
+from services.data_ingestion.connectors.boj_connector import BoJConnector
+from services.data_ingestion.connectors.ecb_connector import ECBConnector
+from services.data_ingestion.connectors.fred_connector import FREDConnector
+from services.data_ingestion.connectors.macro_base import MacroConnector
 
 logger = structlog.get_logger(__name__)
 

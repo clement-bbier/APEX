@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from prometheus_client import CollectorRegistry, Counter, Histogram
 
-from services.s01_data_ingestion.observability import metrics
+from services.data_ingestion.observability import metrics
 
 
 @pytest.fixture(autouse=True)

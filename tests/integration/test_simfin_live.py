@@ -30,7 +30,7 @@ class TestSimFinLiveIntegration:
     @pytest.mark.asyncio
     async def test_fetch_aapl_financials(self) -> None:
         """Fetch AAPL P&L from SimFin (real network call)."""
-        from services.s01_data_ingestion.connectors.simfin_connector import SimFinConnector
+        from services.data_ingestion.connectors.simfin_connector import SimFinConnector
 
         conn = SimFinConnector()
         result = await conn.fetch_financials("AAPL", "PL", "fy")
@@ -39,7 +39,7 @@ class TestSimFinLiveIntegration:
     @pytest.mark.asyncio
     async def test_fetch_aapl_ratios(self) -> None:
         """Fetch AAPL financial ratios from SimFin (real network call)."""
-        from services.s01_data_ingestion.connectors.simfin_connector import SimFinConnector
+        from services.data_ingestion.connectors.simfin_connector import SimFinConnector
 
         conn = SimFinConnector()
         result = await conn.fetch_ratios("AAPL")
@@ -48,7 +48,7 @@ class TestSimFinLiveIntegration:
     @pytest.mark.asyncio
     async def test_fetch_fundamentals_generator(self) -> None:
         """Fetch AAPL fundamentals through the full generator interface."""
-        from services.s01_data_ingestion.connectors.simfin_connector import SimFinConnector
+        from services.data_ingestion.connectors.simfin_connector import SimFinConnector
 
         conn = SimFinConnector()
         all_points: list[FundamentalPoint] = []

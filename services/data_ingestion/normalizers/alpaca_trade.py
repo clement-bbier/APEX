@@ -11,7 +11,7 @@ from decimal import Decimal
 from typing import Any
 
 from core.models.data import Asset, DbTick
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.normalizers.base import NormalizerStrategy
 
 
 class AlpacaTradeNormalizer(NormalizerStrategy[Any, DbTick]):

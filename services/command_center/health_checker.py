@@ -8,22 +8,22 @@ from typing import Any, ClassVar
 
 from core.logger import get_logger
 
-logger = get_logger("s10_monitor.health_checker")
+logger = get_logger("command_center.health_checker")
 
 
 class HealthChecker:
     """Per-service heartbeat tracking with latency statistics."""
 
     SERVICE_IDS: ClassVar[list[str]] = [
-        "s01_data_ingestion",
-        "s02_signal_engine",
-        "s03_regime_detector",
-        "s04_fusion_engine",
-        "s05_risk_manager",
-        "s06_execution",
-        "s07_quant_analytics",
-        "s08_macro_intelligence",
-        "s09_feedback_loop",
+        "data_ingestion",
+        "signal_engine",
+        "regime_detector",
+        "fusion_engine",
+        "risk_manager",
+        "execution",
+        "quant_analytics",
+        "macro_intelligence",
+        "feedback_loop",
     ]
 
     def __init__(self) -> None:

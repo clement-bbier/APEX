@@ -16,13 +16,13 @@ import structlog
 from core.config import Settings
 from core.data.timescale_repository import TimescaleRepository
 from core.models.data import BarSize
-from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.connectors.calendar_base import CalendarConnector
-from services.s01_data_ingestion.connectors.fundamentals_base import (
+from services.data_ingestion.connectors.base import DataConnector
+from services.data_ingestion.connectors.calendar_base import CalendarConnector
+from services.data_ingestion.connectors.fundamentals_base import (
     FundamentalsConnector,
 )
-from services.s01_data_ingestion.connectors.macro_base import MacroConnector
-from services.s01_data_ingestion.observability.metrics import (
+from services.data_ingestion.connectors.macro_base import MacroConnector
+from services.data_ingestion.observability.metrics import (
     orchestrator_jobs_running,
     record_orchestrator_job,
 )

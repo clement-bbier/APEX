@@ -16,9 +16,9 @@ import aiohttp
 
 from core.logger import get_logger
 from core.models.order import ApprovedOrder, ExecutedOrder
-from services.s06_execution.broker_base import Broker, BrokerConnectionError
+from services.execution.broker_base import Broker, BrokerConnectionError
 
-logger = get_logger("s06_execution.broker_binance")
+logger = get_logger("execution.broker_binance")
 
 
 class BinanceBroker(Broker):

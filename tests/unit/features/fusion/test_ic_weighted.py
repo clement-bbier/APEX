@@ -513,15 +513,15 @@ def test_fusion_sharpe_exceeds_best_individual_on_synthetic() -> None:
 
 
 # ----------------------------------------------------------------------
-# 10 — scope guard: services/s04_fusion_engine/ must be untouched by 4.7
+# 10 — scope guard: services/fusion_engine/ must be untouched by 4.7
 # ----------------------------------------------------------------------
 
 
-def test_services_s04_fusion_engine_untouched_by_phase_4_7_branch() -> None:
+def test_services_fusion_engine_untouched_by_phase_4_7_branch() -> None:
     """Scope guard per PHASE_4_SPEC §3.7 DoD #6.
 
     Verifies that the current 4.7 branch has not modified any file
-    under ``services/s04_fusion_engine/``. Implemented via ``git
+    under ``services/fusion_engine/``. Implemented via ``git
     diff --name-only main...HEAD``. Skipped when the test is run
     outside a git checkout or when the ``main`` branch cannot be
     located (e.g. in a shallow sandbox clone).
@@ -540,7 +540,7 @@ def test_services_s04_fusion_engine_untouched_by_phase_4_7_branch() -> None:
     except (subprocess.CalledProcessError, FileNotFoundError):
         pytest.skip("git unavailable or main branch not resolvable")
     changed = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    offenders = [p for p in changed if p.startswith("services/s04_fusion_engine/")]
+    offenders = [p for p in changed if p.startswith("services/fusion_engine/")]
     assert not offenders, (
-        f"Phase 4.7 must not modify services/s04_fusion_engine/; offending files: {offenders}"
+        f"Phase 4.7 must not modify services/fusion_engine/; offending files: {offenders}"
     )

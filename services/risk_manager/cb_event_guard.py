@@ -31,7 +31,7 @@ from decimal import Decimal
 import structlog
 from redis.asyncio import Redis
 
-from services.s05_risk_manager.models import (
+from services.risk_manager.models import (
     CB_BLOCK_MINUTES_BEFORE,
     CB_SCALP_MINUTES_AFTER,
     CB_SCALP_SIZE_MULTIPLIER,

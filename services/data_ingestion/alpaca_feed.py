@@ -14,7 +14,7 @@ from alpaca.data.live import StockDataStream
 
 from core.logger import get_logger
 
-logger = get_logger("s01_data_ingestion.alpaca_feed")
+logger = get_logger("data_ingestion.alpaca_feed")
 
 _RECONNECT_BASE_SECONDS: float = 1.0
 _RECONNECT_MAX_SECONDS: float = 60.0

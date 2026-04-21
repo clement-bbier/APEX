@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 
 from core.models.regime import RiskMode, VolRegime
-from services.s03_regime_detector.regime_engine import RegimeEngine
+from services.regime_detector.regime_engine import RegimeEngine
 
 
 class TestRegimeEngine:

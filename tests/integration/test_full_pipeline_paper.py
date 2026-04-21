@@ -17,13 +17,13 @@ import pytest
 
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
-from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
-from services.s03_regime_detector.regime_engine import RegimeEngine
-from services.s04_fusion_engine.kelly_sizer import KellySizer
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.models import CircuitBreakerState
-from services.s05_risk_manager.position_rules import check_max_risk_per_trade
-from services.s06_execution.paper_trader import PaperTrader
+from services.signal_engine.signal_scorer import SignalComponent, SignalScorer
+from services.regime_detector.regime_engine import RegimeEngine
+from services.fusion_engine.kelly_sizer import KellySizer
+from services.risk_manager.circuit_breaker import CircuitBreaker
+from services.risk_manager.models import CircuitBreakerState
+from services.risk_manager.position_rules import check_max_risk_per_trade
+from services.execution.paper_trader import PaperTrader
 
 
 class TestFullPipelinePaper:

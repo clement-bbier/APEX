@@ -24,7 +24,7 @@ from pydantic import BaseModel
 from core.logger import get_logger
 from core.state import StateStore
 
-logger = get_logger("s10_monitor.command_api")
+logger = get_logger("command_center.command_api")
 
 
 # ── Response models ───────────────────────────────────────────────────────────
@@ -123,16 +123,16 @@ class ActionResult(BaseModel):
 
 _START_TIME = time.time()
 _SERVICE_IDS_FULL = [
-    "s01_data_ingestion",
-    "s02_signal_engine",
-    "s03_regime_detector",
-    "s04_fusion_engine",
-    "s05_risk_manager",
-    "s06_execution",
-    "s07_quant_analytics",
-    "s08_macro_intelligence",
-    "s09_feedback_loop",
-    "s10_monitor",
+    "data_ingestion",
+    "signal_engine",
+    "regime_detector",
+    "fusion_engine",
+    "risk_manager",
+    "execution",
+    "quant_analytics",
+    "macro_intelligence",
+    "feedback_loop",
+    "command_center",
 ]
 
 

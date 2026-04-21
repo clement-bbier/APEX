@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from services.s07_quant_analytics.realized_vol import RealizedVolEstimator
+from services.quant_analytics.realized_vol import RealizedVolEstimator
 
 
 class TestRV:

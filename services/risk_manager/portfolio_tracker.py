@@ -5,7 +5,7 @@ Phase A.7 (issue #197, Roadmap v3.0 §2.2.4, ADR-0007 §D9).
 Audit finding (2026-04-20)
 --------------------------
 Prior to this module, the S05 pre-trade context loader
-(:mod:`services.s05_risk_manager.context_loader`) reads the
+(:mod:`services.risk_manager.context_loader`) reads the
 ``portfolio:capital`` Redis key directly and **unscoped**. Per ADR-0007 §D9
 the Phase B topology migrates every order-path writer to a per-strategy
 key (``portfolio:{strategy_id}:capital``). Once Phase B writers cut over,
@@ -43,7 +43,7 @@ Wiring
 ------
 This module is **new** and not yet consumed. The follow-up that replaces
 the raw ``portfolio:capital`` read in
-:class:`services.s05_risk_manager.context_loader.ContextLoader.load` with
+:class:`services.risk_manager.context_loader.ContextLoader.load` with
 a :class:`PortfolioTracker` call is tracked as a dedicated micro-PR -- or
 naturally bundled into the Phase B ``LegacyConfluenceStrategy`` wrap.
 """
@@ -55,7 +55,7 @@ from typing import Any, Protocol
 
 from core.logger import get_logger
 
-logger = get_logger("s05_risk_manager.portfolio_tracker")
+logger = get_logger("risk_manager.portfolio_tracker")
 
 LEGACY_CAPITAL_KEY = "portfolio:capital"
 """Legacy unscoped Redis key. Written by pre-Phase-B producers only."""

@@ -34,7 +34,7 @@ from decimal import Decimal
 import structlog
 from redis.asyncio import Redis
 
-from services.s05_risk_manager.models import (
+from services.risk_manager.models import (
     HALF_OPEN_RECOVERY_MINUTES,
     MAX_DAILY_LOSS_PCT,
     MAX_INTRADAY_LOSS_30M_PCT,

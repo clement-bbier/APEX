@@ -12,8 +12,8 @@ from typing import Any
 
 from core.models.data import Asset
 from core.models.tick import Market, NormalizedTick, RawTick, TradeSide
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
-from services.s01_data_ingestion.normalizers.session_tagger import SessionTagger
+from services.data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.normalizers.session_tagger import SessionTagger
 
 
 class AlpacaTickNormalizer(NormalizerStrategy[dict[str, Any], NormalizedTick]):

@@ -9,11 +9,11 @@ import fakeredis.aioredis
 import pytest
 from prometheus_client import CollectorRegistry, Counter, Gauge, Histogram
 
-from services.s01_data_ingestion.observability import metrics
-from services.s01_data_ingestion.orchestrator.config import JobConfig, RetryConfig
-from services.s01_data_ingestion.orchestrator.connector_factory import ConnectorFactory
-from services.s01_data_ingestion.orchestrator.job_runner import JobRunner
-from services.s01_data_ingestion.orchestrator.state import JobStateManager
+from services.data_ingestion.observability import metrics
+from services.data_ingestion.orchestrator.config import JobConfig, RetryConfig
+from services.data_ingestion.orchestrator.connector_factory import ConnectorFactory
+from services.data_ingestion.orchestrator.job_runner import JobRunner
+from services.data_ingestion.orchestrator.state import JobStateManager
 
 
 def _make_job(

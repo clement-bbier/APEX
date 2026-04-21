@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock, call, patch
 
 import pytest
 
-from services.s04_fusion_engine.kelly_sizer import KellySizer
+from services.fusion_engine.kelly_sizer import KellySizer
 
 
 class TestKellyRollingStats:
@@ -162,7 +162,7 @@ class TestKellyDualRead:
     async def test_new_key_hit_no_fallback(self) -> None:
         store = {"kelly:default:BTCUSDT": {"win_rate": 0.60, "avg_rr": 2.0}}
         state = self._keyed_state(store)
-        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+        with patch("services.fusion_engine.kelly_sizer._logger") as mock_log:
             win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
         assert win_rate == pytest.approx(0.60)
         assert avg_rr == pytest.approx(2.0)
@@ -173,7 +173,7 @@ class TestKellyDualRead:
     async def test_legacy_key_fallback_warns(self) -> None:
         store = {"kelly:BTCUSDT": {"win_rate": 0.55, "avg_rr": 1.8}}
         state = self._keyed_state(store)
-        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+        with patch("services.fusion_engine.kelly_sizer._logger") as mock_log:
             win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
         assert win_rate == pytest.approx(0.55)
         assert avg_rr == pytest.approx(1.8)
@@ -197,7 +197,7 @@ class TestKellyDualRead:
             "kelly:BTCUSDT": {"win_rate": 0.40, "avg_rr": 1.2},
         }
         state = self._keyed_state(store)
-        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+        with patch("services.fusion_engine.kelly_sizer._logger") as mock_log:
             win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
         assert win_rate == pytest.approx(0.65)
         assert avg_rr == pytest.approx(2.5)
@@ -207,7 +207,7 @@ class TestKellyDualRead:
     @pytest.mark.asyncio
     async def test_both_missing_returns_defaults(self) -> None:
         state = self._keyed_state({})
-        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+        with patch("services.fusion_engine.kelly_sizer._logger") as mock_log:
             win_rate, avg_rr = await self.sizer().get_stats(state, "BTCUSDT")
         assert win_rate == 0.5
         assert avg_rr == 1.5
@@ -221,7 +221,7 @@ class TestKellyDualRead:
     async def test_non_default_strategy_id_fallback(self) -> None:
         store = {"kelly:BTCUSDT": {"win_rate": 0.58, "avg_rr": 1.9}}
         state = self._keyed_state(store)
-        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+        with patch("services.fusion_engine.kelly_sizer._logger") as mock_log:
             win_rate, avg_rr = await self.sizer().get_stats(
                 state, "BTCUSDT", strategy_id="crypto_momentum"
             )
@@ -251,7 +251,7 @@ class TestKellyDualRead:
             "kelly:BTCUSDT": {"win_rate": 0.99, "avg_rr": 3.0},
         }
         state = self._keyed_state(store)
-        with patch("services.s04_fusion_engine.kelly_sizer._logger") as mock_log:
+        with patch("services.fusion_engine.kelly_sizer._logger") as mock_log:
             with pytest.raises(ValueError, match="could not convert"):
                 await self.sizer().get_stats(state, "BTCUSDT")
         # Crucially: fallback was NOT triggered — only the primary key was read.

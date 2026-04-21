@@ -19,9 +19,9 @@ from core.models.regime import (
     TrendRegime,
     VolRegime,
 )
-from services.s03_regime_detector.cb_calendar import CBCalendar
-from services.s03_regime_detector.regime_engine import RegimeEngine
-from services.s03_regime_detector.session_tracker import (
+from services.regime_detector.cb_calendar import CBCalendar
+from services.regime_detector.regime_engine import RegimeEngine
+from services.regime_detector.session_tracker import (
     PRIME_SESSIONS,
     Session,
     SessionTracker,
@@ -46,7 +46,7 @@ class RegimeDetectorService(BaseService):
     5. Refreshes the CB calendar in Redis as ``cb:calendar``.
     """
 
-    service_id = "s03_regime_detector"
+    service_id = "regime_detector"
 
     def __init__(self) -> None:
         """Initialize regime components (PUB socket created by BaseService.start)."""

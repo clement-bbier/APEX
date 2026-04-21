@@ -13,12 +13,12 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from core.models.tick import Market, NormalizedTick, TradeSide
-from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
-from services.s02_signal_engine.mtf_aligner import MTFAligner
-from services.s02_signal_engine.pipeline import PipelineState, SignalPipeline
-from services.s02_signal_engine.signal_scorer import SignalScorer
-from services.s02_signal_engine.technical import TechnicalAnalyzer
-from services.s02_signal_engine.vpin import VPINCalculator
+from services.signal_engine.microstructure import MicrostructureAnalyzer
+from services.signal_engine.mtf_aligner import MTFAligner
+from services.signal_engine.pipeline import PipelineState, SignalPipeline
+from services.signal_engine.signal_scorer import SignalScorer
+from services.signal_engine.technical import TechnicalAnalyzer
+from services.signal_engine.vpin import VPINCalculator
 
 
 def _make_tick(

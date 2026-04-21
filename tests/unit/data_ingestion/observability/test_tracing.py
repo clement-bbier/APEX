@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from opentelemetry.sdk.trace import TracerProvider
 
-from services.s01_data_ingestion.observability.tracing import (
+from services.data_ingestion.observability.tracing import (
     get_tracer,
     init_tracing,
     reset_tracing,
@@ -40,7 +40,7 @@ class TestInitTracing:
         assert isinstance(p2, TracerProvider)
 
     @patch(
-        "services.s01_data_ingestion.observability.tracing.OTLPSpanExporter",
+        "services.data_ingestion.observability.tracing.OTLPSpanExporter",
         create=True,
     )
     def test_otlp_exporter_when_endpoint_set(self, mock_otlp: MagicMock) -> None:

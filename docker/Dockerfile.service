@@ -61,7 +61,7 @@ COPY --from=python-builder --chown=apex:apex /root/.local /home/apex/.local
 COPY --chown=apex:apex . /app
 USER apex
 # SERVICE_MODULE is set per service in docker-compose.yml, e.g.
-# ``services.s01_data_ingestion.service`` or
+# ``services.data_ingestion.service`` or
 # ``core.zmq_broker`` for the broker container.
 CMD ["sh", "-c", "exec python -m ${SERVICE_MODULE}"]
 HEALTHCHECK --interval=10s --timeout=5s --start-period=15s --retries=3 \

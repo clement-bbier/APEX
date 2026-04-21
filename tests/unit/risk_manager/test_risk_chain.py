@@ -22,17 +22,17 @@ from hypothesis import strategies as st
 from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from core.state import SystemRiskMonitor
-from services.s05_risk_manager.cb_event_guard import CBEventGuard
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.fail_closed import FailClosedGuard
-from services.s05_risk_manager.meta_label_gate import MetaLabelGate
-from services.s05_risk_manager.models import (
+from services.risk_manager.cb_event_guard import CBEventGuard
+from services.risk_manager.circuit_breaker import CircuitBreaker
+from services.risk_manager.fail_closed import FailClosedGuard
+from services.risk_manager.meta_label_gate import MetaLabelGate
+from services.risk_manager.models import (
     REDIS_CB_KEY,
     BlockReason,
     CircuitBreakerSnapshot,
     CircuitBreakerState,
 )
-from services.s05_risk_manager.service import RiskManagerService
+from services.risk_manager.service import RiskManagerService
 
 # ── Fixtures ────────────────────────────────────────────────────────────────
 
@@ -57,7 +57,7 @@ def _make_service(redis: fakeredis.aioredis.FakeRedis) -> RiskManagerService:
     from core.logger import get_logger
 
     svc.logger = get_logger("s05_test")
-    svc.service_id = "s05_risk_manager"
+    svc.service_id = "risk_manager"
 
     # Wire state store with fakeredis
     from core.state import StateStore
@@ -356,7 +356,7 @@ def test_approved_order_risk_never_exceeds_max(capital: Decimal, confidence: flo
     This test uses synchronous pure function checks to verify the invariant
     holds across all inputs without running the async chain.
     """
-    from services.s05_risk_manager.position_rules import check_max_risk_per_trade
+    from services.risk_manager.position_rules import check_max_risk_per_trade
 
     sz = Decimal("0.01")
     order = OrderCandidate(

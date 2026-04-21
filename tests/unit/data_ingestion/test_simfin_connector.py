@@ -16,7 +16,7 @@ from unittest.mock import patch
 import httpx
 import pytest
 
-from services.s01_data_ingestion.connectors.simfin_connector import (
+from services.data_ingestion.connectors.simfin_connector import (
     SimFinConnector,
     SimFinFetchError,
 )
@@ -46,7 +46,7 @@ class TestAuth:
 
     def test_missing_api_key_raises(self) -> None:
         with patch(
-            "services.s01_data_ingestion.connectors.simfin_connector.get_settings"
+            "services.data_ingestion.connectors.simfin_connector.get_settings"
         ) as mock_settings:
             mock_secret = type("FakeSecret", (), {"get_secret_value": lambda self: ""})()
             mock_settings.return_value.simfin_api_key = mock_secret

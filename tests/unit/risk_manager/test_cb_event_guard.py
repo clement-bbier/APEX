@@ -12,8 +12,8 @@ from datetime import UTC, datetime, timedelta
 import fakeredis.aioredis
 import pytest
 
-from services.s05_risk_manager.cb_event_guard import CBEventGuard
-from services.s05_risk_manager.models import BlockReason
+from services.risk_manager.cb_event_guard import CBEventGuard
+from services.risk_manager.models import BlockReason
 
 _NOW = datetime(2026, 4, 5, 14, 0, 0, tzinfo=UTC)
 _EVENT = datetime(2026, 4, 5, 14, 40, 0, tzinfo=UTC)  # 40min from _NOW

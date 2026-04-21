@@ -30,7 +30,7 @@ class TestFREDBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_fedfunds_one_year(self) -> None:
         """Download ~1 year of FEDFUNDS from FRED."""
-        from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
+        from services.data_ingestion.connectors.fred_connector import FREDConnector
 
         connector = FREDConnector()
         start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -48,7 +48,7 @@ class TestFREDBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_metadata_fedfunds(self) -> None:
         """Fetch FEDFUNDS metadata from FRED."""
-        from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
+        from services.data_ingestion.connectors.fred_connector import FREDConnector
 
         connector = FREDConnector()
         meta = await connector.fetch_metadata("FEDFUNDS")

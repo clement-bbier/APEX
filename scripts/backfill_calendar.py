@@ -35,11 +35,11 @@ from core.config import get_settings
 from core.data.timescale_repository import TimescaleRepository
 from core.models.data import IngestionStatus
 from scripts._backfill_common import _parse_utc_datetime
-from services.s01_data_ingestion.connectors.boj_calendar_scraper import BoJCalendarScraper
-from services.s01_data_ingestion.connectors.calendar_base import CalendarConnector
-from services.s01_data_ingestion.connectors.ecb_scraper import ECBScraper
-from services.s01_data_ingestion.connectors.fomc_scraper import FOMCScraper
-from services.s01_data_ingestion.connectors.fred_releases import FREDReleasesConnector
+from services.data_ingestion.connectors.boj_calendar_scraper import BoJCalendarScraper
+from services.data_ingestion.connectors.calendar_base import CalendarConnector
+from services.data_ingestion.connectors.ecb_scraper import ECBScraper
+from services.data_ingestion.connectors.fomc_scraper import FOMCScraper
+from services.data_ingestion.connectors.fred_releases import FREDReleasesConnector
 
 logger = structlog.get_logger(__name__)
 

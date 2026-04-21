@@ -29,20 +29,20 @@ from core.models.order import OrderCandidate
 from core.models.signal import Direction
 from core.state import SystemRiskMonitor
 from core.topics import Topics
-from services.s05_risk_manager.cb_event_guard import CBEventGuard
-from services.s05_risk_manager.chain_orchestrator import RiskChainOrchestrator
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.context_loader import ContextLoader
-from services.s05_risk_manager.decision_builder import RiskDecisionBuilder
-from services.s05_risk_manager.fail_closed import FailClosedGuard
-from services.s05_risk_manager.meta_label_gate import MetaLabelGate
-from services.s05_risk_manager.models import RiskDecision
+from services.risk_manager.cb_event_guard import CBEventGuard
+from services.risk_manager.chain_orchestrator import RiskChainOrchestrator
+from services.risk_manager.circuit_breaker import CircuitBreaker
+from services.risk_manager.context_loader import ContextLoader
+from services.risk_manager.decision_builder import RiskDecisionBuilder
+from services.risk_manager.fail_closed import FailClosedGuard
+from services.risk_manager.meta_label_gate import MetaLabelGate
+from services.risk_manager.models import RiskDecision
 
 
 class RiskManagerService(BaseService):
     """S05 Risk Manager -- thin lifecycle + dispatch wrapper."""
 
-    service_id = "s05_risk_manager"
+    service_id = "risk_manager"
 
     def __init__(self) -> None:
         super().__init__(self.service_id)

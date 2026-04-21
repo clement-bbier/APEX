@@ -27,7 +27,7 @@ class TestECBScraperLive:
     @pytest.mark.asyncio
     async def test_fetch_ecb_events(self) -> None:
         """Scrape ECB calendar and verify events are returned."""
-        from services.s01_data_ingestion.connectors.ecb_scraper import ECBScraper
+        from services.data_ingestion.connectors.ecb_scraper import ECBScraper
 
         scraper = ECBScraper()
         start = datetime(2024, 1, 1, tzinfo=UTC)

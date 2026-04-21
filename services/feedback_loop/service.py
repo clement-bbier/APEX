@@ -9,11 +9,11 @@ from typing import Any
 from core.base_service import BaseService
 from core.logger import get_logger
 from core.models.order import TradeRecord
-from services.s09_feedback_loop.drift_detector import DriftDetector
-from services.s09_feedback_loop.signal_quality import SignalQuality
-from services.s09_feedback_loop.trade_analyzer import TradeAnalyzer
+from services.feedback_loop.drift_detector import DriftDetector
+from services.feedback_loop.signal_quality import SignalQuality
+from services.feedback_loop.trade_analyzer import TradeAnalyzer
 
-logger = get_logger("s09_feedback_loop")
+logger = get_logger("feedback_loop")
 
 KELLY_DEFAULT_WIN_RATE = 0.5
 KELLY_DEFAULT_AVG_RR = 1.5
@@ -29,7 +29,7 @@ class FeedbackLoopService(BaseService):
     """
 
     def __init__(self) -> None:
-        super().__init__("s09_feedback_loop")
+        super().__init__("feedback_loop")
         self._analyzer = TradeAnalyzer()
         self._quality = SignalQuality()
         self._drift = DriftDetector()

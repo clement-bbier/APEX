@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 import yaml
 
-from services.s01_data_ingestion.orchestrator.config import (
+from services.data_ingestion.orchestrator.config import (
     JobConfig,
     OrchestratorConfig,
     RetryConfig,

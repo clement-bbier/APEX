@@ -18,14 +18,14 @@ from core.base_service import BaseService
 from core.logger import get_logger
 from core.models.signal import Signal
 from core.models.tick import NormalizedTick
-from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
-from services.s02_signal_engine.mtf_aligner import MTFAligner
-from services.s02_signal_engine.pipeline import SignalPipeline
-from services.s02_signal_engine.signal_scorer import SignalScorer
-from services.s02_signal_engine.technical import TechnicalAnalyzer
-from services.s02_signal_engine.vpin import VPINCalculator
+from services.signal_engine.microstructure import MicrostructureAnalyzer
+from services.signal_engine.mtf_aligner import MTFAligner
+from services.signal_engine.pipeline import SignalPipeline
+from services.signal_engine.signal_scorer import SignalScorer
+from services.signal_engine.technical import TechnicalAnalyzer
+from services.signal_engine.vpin import VPINCalculator
 
-logger = get_logger("s02_signal_engine.service")
+logger = get_logger("signal_engine.service")
 
 # ZMQ topic prefix for all normalized ticks.
 _TICK_TOPICS: list[str] = ["tick."]
@@ -46,7 +46,7 @@ class SignalEngineService(BaseService):
     The service then publishes the signal on ZMQ and caches it in Redis.
     """
 
-    service_id: str = "s02_signal_engine"
+    service_id: str = "signal_engine"
 
     def __init__(self) -> None:
         """Initialize analyzers (sockets are wired in :meth:`run`)."""

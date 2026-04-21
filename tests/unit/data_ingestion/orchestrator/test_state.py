@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 import fakeredis.aioredis
 import pytest
 
-from services.s01_data_ingestion.orchestrator.state import JobRunResult, JobStateManager
+from services.data_ingestion.orchestrator.state import JobRunResult, JobStateManager
 
 
 @pytest.fixture

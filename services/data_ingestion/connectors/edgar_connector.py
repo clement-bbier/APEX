@@ -25,7 +25,7 @@ import structlog
 
 from core.config import get_settings
 from core.models.data import CorporateEvent, FundamentalPoint
-from services.s01_data_ingestion.connectors.fundamentals_base import (
+from services.data_ingestion.connectors.fundamentals_base import (
     FundamentalsConnector,
 )
 

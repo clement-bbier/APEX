@@ -14,7 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from core.models.data import MacroPoint, MacroSeriesMeta
-from services.s01_data_ingestion.connectors.ecb_connector import (
+from services.data_ingestion.connectors.ecb_connector import (
     ECBConnector,
     ECBFetchError,
 )
@@ -72,7 +72,7 @@ class TestECBFetchSeries:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "services.s01_data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
+            "services.data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
             return_value=mock_client,
         ):
             start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -98,7 +98,7 @@ class TestECBFetchSeries:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "services.s01_data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
+            "services.data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
             return_value=mock_client,
         ):
             # Only request first week of January
@@ -124,7 +124,7 @@ class TestECBFetchSeries:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "services.s01_data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
+            "services.data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
             return_value=mock_client,
         ):
             start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -148,7 +148,7 @@ class TestECBFetchSeries:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "services.s01_data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
+            "services.data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
             return_value=mock_client,
         ):
             start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -230,7 +230,7 @@ class TestECBFetchMetadata:
         mock_client.__aexit__ = AsyncMock(return_value=False)
 
         with patch(
-            "services.s01_data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
+            "services.data_ingestion.connectors.ecb_connector.httpx.AsyncClient",
             return_value=mock_client,
         ):
             meta = await conn.fetch_metadata("EXR/D.USD.EUR.SP00.A")

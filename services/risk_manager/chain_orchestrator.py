@@ -28,25 +28,25 @@ from typing import Any
 from core.logger import get_logger
 from core.models.order import OrderCandidate
 from core.models.tick import Session
-from services.s05_risk_manager.cb_event_guard import CBEventGuard
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.decision_builder import RiskDecisionBuilder
-from services.s05_risk_manager.exposure_monitor import (
+from services.risk_manager.cb_event_guard import CBEventGuard
+from services.risk_manager.circuit_breaker import CircuitBreaker
+from services.risk_manager.decision_builder import RiskDecisionBuilder
+from services.risk_manager.exposure_monitor import (
     check_correlation,
     check_max_positions,
     check_per_class_exposure,
     check_total_exposure,
 )
-from services.s05_risk_manager.fail_closed import FailClosedGuard
-from services.s05_risk_manager.meta_label_gate import MetaLabelGate
-from services.s05_risk_manager.models import (
+from services.risk_manager.fail_closed import FailClosedGuard
+from services.risk_manager.meta_label_gate import MetaLabelGate
+from services.risk_manager.models import (
     CB_SCALP_SIZE_MULTIPLIER,
     BlockReason,
     Position,
     RiskDecision,
     RuleResult,
 )
-from services.s05_risk_manager.position_rules import (
+from services.risk_manager.position_rules import (
     apply_crypto_multiplier,
     apply_session_multiplier,
     check_max_risk_per_trade,
@@ -55,7 +55,7 @@ from services.s05_risk_manager.position_rules import (
     check_stop_loss_present,
 )
 
-logger = get_logger("s05_risk_manager.chain_orchestrator")
+logger = get_logger("risk_manager.chain_orchestrator")
 
 
 class RiskChainOrchestrator:

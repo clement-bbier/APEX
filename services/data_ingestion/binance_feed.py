@@ -18,7 +18,7 @@ from websockets.exceptions import ConnectionClosed
 from core.config import get_settings
 from core.logger import get_logger
 
-logger = get_logger("s01_data_ingestion.binance_feed")
+logger = get_logger("data_ingestion.binance_feed")
 
 _RECONNECT_BASE_SECONDS: float = 1.0
 _RECONNECT_MAX_SECONDS: float = 60.0

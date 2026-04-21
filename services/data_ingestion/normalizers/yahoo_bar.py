@@ -16,7 +16,7 @@ from decimal import Decimal
 import pandas as pd
 
 from core.models.data import Asset, Bar, BarSize, BarType
-from services.s01_data_ingestion.normalizers.base import NormalizerStrategy
+from services.data_ingestion.normalizers.base import NormalizerStrategy
 
 type YahooBarPayload = tuple[pd.Timestamp, Mapping[str, object]]
 

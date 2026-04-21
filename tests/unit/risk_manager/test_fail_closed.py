@@ -26,8 +26,8 @@ from core.state import (
     SystemRiskMonitor,
     SystemRiskState,
 )
-from services.s05_risk_manager.fail_closed import FailClosedGuard
-from services.s05_risk_manager.models import BlockReason, RuleResult
+from services.risk_manager.fail_closed import FailClosedGuard
+from services.risk_manager.models import BlockReason, RuleResult
 
 
 def _make_guard_real_redis() -> tuple[FailClosedGuard, fakeredis.aioredis.FakeRedis, MagicMock]:

@@ -11,8 +11,8 @@ from decimal import Decimal
 import fakeredis.aioredis
 import pytest
 
-from services.s05_risk_manager.circuit_breaker import CircuitBreaker
-from services.s05_risk_manager.models import (
+from services.risk_manager.circuit_breaker import CircuitBreaker
+from services.risk_manager.models import (
     BlockReason,
     CircuitBreakerState,
 )

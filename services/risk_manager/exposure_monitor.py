@@ -20,7 +20,7 @@ from __future__ import annotations
 from decimal import Decimal
 
 from core.models.order import OrderCandidate
-from services.s05_risk_manager.models import (
+from services.risk_manager.models import (
     CORRELATION_BLOCK_THRESHOLD,
     MAX_CLASS_EXPOSURE_PCT,
     MAX_POSITIONS,

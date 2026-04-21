@@ -25,19 +25,19 @@ from core.config import get_settings
 from core.data.timescale_repository import TimescaleRepository
 from core.models.data import AssetClass, BarSize, IngestionStatus
 from scripts._backfill_common import _parse_utc_datetime
-from services.s01_data_ingestion.connectors.alpaca_historical import (
+from services.data_ingestion.connectors.alpaca_historical import (
     AlpacaHistoricalConnector,
 )
-from services.s01_data_ingestion.connectors.base import DataConnector
-from services.s01_data_ingestion.connectors.massive_historical import (
+from services.data_ingestion.connectors.base import DataConnector
+from services.data_ingestion.connectors.massive_historical import (
     MassiveHistoricalConnector,
 )
-from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
-from services.s01_data_ingestion.normalizers.alpaca_trade import AlpacaTradeNormalizer
-from services.s01_data_ingestion.normalizers.asset_resolver import AssetResolver
-from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
-from services.s01_data_ingestion.quality.checker import DataQualityChecker
-from services.s01_data_ingestion.quality.db_logger import QualityDbLogger
+from services.data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
+from services.data_ingestion.normalizers.alpaca_trade import AlpacaTradeNormalizer
+from services.data_ingestion.normalizers.asset_resolver import AssetResolver
+from services.data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
+from services.data_ingestion.quality.checker import DataQualityChecker
+from services.data_ingestion.quality.db_logger import QualityDbLogger
 
 logger = structlog.get_logger(__name__)
 

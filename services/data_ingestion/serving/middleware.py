@@ -16,7 +16,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import Response
 
-from services.s01_data_ingestion.observability.metrics import record_serving_request
+from services.data_ingestion.observability.metrics import record_serving_request
 
 # Paths excluded from metrics to avoid noise
 _EXCLUDED_PATHS = frozenset({"/metrics", "/openapi.json", "/docs", "/redoc"})

@@ -7,7 +7,7 @@ import math
 import numpy as np
 import pytest
 
-from services.s07_quant_analytics.regime_ml import RegimeML
+from services.quant_analytics.regime_ml import RegimeML
 
 
 @pytest.fixture
