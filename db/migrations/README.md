@@ -24,12 +24,17 @@ Current files:
 |---|---|---|
 | `001_universal_schema.sql` | Phase 2 ingestion data layer (assets, bars, ticks-by-asset-id, macro, fundamentals, corp events). | Pre-dates Phase B multi-strat. |
 | `002_feature_store.sql` | Phase 3 feature store (feature_values, feature_versions). | — |
-| `001_apex_initial_schema.sql` | **Schema v2** — multi-strat-aware (ticks, bars_1m, signals, order_candidates, approved_orders, executed_orders, trade_records, pnl_snapshots, strategy_metrics, regime_states, risk_limits). See ADR-0014. | Additive; never drops anything. |
+| `001_apex_initial_schema.sql` | **Schema v2** — multi-strat-aware (apex_ticks, apex_bars_1m, apex_signals, apex_order_candidates, apex_approved_orders, apex_executed_orders, apex_trade_records, apex_pnl_snapshots, apex_strategy_metrics, apex_regime_states, apex_risk_limits). See ADR-0014. | Additive; never drops anything. All tables carry an `apex_` prefix to coexist with the v1 schema. |
 
-> The two `001_*` filenames are intentional — schema v2 is the start of a
-> new lineage introduced by ADR-0014. Both files are independently
-> idempotent, so applying both in sorted order is safe. A future cleanup
-> can renumber under a dedicated ADR.
+> Schema v1 (`001_universal_schema.sql`, legacy) and Schema v2
+> (`001_apex_initial_schema.sql`, current) coexist on the same database.
+> v2 uses an `apex_` table prefix to avoid name collision with v1 tables
+> (notably `ticks` and `bars`, which v1 defines with different column
+> sets). Both files are individually idempotent and can be applied
+> together to the same database in lexical order; the `apex_` prefix is
+> the invariant that keeps them from clobbering each other. v1 will be
+> retired in a future ADR with an explicit data-migration path, at which
+> point the `apex_` prefix can be dropped via a renaming migration.
 
 ---
 

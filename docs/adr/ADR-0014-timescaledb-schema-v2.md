@@ -40,21 +40,27 @@ We ship a schema v2 consisting of eleven additive tables, authored as a single i
 
 | # | Table | Kind | Hypertable | Retention | Compression | Per-strategy |
 |---|---|---|---|---|---|---|
-| 1 | ticks | raw tick / top-of-book | yes, ts, 1 day | 90 days | after 7 days | no (asset-level) |
-| 2 | bars_1m | 1-min OHLCV | yes, ts, 1 day | 730 days | after 30 days | yes |
-| 3 | signals | strategy signals | yes, ts, 1 day | 730 days | - | yes |
-| 4 | order_candidates | pre-VETO proposals | yes, ts_proposed, 1 day | - | - | yes |
-| 5 | approved_orders | post-VETO approvals | yes, ts_approved, 1 day | - | - | yes |
-| 6 | executed_orders | broker fills | yes, ts_submitted, 1 day | - | - | yes |
-| 7 | trade_records | closed-trade PnL | yes, ts_close, 1 day | - | - | yes |
-| 8 | pnl_snapshots | portfolio state | yes, snapshot_ts, 1 hour | - | - | yes |
-| 9 | strategy_metrics | daily perf metrics | regular | - | - | yes |
-| 10 | regime_states | regime labels | yes, ts, 1 day | - | - | no (global) |
-| 11 | risk_limits | per-strategy envelopes | regular | - | - | yes |
+| 1 | apex_ticks | raw tick / top-of-book | yes, ts, 1 day | 90 days | after 7 days | no (asset-level) |
+| 2 | apex_bars_1m | 1-min OHLCV | yes, ts, 1 day | 730 days | after 30 days | yes |
+| 3 | apex_signals | strategy signals | yes, ts, 1 day | 730 days | - | yes |
+| 4 | apex_order_candidates | pre-VETO proposals | yes, ts_proposed, 1 day | - | - | yes |
+| 5 | apex_approved_orders | post-VETO approvals | yes, ts_approved, 1 day | - | - | yes |
+| 6 | apex_executed_orders | broker fills | yes, ts_submitted, 1 day | - | - | yes |
+| 7 | apex_trade_records | closed-trade PnL | yes, ts_close, 1 day | - | - | yes |
+| 8 | apex_pnl_snapshots | portfolio state | yes, snapshot_ts, 1 hour | - | - | yes |
+| 9 | apex_strategy_metrics | daily perf metrics | regular | - | - | yes |
+| 10 | apex_regime_states | regime labels | yes, ts, 1 day | - | - | no (global) |
+| 11 | apex_risk_limits | per-strategy envelopes | regular | - | - | yes |
 
 Every order-path / PnL / metrics table includes `strategy_id TEXT NOT NULL DEFAULT 'default'` per Charter sec 5.5. Prices, sizes, PnL and fees are NUMERIC(20,8). Timestamps are TIMESTAMPTZ. Structured metadata (features, targets, positions, risk_chain_result) is JSONB.
 
-A one-row seed populates risk_limits('default', ...) with placeholder limits so the legacy path does not trip STEP 3 during Phase B bring-up. Real limits are written by each Gate 2 PR per Playbook sec 4.
+A one-row seed populates apex_risk_limits('default', ...) with placeholder limits so the legacy path does not trip STEP 3 during Phase B bring-up. Real limits are written by each Gate 2 PR per Playbook sec 4.
+
+### 2.1.1 Naming convention
+
+All eleven v2 tables are prefixed with `apex_` to eliminate name collision with the legacy v1 schema (`db/migrations/001_universal_schema.sql`), which still owns unprefixed names like `ticks` and `bars`. The legacy `ticks` table uses `(asset_id, timestamp, trade_id)` whereas v2's `apex_ticks` uses `(symbol, exchange, ts, ...)`; without the prefix, `CREATE TABLE IF NOT EXISTS ticks` in v2 becomes a silent no-op and the subsequent `create_hypertable('ticks', 'ts')` / `ALTER TABLE ticks SET (... compress_segmentby = 'symbol, exchange')` fail because the column `ts` and the segment columns do not exist in the v1 schema.
+
+Once the legacy v1 schema is fully retired in a future ADR with an explicit data-migration path, the `apex_` prefix may be dropped via a renaming migration. Until then, the prefix is the simplest invariant that lets both lineages coexist on the same database.
 
 ### 2.2 Migration toolchain
 

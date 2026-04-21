@@ -13,6 +13,11 @@
 --   * All timestamps are TIMESTAMPTZ. The application layer stores UTC.
 --   * Forward-only. No DROP anywhere. Destructive changes get their own
 --     migration file with their own ADR.
+--   * All v2 tables are prefixed with ``apex_`` to eliminate name
+--     collision with the legacy v1 schema (001_universal_schema.sql)
+--     which still owns unprefixed names like ``ticks`` and ``bars``.
+--     Once v1 is retired in a future ADR, the prefix may be dropped
+--     via a renaming migration. See ADR-0014 §"Naming convention".
 --
 -- References
 --   * Charter §5.5 — per-strategy identity
@@ -26,9 +31,9 @@ CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE;
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- ============================================================
--- 1. ticks — raw tick / top-of-book snapshots (hypertable)
+-- 1. apex_ticks — raw tick / top-of-book snapshots (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS ticks (
+CREATE TABLE IF NOT EXISTS apex_ticks (
     symbol      TEXT          NOT NULL,
     exchange    TEXT          NOT NULL,
     ts          TIMESTAMPTZ   NOT NULL,
@@ -40,27 +45,27 @@ CREATE TABLE IF NOT EXISTS ticks (
     last_size   NUMERIC(20,8)
 );
 
-SELECT create_hypertable('ticks', 'ts',
+SELECT create_hypertable('apex_ticks', 'ts',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_ticks_symbol_ts_desc
-    ON ticks (symbol, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_ticks_symbol_ts_desc
+    ON apex_ticks (symbol, ts DESC);
 
-ALTER TABLE ticks SET (
+ALTER TABLE apex_ticks SET (
     timescaledb.compress,
     timescaledb.compress_segmentby = 'symbol, exchange',
     timescaledb.compress_orderby   = 'ts'
 );
 
-SELECT add_compression_policy('ticks', INTERVAL '7 days',  if_not_exists => TRUE);
-SELECT add_retention_policy  ('ticks', INTERVAL '90 days', if_not_exists => TRUE);
+SELECT add_compression_policy('apex_ticks', INTERVAL '7 days',  if_not_exists => TRUE);
+SELECT add_retention_policy  ('apex_ticks', INTERVAL '90 days', if_not_exists => TRUE);
 
 -- ============================================================
--- 2. bars_1m — 1-minute OHLCV, strategy-tagged (hypertable)
+-- 2. apex_bars_1m — 1-minute OHLCV, strategy-tagged (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS bars_1m (
+CREATE TABLE IF NOT EXISTS apex_bars_1m (
     symbol       TEXT          NOT NULL,
     strategy_id  TEXT          NOT NULL DEFAULT 'default',
     ts           TIMESTAMPTZ   NOT NULL,
@@ -73,27 +78,27 @@ CREATE TABLE IF NOT EXISTS bars_1m (
     trade_count  INTEGER
 );
 
-SELECT create_hypertable('bars_1m', 'ts',
+SELECT create_hypertable('apex_bars_1m', 'ts',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_bars_1m_strategy_symbol_ts_desc
-    ON bars_1m (strategy_id, symbol, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_bars_1m_strategy_symbol_ts_desc
+    ON apex_bars_1m (strategy_id, symbol, ts DESC);
 
-ALTER TABLE bars_1m SET (
+ALTER TABLE apex_bars_1m SET (
     timescaledb.compress,
     timescaledb.compress_segmentby = 'strategy_id, symbol',
     timescaledb.compress_orderby   = 'ts'
 );
 
-SELECT add_compression_policy('bars_1m', INTERVAL '30 days', if_not_exists => TRUE);
-SELECT add_retention_policy  ('bars_1m', INTERVAL '730 days', if_not_exists => TRUE);
+SELECT add_compression_policy('apex_bars_1m', INTERVAL '30 days', if_not_exists => TRUE);
+SELECT add_retention_policy  ('apex_bars_1m', INTERVAL '730 days', if_not_exists => TRUE);
 
 -- ============================================================
--- 3. signals — strategy-emitted signals (hypertable)
+-- 3. apex_signals — strategy-emitted signals (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS signals (
+CREATE TABLE IF NOT EXISTS apex_signals (
     signal_id    UUID          NOT NULL DEFAULT gen_random_uuid(),
     strategy_id  TEXT          NOT NULL DEFAULT 'default',
     symbol       TEXT          NOT NULL,
@@ -107,20 +112,20 @@ CREATE TABLE IF NOT EXISTS signals (
     PRIMARY KEY (signal_id, ts)
 );
 
-SELECT create_hypertable('signals', 'ts',
+SELECT create_hypertable('apex_signals', 'ts',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_signals_strategy_ts_desc
-    ON signals (strategy_id, ts DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_signals_strategy_ts_desc
+    ON apex_signals (strategy_id, ts DESC);
 
-SELECT add_retention_policy('signals', INTERVAL '730 days', if_not_exists => TRUE);
+SELECT add_retention_policy('apex_signals', INTERVAL '730 days', if_not_exists => TRUE);
 
 -- ============================================================
--- 4. order_candidates — pre-VETO order proposals (hypertable)
+-- 4. apex_order_candidates — pre-VETO order proposals (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS order_candidates (
+CREATE TABLE IF NOT EXISTS apex_order_candidates (
     order_id          UUID          NOT NULL DEFAULT gen_random_uuid(),
     strategy_id       TEXT          NOT NULL DEFAULT 'default',
     symbol            TEXT          NOT NULL,
@@ -136,18 +141,18 @@ CREATE TABLE IF NOT EXISTS order_candidates (
     PRIMARY KEY (order_id, ts_proposed)
 );
 
-SELECT create_hypertable('order_candidates', 'ts_proposed',
+SELECT create_hypertable('apex_order_candidates', 'ts_proposed',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_order_candidates_strategy_ts_desc
-    ON order_candidates (strategy_id, ts_proposed DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_order_candidates_strategy_ts_desc
+    ON apex_order_candidates (strategy_id, ts_proposed DESC);
 
 -- ============================================================
--- 5. approved_orders — post-VETO approved orders (hypertable)
+-- 5. apex_approved_orders — post-VETO approved orders (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS approved_orders (
+CREATE TABLE IF NOT EXISTS apex_approved_orders (
     order_id           UUID          NOT NULL,
     strategy_id        TEXT          NOT NULL DEFAULT 'default',
     symbol             TEXT          NOT NULL,
@@ -156,18 +161,18 @@ CREATE TABLE IF NOT EXISTS approved_orders (
     PRIMARY KEY (order_id, ts_approved)
 );
 
-SELECT create_hypertable('approved_orders', 'ts_approved',
+SELECT create_hypertable('apex_approved_orders', 'ts_approved',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_approved_orders_strategy_ts_desc
-    ON approved_orders (strategy_id, ts_approved DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_approved_orders_strategy_ts_desc
+    ON apex_approved_orders (strategy_id, ts_approved DESC);
 
 -- ============================================================
--- 6. executed_orders — broker-confirmed executions (hypertable)
+-- 6. apex_executed_orders — broker-confirmed executions (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS executed_orders (
+CREATE TABLE IF NOT EXISTS apex_executed_orders (
     order_id         UUID          NOT NULL,
     strategy_id      TEXT          NOT NULL DEFAULT 'default',
     symbol           TEXT          NOT NULL,
@@ -181,18 +186,18 @@ CREATE TABLE IF NOT EXISTS executed_orders (
     PRIMARY KEY (order_id, ts_submitted)
 );
 
-SELECT create_hypertable('executed_orders', 'ts_submitted',
+SELECT create_hypertable('apex_executed_orders', 'ts_submitted',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_executed_orders_strategy_ts_desc
-    ON executed_orders (strategy_id, ts_submitted DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_executed_orders_strategy_ts_desc
+    ON apex_executed_orders (strategy_id, ts_submitted DESC);
 
 -- ============================================================
--- 7. trade_records — closed-trade PnL attribution (hypertable)
+-- 7. apex_trade_records — closed-trade PnL attribution (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS trade_records (
+CREATE TABLE IF NOT EXISTS apex_trade_records (
     trade_id         UUID          NOT NULL DEFAULT gen_random_uuid(),
     strategy_id      TEXT          NOT NULL DEFAULT 'default',
     symbol           TEXT          NOT NULL,
@@ -209,18 +214,18 @@ CREATE TABLE IF NOT EXISTS trade_records (
     PRIMARY KEY (trade_id, ts_close)
 );
 
-SELECT create_hypertable('trade_records', 'ts_close',
+SELECT create_hypertable('apex_trade_records', 'ts_close',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_trade_records_strategy_ts_close_desc
-    ON trade_records (strategy_id, ts_close DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_trade_records_strategy_ts_close_desc
+    ON apex_trade_records (strategy_id, ts_close DESC);
 
 -- ============================================================
--- 8. pnl_snapshots — per-strategy portfolio state (hypertable)
+-- 8. apex_pnl_snapshots — per-strategy portfolio state (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS pnl_snapshots (
+CREATE TABLE IF NOT EXISTS apex_pnl_snapshots (
     snapshot_ts      TIMESTAMPTZ   NOT NULL,
     strategy_id      TEXT          NOT NULL DEFAULT 'default',
     realized_pnl     NUMERIC(20,8) NOT NULL DEFAULT 0,
@@ -231,18 +236,18 @@ CREATE TABLE IF NOT EXISTS pnl_snapshots (
     PRIMARY KEY (snapshot_ts, strategy_id)
 );
 
-SELECT create_hypertable('pnl_snapshots', 'snapshot_ts',
+SELECT create_hypertable('apex_pnl_snapshots', 'snapshot_ts',
     chunk_time_interval => INTERVAL '1 hour',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_pnl_snapshots_strategy_ts_desc
-    ON pnl_snapshots (strategy_id, snapshot_ts DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_pnl_snapshots_strategy_ts_desc
+    ON apex_pnl_snapshots (strategy_id, snapshot_ts DESC);
 
 -- ============================================================
--- 9. strategy_metrics — daily per-strategy performance (regular table)
+-- 9. apex_strategy_metrics — daily per-strategy performance (regular table)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS strategy_metrics (
+CREATE TABLE IF NOT EXISTS apex_strategy_metrics (
     date           DATE          NOT NULL,
     strategy_id    TEXT          NOT NULL DEFAULT 'default',
     sharpe         NUMERIC(10,6),
@@ -258,13 +263,13 @@ CREATE TABLE IF NOT EXISTS strategy_metrics (
     PRIMARY KEY (date, strategy_id)
 );
 
-CREATE INDEX IF NOT EXISTS idx_strategy_metrics_strategy_date_desc
-    ON strategy_metrics (strategy_id, date DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_strategy_metrics_strategy_date_desc
+    ON apex_strategy_metrics (strategy_id, date DESC);
 
 -- ============================================================
--- 10. regime_states — regime classification over time (hypertable)
+-- 10. apex_regime_states — regime classification over time (hypertable)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS regime_states (
+CREATE TABLE IF NOT EXISTS apex_regime_states (
     ts            TIMESTAMPTZ   NOT NULL,
     regime_label  TEXT          NOT NULL,
     confidence    NUMERIC(5,4)  NOT NULL
@@ -273,18 +278,18 @@ CREATE TABLE IF NOT EXISTS regime_states (
     PRIMARY KEY (ts, regime_label)
 );
 
-SELECT create_hypertable('regime_states', 'ts',
+SELECT create_hypertable('apex_regime_states', 'ts',
     chunk_time_interval => INTERVAL '1 day',
     if_not_exists       => TRUE
 );
 
-CREATE INDEX IF NOT EXISTS idx_regime_states_ts_desc
-    ON regime_states (ts DESC);
+CREATE INDEX IF NOT EXISTS idx_apex_regime_states_ts_desc
+    ON apex_regime_states (ts DESC);
 
 -- ============================================================
--- 11. risk_limits — per-strategy risk envelopes (regular table)
+-- 11. apex_risk_limits — per-strategy risk envelopes (regular table)
 -- ============================================================
-CREATE TABLE IF NOT EXISTS risk_limits (
+CREATE TABLE IF NOT EXISTS apex_risk_limits (
     strategy_id          TEXT          PRIMARY KEY,
     max_position_size    NUMERIC(20,8) NOT NULL,
     max_gross_exposure   NUMERIC(20,8) NOT NULL,
@@ -295,7 +300,7 @@ CREATE TABLE IF NOT EXISTS risk_limits (
 -- Seed the default strategy with loose placeholder limits so the
 -- legacy path does not trip STEP 3 during Phase B bring-up. Real
 -- limits are populated by the Playbook §4 Gate 2 PR for each strategy.
-INSERT INTO risk_limits (strategy_id, max_position_size, max_gross_exposure, daily_loss_limit)
+INSERT INTO apex_risk_limits (strategy_id, max_position_size, max_gross_exposure, daily_loss_limit)
 VALUES ('default', 1000000, 10000000, 100000)
 ON CONFLICT (strategy_id) DO NOTHING;
 
