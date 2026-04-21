@@ -19,7 +19,7 @@ S05 Risk Manager is the **VETO layer** of the APEX trading pipeline
 (CLAUDE.md §2). Every `OrderCandidate` from S04 must pass S05 before
 it can become an `ApprovedOrder` consumed by S06 Execution.
 
-The S05 service as inherited from Phase 4 (`services/s05_risk_manager/service.py:341-385`)
+The S05 service as inherited from Phase 4 (`services/risk_manager/service.py:341-385`)
 loads its critical pre-trade context via a single `_load_context_parallel()` call that
 fans out 8 parallel Redis reads (capital, daily PnL, intraday PnL, VIX current, VIX 1h
 ago, positions, correlation matrix, session). When any read fails or returns `None`, a
@@ -101,7 +101,7 @@ fail-closed behavior — a dead heartbeat writer must not allow trading to conti
 
 ### D3 — `FailClosedGuard` as the chain's outermost shell
 
-`services/s05_risk_manager/fail_closed.py` ships `FailClosedGuard.check()` returning
+`services/risk_manager/fail_closed.py` ships `FailClosedGuard.check()` returning
 `(SystemRiskState, RuleResult)`. `RiskManagerService.process_order_candidate()` calls
 it as **STEP 0**, before STEP 1 CB Event Guard. When the returned state is not
 `HEALTHY`, the service returns a `RiskDecision` with `approved=False` and
@@ -110,7 +110,7 @@ step. Latency budget for the guard: < 1ms (single Redis EXISTS).
 
 ### D4 — Removal of `_safe()` heuristic fallback
 
-The `_safe()` helper at `services/s05_risk_manager/service.py:341` and all 8 call sites
+The `_safe()` helper at `services/risk_manager/service.py:341` and all 8 call sites
 are removed. The `try/except: results = [None] * 8` wrapper around the parallel read is
 also removed. After 5.1, `_load_context_parallel()` either returns a fully-populated
 context (every field non-None, every Redis read succeeded) or raises. Order processing
@@ -123,7 +123,7 @@ heuristic value for a missing or unreadable Redis key. This invariant is enforce
 CI grep audit:
 
 ```
-grep -rn "_safe(" services/s05_risk_manager/   # must return zero hits
+grep -rn "_safe(" services/risk_manager/   # must return zero hits
 ```
 
 ### D5 — New ZMQ topic `risk.system.state_change`
@@ -142,7 +142,7 @@ The naming follows the existing dot-separated functional convention (`risk.appro
 ### D6 — Single new `BlockReason` value
 
 `BlockReason.SYSTEM_UNAVAILABLE = "system_unavailable"` is added to
-`services/s05_risk_manager/models.py`. The spec name `REJECTED_SYSTEM_UNAVAILABLE`
+`services/risk_manager/models.py`. The spec name `REJECTED_SYSTEM_UNAVAILABLE`
 (PHASE_5_SPEC §3.1) maps to this canonical reason code; the lowercase
 `"system_unavailable"` matches the existing `BlockReason` value convention
 (`"circuit_breaker_open"`, `"service_down"`, etc.). The same value is emitted whether
@@ -211,7 +211,7 @@ to trade, which is a routable on-call signal in production.
   individual rule; subsequent sub-phases (5.2 in-memory state, 5.3 streaming
   inference) can replace Redis as the heartbeat backing store without touching the
   guard's contract.
-- The CI grep audit (`grep -rn "_safe(" services/s05_risk_manager/`) prevents
+- The CI grep audit (`grep -rn "_safe(" services/risk_manager/`) prevents
   regression: any future PR that re-introduces the pattern fails CI.
 
 ### Negative

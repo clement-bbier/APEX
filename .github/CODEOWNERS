@@ -3,8 +3,8 @@
 
 # Human-only critical paths
 /core/models/                 @clement-bbier
-/services/s05_risk_manager/   @clement-bbier
-/services/s06_execution/      @clement-bbier
+/services/risk_manager/   @clement-bbier
+/services/execution/      @clement-bbier
 /rust/                        @clement-bbier
 /.github/CODEOWNERS           @clement-bbier
 /.github/agents/              @clement-bbier

@@ -5,7 +5,7 @@ Verifies services handle concurrent symbols without interference.
 
 from __future__ import annotations
 
-from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
+from services.signal_engine.signal_scorer import SignalComponent, SignalScorer
 
 
 class TestMultiAssetConcurrent:

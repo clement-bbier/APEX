@@ -27,9 +27,9 @@ class TestEDGARLiveIntegration:
     @pytest.mark.asyncio
     async def test_fetch_aapl_fundamentals(self) -> None:
         """Fetch AAPL fundamentals from SEC EDGAR (real network call)."""
-        from services.s01_data_ingestion.connectors.edgar_connector import EDGARConnector
+        from services.data_ingestion.connectors.edgar_connector import EDGARConnector
 
-        conn = EDGARConnector(user_agent="APEX/CashMachine test@example.com")
+        conn = EDGARConnector(user_agent="APEX test@example.com")
         all_points: list[FundamentalPoint] = []
         async for batch in conn.fetch_fundamentals(
             "AAPL",
@@ -47,18 +47,18 @@ class TestEDGARLiveIntegration:
     @pytest.mark.asyncio
     async def test_ticker_to_cik_resolution(self) -> None:
         """Resolve real ticker to CIK via SEC EDGAR."""
-        from services.s01_data_ingestion.connectors.edgar_connector import EDGARConnector
+        from services.data_ingestion.connectors.edgar_connector import EDGARConnector
 
-        conn = EDGARConnector(user_agent="APEX/CashMachine test@example.com")
+        conn = EDGARConnector(user_agent="APEX test@example.com")
         cik = await conn.ticker_to_cik("AAPL")
         assert cik == 320193
 
     @pytest.mark.asyncio
     async def test_fetch_filings_list(self) -> None:
         """Fetch real filing list for AAPL."""
-        from services.s01_data_ingestion.connectors.edgar_connector import EDGARConnector
+        from services.data_ingestion.connectors.edgar_connector import EDGARConnector
 
-        conn = EDGARConnector(user_agent="APEX/CashMachine test@example.com")
+        conn = EDGARConnector(user_agent="APEX test@example.com")
         filings = await conn.fetch_filings(
             "AAPL",
             ["10-K", "10-Q"],

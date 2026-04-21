@@ -21,7 +21,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from features.calculators.har_rv import HARRVCalculator
-from services.s07_quant_analytics.realized_vol import RealizedVolEstimator
+from services.quant_analytics.realized_vol import RealizedVolEstimator
 
 # ── Helpers ──────────────────────────────────────────────────────────
 

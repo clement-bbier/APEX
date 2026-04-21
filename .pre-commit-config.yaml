@@ -47,7 +47,7 @@ repos:
           - types-PyYAML
           - types-croniter
         args: [--strict]
-        exclude: ^(tests/|services/s10_monitor/dashboard\.py)
+        exclude: ^(tests/|services/command_center/dashboard\.py)
 
   # Bandit (security)
   - repo: https://github.com/PyCQA/bandit

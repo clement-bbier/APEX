@@ -36,11 +36,11 @@ async def test_alpaca_fetch_aapl_bars() -> None:
 
     from core.config import Settings
     from core.models.data import Bar, BarSize
-    from services.s01_data_ingestion.connectors.alpaca_historical import (
+    from services.data_ingestion.connectors.alpaca_historical import (
         AlpacaHistoricalConnector,
     )
-    from services.s01_data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
-    from services.s01_data_ingestion.normalizers.alpaca_trade import (
+    from services.data_ingestion.normalizers.alpaca_bar import AlpacaBarNormalizer
+    from services.data_ingestion.normalizers.alpaca_trade import (
         AlpacaTradeNormalizer,
     )
 

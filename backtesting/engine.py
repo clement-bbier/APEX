@@ -37,16 +37,16 @@ from core.models.regime import (
 )
 from core.models.signal import Direction, Signal
 from core.models.tick import NormalizedTick, Session
-from services.s01_data_ingestion.normalizer import SessionTagger
-from services.s02_signal_engine.microstructure import MicrostructureAnalyzer
-from services.s02_signal_engine.technical import TechnicalAnalyzer
-from services.s05_risk_manager.position_rules import (
+from services.data_ingestion.normalizer import SessionTagger
+from services.execution.paper_trader import PaperTrader
+from services.risk_manager.position_rules import (
     check_max_risk_per_trade,
     check_max_size,
     check_min_rr,
     check_stop_loss_present,
 )
-from services.s06_execution.paper_trader import PaperTrader
+from services.signal_engine.microstructure import MicrostructureAnalyzer
+from services.signal_engine.technical import TechnicalAnalyzer
 
 logger = get_logger("backtesting.engine")
 
@@ -239,7 +239,7 @@ class BacktestEngine:
             return
 
         # Risk check (Phase 6 pure functions)
-        from services.s05_risk_manager.models import RuleResult as _RuleResult
+        from services.risk_manager.models import RuleResult as _RuleResult
 
         _checks: list[_RuleResult] = [
             check_stop_loss_present(candidate),

@@ -418,7 +418,7 @@ class SystemRiskMonitor:
       background task (:meth:`run_heartbeat_loop`). It refreshes
       ``risk:heartbeat`` with TTL 5 s.
     - :meth:`current_state` is called synchronously by
-      :class:`services.s05_risk_manager.fail_closed.FailClosedGuard` on
+      :class:`services.risk_manager.fail_closed.FailClosedGuard` on
       every ``OrderCandidate``. It reads the heartbeat directly, maps the
       result to a :class:`SystemRiskState`, and publishes a transition
       event on :attr:`Topics.RISK_SYSTEM_STATE_CHANGE` if the state has

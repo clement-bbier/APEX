@@ -12,10 +12,10 @@ from datetime import UTC, datetime
 import pytest
 
 from core.models.data import Bar, BarSize
-from services.s01_data_ingestion.connectors.binance_historical import (
+from services.data_ingestion.connectors.binance_historical import (
     BinanceHistoricalConnector,
 )
-from services.s01_data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
+from services.data_ingestion.normalizers.binance_bar import BinanceBarNormalizer
 
 _HAS_NETWORK = os.environ.get("APEX_NETWORK_TESTS", "0") == "1"
 _HAS_TIMESCALE = bool(os.environ.get("TIMESCALE_HOST"))

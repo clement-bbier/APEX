@@ -322,7 +322,7 @@ Covered in D8; rejected per Charter §5.3.
 
 **Description**: use TimescaleDB continuous aggregates to produce per-universe panels as materialized views.
 
-**Pros**: leverages existing TimescaleDB infrastructure (MULTI_STRAT_READINESS_AUDIT_2026-04-18.md §1 — `services/s01_data_ingestion/serving/`).
+**Pros**: leverages existing TimescaleDB infrastructure (MULTI_STRAT_READINESS_AUDIT_2026-04-18.md §1 — `services/data_ingestion/serving/`).
 
 **Cons**:
 
@@ -405,7 +405,7 @@ Each subsequent boot strategy adds its universe to `config.yaml`:
 - [`core/topics.py`](../../core/topics.py) — topic factories; extended with `Topics.panel(universe_id)`.
 - [`core/models/tick.py`](../../core/models/tick.py) — `NormalizedTick` schema (ADR-0003 Universal Data Schema); source for panel buffering.
 - [`features/base.py`](../../features/base.py), [`features/pipeline.py`](../../features/pipeline.py) — `FeatureCalculator` / `FeaturePipeline` consumed by aggregator.
-- [`services/s01_data_ingestion/`](../../services/s01_data_ingestion/) — upstream tick producer; post Phase D.5 at `services/data/ingestion/`.
+- [`services/data_ingestion/`](../../services/data_ingestion/) — upstream tick producer; post Phase D.5 at `services/data/ingestion/`.
 
 ---
 

@@ -1,4 +1,4 @@
-# APEX Trading System (CashMachine)
+# APEX Trading System
 
 Autonomous quantitative trading engine — hedge fund grade.
 **Objective: maximize alpha through systematic, continuously adaptive signal generation.**

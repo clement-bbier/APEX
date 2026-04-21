@@ -27,7 +27,7 @@ class TestECBBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_eurusd_daily(self) -> None:
         """Download ~1 month of EUR/USD daily from ECB."""
-        from services.s01_data_ingestion.connectors.ecb_connector import ECBConnector
+        from services.data_ingestion.connectors.ecb_connector import ECBConnector
 
         connector = ECBConnector()
         start = datetime(2024, 1, 1, tzinfo=UTC)
@@ -44,7 +44,7 @@ class TestECBBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_metadata_eurusd(self) -> None:
         """Fetch EUR/USD metadata from ECB."""
-        from services.s01_data_ingestion.connectors.ecb_connector import ECBConnector
+        from services.data_ingestion.connectors.ecb_connector import ECBConnector
 
         connector = ECBConnector()
         meta = await connector.fetch_metadata("EXR/D.USD.EUR.SP00.A")

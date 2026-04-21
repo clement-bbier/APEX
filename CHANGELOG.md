@@ -28,20 +28,20 @@ Format: [Semantic Versioning](https://semver.org/)
 ## [0.3.0] — Phase 4: Academic Alpha & Command Center
 
 ### Added
-- **HAR-RV model** (`services/s07_quant_analytics/realized_vol.py`): Corsi (2009) heterogeneous
+- **HAR-RV model** (`services/quant_analytics/realized_vol.py`): Corsi (2009) heterogeneous
   autoregressive realized variance with daily/weekly/monthly lags and OLS fitting.
 - **Bipower Variation** (Barndorff-Nielsen & Shephard 2004): jump-robust volatility estimator
   and `jump_detection()` with configurable threshold.
-- **Rough Volatility** (`services/s07_quant_analytics/rough_vol.py`): Hurst exponent estimation
+- **Rough Volatility** (`services/quant_analytics/rough_vol.py`): Hurst exponent estimation
   via log-log regression on volatility lags; Gatheral et al. (2018) H≈0.1 regime classification.
 - **Variance Ratio Test** (Lo & MacKinlay 1988): momentum/mean-reversion diagnostic integrated
   into `RoughVolAnalyzer.variance_ratio_test()`.
-- **Optimal Execution** (`services/s06_execution/optimal_execution.py`): Almgren-Chriss (2001)
+- **Optimal Execution** (`services/execution/optimal_execution.py`): Almgren-Chriss (2001)
   liquidation schedule and Bouchaud et al. (2018) square-root market impact law.
-- **Command Center REST API** (`services/s10_monitor/command_api.py`): 11 plain async functions
+- **Command Center REST API** (`services/command_center/command_api.py`): 11 plain async functions
   exposing system status, PnL, regime, signals, positions, performance, CB events, and config.
   Confirmation guard (`_require_confirmation`) on destructive actions.
-- **Enhanced dashboard** (`services/s10_monitor/dashboard.py`): Chart.js equity curve, service
+- **Enhanced dashboard** (`services/command_center/dashboard.py`): Chart.js equity curve, service
   health grid, CB event panel, live regime and signal feed, WebSocket broadcast loop.
 - S07 `QuantAnalyticsService` wired to `RealizedVolEstimator` and `RoughVolAnalyzer`: jump
   detection and rough vol Hurst written to Redis on every fast loop cycle.
@@ -81,7 +81,7 @@ Format: [Semantic Versioning](https://semver.org/)
 - walk_forward.py: new pandas/datetime-based WalkForwardValidator (keeps tick-based as TickBasedWalkForwardValidator)
 - drift_detector.py: new check_drift() method with DriftAlert dataclass
 - pyproject.toml: fixed mypy override config (removed unsupported disable_error_codes)
-- backtesting/engine.py, services/s02_signal_engine/: line-length and lint fixes
+- backtesting/engine.py, services/signal_engine/: line-length and lint fixes
 
 ---
 

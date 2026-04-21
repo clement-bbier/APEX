@@ -745,7 +745,7 @@ For each output column C of any FeatureCalculator:
 
 ### Context
 
-S02 `MicrostructureAnalyzer.ofi()` (`services/s02_signal_engine/microstructure.py`) computes OFI as `Σ(ΔBid_price − ΔAsk_price) / total_volume`. This is a price-based proxy for queue-volume changes. The canonical Cont, Kukanov & Stoikov (2014) formula uses order book SIZE deltas: `Σ(Δbid_size − Δask_size)`.
+S02 `MicrostructureAnalyzer.ofi()` (`services/signal_engine/microstructure.py`) computes OFI as `Σ(ΔBid_price − ΔAsk_price) / total_volume`. This is a price-based proxy for queue-volume changes. The canonical Cont, Kukanov & Stoikov (2014) formula uses order book SIZE deltas: `Σ(Δbid_size − Δask_size)`.
 
 ### Why Not Wrap S02
 
@@ -764,7 +764,7 @@ S02 `MicrostructureAnalyzer.ofi()` (`services/s02_signal_engine/microstructure.p
 
 - D026 (wrapper strict — honored where applicable)
 - Cont, Kukanov & Stoikov (2014) JFE 104(2)
-- S02 `services/s02_signal_engine/microstructure.py` lines 61-81
+- S02 `services/signal_engine/microstructure.py` lines 61-81
 
 ---
 
@@ -835,7 +835,7 @@ Phase 3.7 CVDKyleCalculator needs (a) raw cumulative CVD, (b) Kyle lambda via OL
 - D026 (strict wrapper — honored where applicable)
 - D030 (OFI precedent: implement directly when S02 formula differs)
 - Kyle (1985) Econometrica 53(6)
-- S02 `services/s02_signal_engine/microstructure.py` lines 83-126
+- S02 `services/signal_engine/microstructure.py` lines 83-126
 
 ---
 
@@ -875,7 +875,7 @@ Phase 3.8 GEXCalculator needs dealer-adjusted gamma exposure per Barbon-Buraschi
 - D026 (strict wrapper — honored where applicable)
 - D030 (OFI precedent), D032 (CVD/Kyle precedent)
 - Barbon & Buraschi (2020) "Gamma Fragility"
-- S02 `services/s02_signal_engine/crowd_behavior.py` lines 43-79
+- S02 `services/signal_engine/crowd_behavior.py` lines 43-79
 
 ---
 
@@ -1006,13 +1006,13 @@ alongside deletion of the now-redundant prototype.
   [`docs/audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md`](../audits/REDIS_KEYS_WRITER_AUDIT_2026-04-17.md). Resolving those writers is part of Phase 5.2 scope (PHASE_5_SPEC_v2).
 
 **Residual debt**:
-- `services/s05_risk_manager/service.py` reached 530 LOC; SOLID-S decomposition deferred to Batch D of the post-audit execution (`RiskChainOrchestrator` + `ContextLoader` + `RiskDecisionBuilder`).
+- `services/risk_manager/service.py` reached 530 LOC; SOLID-S decomposition deferred to Batch D of the post-audit execution (`RiskChainOrchestrator` + `ContextLoader` + `RiskDecisionBuilder`).
 - Heartbeat-TTL empirical calibration after 30 days of paper trading (issue #176).
 
 **References**:
 - [`docs/adr/ADR-0006-fail-closed-risk-controls.md`](../adr/ADR-0006-fail-closed-risk-controls.md)
 - [`core/state.py`](../../core/state.py) §SystemRiskMonitor (lines 365–600)
-- [`services/s05_risk_manager/fail_closed.py`](../../services/s05_risk_manager/fail_closed.py)
+- [`services/risk_manager/fail_closed.py`](../../services/risk_manager/fail_closed.py)
 - SEC Rule 15c3-5; Knight Capital 2012 post-mortem.
 
 

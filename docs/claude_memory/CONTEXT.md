@@ -131,7 +131,7 @@ Phase 5.1 Fail-Closed Pre-Trade Risk Controls **merged** via PR #177.
 GitHub issue #148 CLOSED 2026-04-17T12:35:20Z.
 Canonical decision record: [`docs/adr/ADR-0006-fail-closed-risk-controls.md`](../adr/ADR-0006-fail-closed-risk-controls.md).
 Deliverables: `SystemRiskState` / `SystemRiskStateCause` / `SystemRiskStateChange` / `SystemRiskMonitor` in
-`core/state.py:365-600`; `FailClosedGuard` at `services/s05_risk_manager/fail_closed.py`;
+`core/state.py:365-600`; `FailClosedGuard` at `services/risk_manager/fail_closed.py`;
 `Topics.RISK_SYSTEM_STATE_CHANGE` constant at `core/topics.py:48`; 43+ new tests.
 
 Follow-up S10 observability (subscribe + persist + alert on `risk.system.state_change`) merged via PR #178
@@ -295,13 +295,13 @@ combination sanity, mismatch handling, determinism, compute
 validation, output schema, direct-construction invariants, anti-
 leakage, and the DoD Sharpe assertion (fusion Sharpe > best
 individual on a 1-alpha + 2-noise synthetic scenario). Scope guard
-test verifies `services/s04_fusion_engine/` is untouched by the 4.7
+test verifies `services/fusion_engine/` is untouched by the 4.7
 branch via `git diff --name-only main...HEAD`. Report generator:
 `scripts/generate_phase_4_7_report.py` →
 `reports/phase_4_7/fusion_diagnostics.{md,json}` (weights vector,
 P05/P25/P50/P75/P95 of `fusion_score`, per-signal Pearson
 correlations, Sharpe comparison table). Streaming wiring into
-`services/s04_fusion_engine/` stays out of scope (Phase 5, issue
+`services/fusion_engine/` stays out of scope (Phase 5, issue
 #123).
 
 Phase 4.8 End-to-end Pipeline Test merged via PR `#132` to `main`.

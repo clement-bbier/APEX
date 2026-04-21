@@ -1,7 +1,7 @@
 """Phase 4.7 — IC-weighted fusion engine (library-level MVP).
 
 See ``ic_weighted.py`` for the public API. This package is strictly
-additive: it does not modify ``services/s04_fusion_engine/``. Wiring
+additive: it does not modify ``services/fusion_engine/``. Wiring
 into the streaming S04 service is Phase 5 work (issue #123).
 
 References:

@@ -351,7 +351,7 @@ The allocator is architected as its own microservice (`services/portfolio/strate
 Isolation — each strategy running in its own container, its own Python process, its own resource budget — is not a purity exercise. It serves three concrete goals:
 
 1. **Crash independence.** A bug in Strategy #3 that produces an unhandled exception, a memory leak, or a hang does not affect Strategies #1, #2, #4, #5, #6. Container-level isolation is the only reliable way to guarantee this at the operating-system level.
-2. **Parallel development.** Two Claude Code agents, or one operator working across weeks, can develop Strategy A and Strategy B in parallel without Git-conflicting on the same files. The Multi-Strat Readiness Audit ([MULTI_STRAT_READINESS_AUDIT_2026-04-18.md](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) Q1) flagged exactly this as a current blocker: three files (`services/s02_signal_engine/pipeline.py`, `signal_scorer.py`, `services/s04_fusion_engine/strategy.py`) would become merge hot-spots under the current architecture.
+2. **Parallel development.** Two Claude Code agents, or one operator working across weeks, can develop Strategy A and Strategy B in parallel without Git-conflicting on the same files. The Multi-Strat Readiness Audit ([MULTI_STRAT_READINESS_AUDIT_2026-04-18.md](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) Q1) flagged exactly this as a current blocker: three files (`services/signal_engine/pipeline.py`, `signal_scorer.py`, `services/fusion_engine/strategy.py`) would become merge hot-spots under the current architecture.
 3. **Independent deployment.** Strategy #4 can be restarted, reconfigured, or rolled back without disrupting the other five. In a monolithic architecture, any strategy change requires restarting the whole signal path.
 
 The cost is the operational overhead of more containers and the coordination surface at the allocator. This cost is quantified at approximately **+20%** operational maintenance effort vs a plug-in approach. The Charter accepts this cost because Principles 2 and 7 both favor the institutional pod model at the inflection point where the second strategy arrives.
@@ -508,7 +508,7 @@ APEX implements a simplified G10 carry basket: long the top-3 high-yield currenc
 - Realized volatility of each pair — for volatility-targeting sizing.
 - Global risk indicator — VIX as a proxy, or a composite of VIX + HY credit spreads (HYG).
 
-**Data sources.** Yahoo Finance (G10 FX daily bars — limited but sufficient for daily carry), FRED (US rates), ECB / BoE / BoJ scrapers (already in [services/s01_data_ingestion/connectors/](../../services/s01_data_ingestion/) per audit §1). Cost: **$0/month** at boot; upgrade to OANDA (~$0/month retail API) or IBKR (~$10/month) for execution in Phase 3.
+**Data sources.** Yahoo Finance (G10 FX daily bars — limited but sufficient for daily carry), FRED (US rates), ECB / BoE / BoJ scrapers (already in [services/data_ingestion/connectors/](../../services/data_ingestion/) per audit §1). Cost: **$0/month** at boot; upgrade to OANDA (~$0/month retail API) or IBKR (~$10/month) for execution in Phase 3.
 
 **Budget inheritance.** Low Vol category: max DD 8%, min Sharpe 1.0, max leverage 1×. The Sharpe bar is tight for a strategy known to suffer 15%+ drawdowns in crisis; this is **intentional** — the Charter is forcing the regime overlay to be active and effective, otherwise the strategy will not clear the Low Vol budget.
 
@@ -600,7 +600,7 @@ The multi-strategy platform rests on three architectural decisions that together
 
 **Accepted cost.** The operational maintenance effort increases by approximately **+20%** vs a plug-in-in-single-process approach: more containers to orchestrate, more health checks, more startup coordination. This cost is accepted by Principle 7 (senior-quant tie-breaker, pod model precedent) and Principle 2 (institutional standards).
 
-**Current state (evidence).** The existing 10 services live under [`services/s01_data_ingestion/`](../../services/) through [`services/s10_monitor/`](../../services/). The multi-strat target topology reorganizes these and **adds** the `services/strategies/` tree. No existing service is deleted.
+**Current state (evidence).** The existing 10 services live under [`services/data_ingestion/`](../../services/) through [`services/command_center/`](../../services/). The multi-strat target topology reorganizes these and **adds** the `services/strategies/` tree. No existing service is deleted.
 
 **Target folder structure**:
 
@@ -714,7 +714,7 @@ services/
 
 **`strategy_id` as a first-class field.** The Multi-Strat Readiness Audit ([MULTI_STRAT_READINESS_AUDIT_2026-04-18.md](../audits/MULTI_STRAT_READINESS_AUDIT_2026-04-18.md) P0-1) records that no Pydantic model in the codebase currently carries a `strategy_id` field. The Charter requires this to be added to `Signal`, `OrderCandidate`, `ApprovedOrder`, `ExecutedOrder`, `TradeRecord`. Default value `"default"` preserves backward compatibility with the single-strategy codebase during transition.
 
-**Per-strategy configuration.** Each strategy's parameters (universe, timeframes, thresholds, Kelly fraction, stop multipliers) live in `config/strategies/{strategy_id}.yaml`, loaded and validated by Pydantic at service startup. This replaces the current pattern of hardcoded Python constants in `services/s04_fusion_engine/strategy.py:STRATEGY_REGISTRY`.
+**Per-strategy configuration.** Each strategy's parameters (universe, timeframes, thresholds, Kelly fraction, stop multipliers) live in `config/strategies/{strategy_id}.yaml`, loaded and validated by Pydantic at service startup. This replaces the current pattern of hardcoded Python constants in `services/fusion_engine/strategy.py:STRATEGY_REGISTRY`.
 
 **Per-strategy Redis partitioning.** Keys that are per-strategy get a `{strategy_id}` dimension: `trades:{strategy_id}:all`, `kelly:{strategy_id}:{symbol}`, `pnl:{strategy_id}:daily`, `portfolio:allocation:{strategy_id}`, etc. Keys that are genuinely global (portfolio-level: `portfolio:capital`, `risk:circuit_breaker:state`, `risk:heartbeat`, `correlation:matrix`) remain global.
 
@@ -730,7 +730,7 @@ The following abstract base classes are introduced (see also [MULTI_STRAT_READIN
 | `StrategyAllocator` | `services/portfolio/strategy_allocator/base.py` | Defines how a capital allocation algorithm maps input (strategy performance, risk budgets) to output (per-strategy weights) |
 | `RiskGuard` | `services/portfolio/risk_manager/base.py` | Defines the contract for a step in the VETO chain — supersedes the current duck-typed `RuleResult` convention |
 
-All three ABCs inherit from Python's `abc.ABC` and are `Protocol`-friendly (type-checkable). `StrategyRunner` is the most central: every boot strategy is a concrete `StrategyRunner` subclass. The **legacy single-strategy confluence signal path currently in [`services/s02_signal_engine/pipeline.py`](../../services/s02_signal_engine/pipeline.py)** is wrapped as a concrete `StrategyRunner` called `LegacyConfluenceStrategy`, preserving current behavior (Principle 6) while enabling the multi-strategy topology.
+All three ABCs inherit from Python's `abc.ABC` and are `Protocol`-friendly (type-checkable). `StrategyRunner` is the most central: every boot strategy is a concrete `StrategyRunner` subclass. The **legacy single-strategy confluence signal path currently in [`services/signal_engine/pipeline.py`](../../services/signal_engine/pipeline.py)** is wrapped as a concrete `StrategyRunner` called `LegacyConfluenceStrategy`, preserving current behavior (Principle 6) while enabling the multi-strategy topology.
 
 ### 5.7 ZMQ broker — ADR-0001 continues to govern
 
@@ -777,7 +777,7 @@ Existing supervisor health-check semantics (5-second ping cadence, auto-restart,
 - `services/data/panels/` microservice (Q3).
 - `services/portfolio/strategy_allocator/` microservice (Q2, §5.2, §6).
 - `services/strategies/{six_strategies}/` microservices (one at a time, per lifecycle §7).
-- Refactor of [`services/s02_signal_engine/pipeline.py`](../../services/s02_signal_engine/pipeline.py) to wrap the current hardcoded pipeline as `LegacyConfluenceStrategy` implementing `StrategyRunner`.
+- Refactor of [`services/signal_engine/pipeline.py`](../../services/signal_engine/pipeline.py) to wrap the current hardcoded pipeline as `LegacyConfluenceStrategy` implementing `StrategyRunner`.
 - Data-driven `RiskChainOrchestrator(guards: list[RiskGuard])` that admits `PerStrategyExposureGuard`, `StrategyHealthCheck`, and `PortfolioExposureMonitor` per §8.2.
 - Per-strategy Redis partitioning in `services/research/feedback_loop/` and per-strategy dashboards in `services/ops/monitor_dashboard/`.
 - Per-strategy backtest harness (`backtesting/run_portfolio`) and per-strategy breakdowns in `full_report`.
@@ -796,7 +796,7 @@ Existing supervisor health-check semantics (5-second ping cadence, auto-restart,
 - The existing 1,833+ unit tests and the integration test harness.
 - The Rust extensions (`apex_mc`, `apex_risk`).
 - The CPCV walk-forward validator.
-- All current connectors in `services/s01_data_ingestion/connectors/`.
+- All current connectors in `services/data_ingestion/connectors/`.
 
 ---
 
@@ -1155,7 +1155,7 @@ Notes:
 - **Failure at STEP 0, 1, 2, or 7 → GLOBAL rejection** (affects all strategies for as long as the condition holds). For STEP 0–2, the rejection is the visible effect of a platform-wide state (fail-closed, blackout, halted). For STEP 7, the rejection is per-order but the reason is portfolio-level (e.g., this order would push total exposure past a shared threshold).
 - **Failure at STEP 3, 4, 5, or 6 → PER-STRATEGY rejection**. Other strategies continue to submit and approve orders normally.
 - STEP 0 (`FailClosedGuard`) is governed by [ADR-0006](../adr/ADR-0006-fail-closed-risk-controls.md). The Charter inherits its three-state machine (HEALTHY / DEGRADED / UNAVAILABLE) verbatim.
-- STEP 1 (`CBEventGuard`) blocks new trades in the 45-minute window before a scheduled central bank announcement (Fed, ECB, BoJ, BoE, SNB) for affected asset classes. Already implemented in [`services/s05_risk_manager/cb_event_guard.py`](../../services/s05_risk_manager/).
+- STEP 1 (`CBEventGuard`) blocks new trades in the 45-minute window before a scheduled central bank announcement (Fed, ECB, BoJ, BoE, SNB) for affected asset classes. Already implemented in [`services/risk_manager/cb_event_guard.py`](../../services/risk_manager/).
 - STEP 2 (`PortfolioCircuitBreaker`) enforces the hard global circuit breakers from §8.1.2.
 - STEP 3 (`StrategyHealthCheck`) — new, per-Charter — checks the strategy's own health: is it in `review_mode`, is it paused, is its soft circuit breaker tripped?
 - STEP 4 (`MetaLabelGate`) — already present — uses each strategy's meta-labeler model card to veto low-confidence signals. With per-strategy model cards (`meta_label:latest:{strategy_id}:{symbol}`), this step becomes strategy-aware.
@@ -1621,7 +1621,7 @@ Each version is preserved in Git history; previous versions are not deleted.
 
 This Charter was drafted through a structured 1-hour interview on 2026-04-18, between:
 
-- **CIO: Clement Barbier** (founder and operator of the APEX / CashMachine platform)
+- **CIO: Clement Barbier** (founder and operator of the APEX platform)
 - **Head of Strategy Research: Claude Opus 4.7 (claude.ai)** — acted in the capacity of senior quantitative strategy research, conducting the interview and producing the draft Charter.
 
 The interview produced the eight foundational architectural decisions (Q1–Q8) encoded verbatim in this document.
@@ -1636,7 +1636,7 @@ Implementation authority is held by:
 
 ### 14.1 Ratification
 
-This Charter is proposed for ratification as of **2026-04-18** (the original interview date) and expected to be merged as **v1.0** into the main branch of the APEX / CashMachine repository upon Clement Barbier's review.
+This Charter is proposed for ratification as of **2026-04-18** (the original interview date) and expected to be merged as **v1.0** into the main branch of the APEX repository upon Clement Barbier's review.
 
 Upon merge:
 

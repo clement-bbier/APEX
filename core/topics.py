@@ -7,7 +7,7 @@ Topic convention: hierarchical, dot-delimited segments. The leading two
 segments identify the channel family (``{category}.{subcategory}``), and
 the number of trailing segments varies per channel. Examples:
 
-- 3 segments: ``tick.crypto.BTCUSDT``, ``service.health.s01_data_ingestion``,
+- 3 segments: ``tick.crypto.BTCUSDT``, ``service.health.data_ingestion``,
   ``macro.catalyst.FOMC``.
 - 3 segments (legacy, single-strategy): ``signal.technical.BTCUSDT`` —
   emitted by the deprecated :meth:`Topics.signal` helper.
@@ -62,7 +62,7 @@ class Topics:
     RISK_SYSTEM_STATE_CHANGE: str = "risk.system.state_change"
 
     # ── Service health (all services → supervisor) ────────────────────────────
-    SERVICE_HEALTH: str = "service.health"  # e.g. service.health.s01_data_ingestion
+    SERVICE_HEALTH: str = "service.health"  # e.g. service.health.data_ingestion
 
     # ── Analytics (S07, S04) ─────────────────────────────────────────────────
     ANALYTICS_UPDATE: str = "analytics.update"
@@ -169,7 +169,7 @@ class Topics:
         """Build a service health topic string.
 
         Args:
-            service_id: Service identifier, e.g. ``'s01_data_ingestion'``.
+            service_id: Service identifier, e.g. ``'data_ingestion'``.
 
         Returns:
             Full ZMQ topic string.

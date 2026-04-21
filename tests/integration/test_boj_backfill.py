@@ -25,7 +25,7 @@ class TestBoJOffline:
     @pytest.mark.asyncio
     async def test_fetch_metadata_policy_rate(self) -> None:
         """Fetch BoJ policy rate metadata (no network needed)."""
-        from services.s01_data_ingestion.connectors.boj_connector import BoJConnector
+        from services.data_ingestion.connectors.boj_connector import BoJConnector
 
         connector = BoJConnector()
         meta = await connector.fetch_metadata("boj_policy_rate")
@@ -44,7 +44,7 @@ class TestBoJBackfillIntegration:
     @pytest.mark.asyncio
     async def test_fetch_policy_rate(self) -> None:
         """Download BoJ policy rate CSV."""
-        from services.s01_data_ingestion.connectors.boj_connector import BoJConnector
+        from services.data_ingestion.connectors.boj_connector import BoJConnector
 
         connector = BoJConnector()
         start = datetime(2020, 1, 1, tzinfo=UTC)

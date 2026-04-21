@@ -108,13 +108,13 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 - `core/models/order.py` — TradeRecord.r_multiple returns Decimal instead of float
 - `core/models/signal.py` — Signal.risk_reward returns Decimal instead of float
 - `pyproject.toml` — removed core.models.* from mypy ignore_errors
-- `services/s01_data_ingestion/service.py` — .get_secret_value() for alpaca keys
-- `services/s01_data_ingestion/connectors/alpaca_historical.py` — .get_secret_value()
-- `services/s06_execution/service.py` — .get_secret_value() for alpaca + binance keys
-- `services/s10_monitor/alert_engine.py` — .get_secret_value() for smtp_password, twilio_sid/token
-- `services/s05_risk_manager/position_rules.py` — Decimal computation (float only at kwargs)
-- `services/s05_risk_manager/circuit_breaker.py` — Decimal computation in _evaluate_triggers
-- `services/s05_risk_manager/exposure_monitor.py` — Decimal computation (float only at kwargs)
+- `services/data_ingestion/service.py` — .get_secret_value() for alpaca keys
+- `services/data_ingestion/connectors/alpaca_historical.py` — .get_secret_value()
+- `services/execution/service.py` — .get_secret_value() for alpaca + binance keys
+- `services/command_center/alert_engine.py` — .get_secret_value() for smtp_password, twilio_sid/token
+- `services/risk_manager/position_rules.py` — Decimal computation (float only at kwargs)
+- `services/risk_manager/circuit_breaker.py` — Decimal computation in _evaluate_triggers
+- `services/risk_manager/exposure_monitor.py` — Decimal computation (float only at kwargs)
 - `tests/unit/test_config.py` — updated assertions for SecretStr
 
 ### Files Deferred (with reason)
@@ -150,7 +150,7 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 ### Decisions Made
 
-1. Coverage omit narrowed: removed `services/s01_data_ingestion/*.py` wildcard and `services/s10_monitor/*` wildcard, replaced with specific network/UI modules only
+1. Coverage omit narrowed: removed `services/data_ingestion/*.py` wildcard and `services/command_center/*` wildcard, replaced with specific network/UI modules only
 2. Coverage gate raised from 40% to 75% (baseline measured at 80% post-narrowing)
 3. Backtest thresholds (Sharpe 0.5, DD 12%) retained — deferred to Phase 5 pending full_report() Sharpe bug fix
 4. `continue-on-error: true` retained on backtest-gate — follow-up issue #102 created
@@ -208,29 +208,29 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 **#74 — S03 dead code + enum alignment:**
 
-- `services/s03_regime_detector/service.py` — removed `_update_regime()` (50 LOC)
-- `services/s03_regime_detector/regime_engine.py` — deleted local VolRegime/RiskMode, aligned Phase-2 API on core enums
+- `services/regime_detector/service.py` — removed `_update_regime()` (50 LOC)
+- `services/regime_detector/regime_engine.py` — deleted local VolRegime/RiskMode, aligned Phase-2 API on core enums
 - `tests/unit/s03/test_regime_engine.py` — updated assertions for core enum values
 - `tests/unit/s03/test_regime_engine_legacy.py` — updated Phase-2 boundary assertions
 
 **#75 — S04 StrategySelector registry:**
 
-- `services/s04_fusion_engine/strategy.py` — StrategyProfile dataclass + STRATEGY_REGISTRY, registry-based lookup
+- `services/fusion_engine/strategy.py` — StrategyProfile dataclass + STRATEGY_REGISTRY, registry-based lookup
 
 **#76 — StateStore public API:**
 
 - `core/state.py` — added `client` property, deprecated `_ensure_connected()`
-- `services/s05_risk_manager/service.py` — `state.client` instead of `state._ensure_connected()`
-- `services/s06_execution/order_manager.py` — same migration
-- `services/s10_monitor/command_api.py` — same migration (2 occurrences)
+- `services/risk_manager/service.py` — `state.client` instead of `state._ensure_connected()`
+- `services/execution/order_manager.py` — same migration
+- `services/command_center/command_api.py` — same migration (2 occurrences)
 
 **#77 — S01 layering:**
 
-- `services/s01_data_ingestion/connectors/alpaca_historical.py` — DI normalizer factory
-- `services/s01_data_ingestion/connectors/binance_historical.py` — DI normalizer factory
-- `services/s01_data_ingestion/connectors/massive_historical.py` — DI normalizer factory
-- `services/s01_data_ingestion/connectors/yahoo_historical.py` — DI normalizer factory
-- `services/s01_data_ingestion/orchestrator/connector_factory.py` — injects normalizers
+- `services/data_ingestion/connectors/alpaca_historical.py` — DI normalizer factory
+- `services/data_ingestion/connectors/binance_historical.py` — DI normalizer factory
+- `services/data_ingestion/connectors/massive_historical.py` — DI normalizer factory
+- `services/data_ingestion/connectors/yahoo_historical.py` — DI normalizer factory
+- `services/data_ingestion/orchestrator/connector_factory.py` — injects normalizers
 - `scripts/backfill_binance.py` — passes normalizer factory
 - `scripts/backfill_equities.py` — passes normalizer factory
 - `scripts/backfill_yahoo.py` — passes normalizer factory
@@ -272,19 +272,19 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 
 ### Files Created
 
-- `services/s06_execution/broker_base.py` — Broker ABC + exceptions
-- `services/s06_execution/broker_factory.py` — BrokerFactory
-- `services/s02_signal_engine/pipeline.py` — SignalPipeline + PipelineState
+- `services/execution/broker_base.py` — Broker ABC + exceptions
+- `services/execution/broker_factory.py` — BrokerFactory
+- `services/signal_engine/pipeline.py` — SignalPipeline + PipelineState
 - `tests/unit/s06/test_broker_base.py` — 15 tests (ABC, is_connected, factory)
 - `tests/unit/s02/test_signal_pipeline.py` — 16 tests (all 7 pipeline steps)
 
 ### Files Modified
 
-- `services/s06_execution/broker_alpaca.py` — inherits Broker, is_connected, place_order(ApprovedOrder)
-- `services/s06_execution/broker_binance.py` — inherits Broker, is_connected, place_order(ApprovedOrder), _order_symbols tracking
-- `services/s06_execution/paper_trader.py` — inherits Broker, connect/disconnect no-ops, place_order, _get_or_build_tick
-- `services/s06_execution/service.py` — refactored to use BrokerFactory, _execute() simplified from 35 to 5 lines
-- `services/s02_signal_engine/service.py` — _process_tick now 3 lines delegating to pipeline.run()
+- `services/execution/broker_alpaca.py` — inherits Broker, is_connected, place_order(ApprovedOrder)
+- `services/execution/broker_binance.py` — inherits Broker, is_connected, place_order(ApprovedOrder), _order_symbols tracking
+- `services/execution/paper_trader.py` — inherits Broker, connect/disconnect no-ops, place_order, _get_or_build_tick
+- `services/execution/service.py` — refactored to use BrokerFactory, _execute() simplified from 35 to 5 lines
+- `services/signal_engine/service.py` — _process_tick now 3 lines delegating to pipeline.run()
 
 ### Quality Gates
 
@@ -365,7 +365,7 @@ Each entry follows the template in `templates/SESSION_TEMPLATE.md`.
 ### Files Modified
 
 - `tests/integration/test_cb_event_protocol.py` — 3 tests migrated to async API, 1 new test added (7 total)
-- `services/s05_risk_manager/cb_event_guard.py` — TODO(APEX-CB-API-V2) removed from is_blocked()
+- `services/risk_manager/cb_event_guard.py` — TODO(APEX-CB-API-V2) removed from is_blocked()
 - `docs/claude_memory/SESSIONS.md` — this entry
 
 ### Quality Gates
@@ -1247,7 +1247,7 @@ with explicit reject reasons (`vif_not_computed`, `dsr_not_computed`), never sil
 Phase 3.13 closes Phase 3. Adds `features/integration/` bridging
 Phase 3.4-3.8 validated calculators to S02's `SignalComponent`
 interface via the GoF Adapter pattern, with **zero modification** to
-`services/s02_signal_engine/`.
+`services/signal_engine/`.
 
 New module layout:
 - `FeatureActivationConfig` (frozen): loads Phase 3.12 report JSON into
@@ -1264,7 +1264,7 @@ deferred to Phase 5 or an explicit decision point.
 
 ### Audit Findings (pre-implementation)
 
-- `SignalComponent` lives in `services.s02_signal_engine.signal_scorer`
+- `SignalComponent` lives in `services.signal_engine.signal_scorer`
   as a `@dataclass` (not Pydantic) with fields `name`, `score`, `weight`,
   `triggered`, `metadata`. Imported directly.
 - All Phase 3.4-3.8 calculators expose only batch `compute(df) -> df`.
@@ -1276,7 +1276,7 @@ deferred to Phase 5 or an explicit decision point.
 - Valid `SignalComponent` output: PASS
 - None during warmup: PASS
 - < 1% drift vs offline batch: **PASS** (400-tick OFI consistency test)
-- Zero diff in services/s02_signal_engine/: **PASS** (scope-check test)
+- Zero diff in services/signal_engine/: **PASS** (scope-check test)
 - < 1ms per (feature, tick): **XFAIL with honest numbers**. Measured
   p50=4-9ms, p95=9-16ms, p99=12-19ms on OFI. Root cause: batch-only
   compute() re-run per tick. Plan B options documented in xfail reason
@@ -1404,13 +1404,13 @@ Pre-existing state significantly shapes Phase 4 scope:
   with ternary labels `{-1, 0, +1}` and vol-adaptive barriers. 4.1
   extends (adds binary projection + Polars batch entry point) rather
   than rewrites.
-- `services/s04_fusion_engine/meta_labeler.py` ships a **deterministic
+- `services/fusion_engine/meta_labeler.py` ships a **deterministic
   rules-based** MetaLabeler with in-code roadmap note "Phase 5:
   deterministic rules, Phase 6: trained classifier". ADR-0005 §1
   documents that the Phase 4 trained classifier sits alongside this
   deterministic scorer during the 4.x window; Phase 5 wiring
   replaces `.score()` with trained-classifier inference.
-- `services/s05_risk_manager/meta_label_gate.py` is frozen;
+- `services/risk_manager/meta_label_gate.py` is frozen;
   Phase 4 persists calibrated probabilities to
   `meta_label:latest:{symbol}` in Redis for S05 to consume (wiring
   itself is Phase 5).
@@ -1852,7 +1852,7 @@ fusion_score(symbol, t) = Σ_i (w_i · signal_i(symbol, t))
 Weights **frozen at construction time** from a reference IC
 measurement window — NOT re-calibrated per `compute` call. Scope
 strictly additive: new `features/fusion/` package + unit tests +
-diagnostic report. `services/s04_fusion_engine/` untouched (Phase 5
+diagnostic report. `services/fusion_engine/` untouched (Phase 5
 wiring tracked by issue #123).
 
 ### Deliverables
@@ -1862,7 +1862,7 @@ wiring tracked by issue #123).
 | `reports/phase_4_7/audit.md` | Pre-impl audit: 13 sections covering objective, reuse inventory, public API contract, construction semantics, compute semantics, anti-leakage, test plan (≥16 tests listed), synthetic scenario for DoD Sharpe, report contract, fail-loud inventory, out-of-scope (regime-conditional, HRP, rolling recalibration deferred). |
 | `features/fusion/__init__.py` | Public re-exports (`ICWeightedFusion`, `ICWeightedFusionConfig`). |
 | `features/fusion/ic_weighted.py` | `ICWeightedFusionConfig` frozen dataclass + `from_ic_report` classmethod (intersection of `ICReport.results` ∩ `FeatureActivationConfig.activated_features`; silent drop extras, hard error on missing/duplicate/`Σ=0`; sorted feature order + float re-normalisation). `ICWeightedFusion.compute(signals)` validates required columns, rejects null/NaN/empty, emits `[timestamp, symbol, fusion_score]` Float64 via `pl.sum_horizontal` (no Python row loops). |
-| `tests/unit/features/fusion/test_ic_weighted.py` | ~30 unit tests across 10 sections: simplex contract, linear-combination sanity, mismatch handling, determinism, compute validation, output schema, direct-construction invariants, anti-leakage property test (permuting future rows must not change past scores), DoD Sharpe assertion (fusion Sharpe > best individual on 1-alpha + 2-noise synthetic, seed 42, n=2000), scope guard asserting `services/s04_fusion_engine/` untouched via `git diff --name-only main...HEAD`. |
+| `tests/unit/features/fusion/test_ic_weighted.py` | ~30 unit tests across 10 sections: simplex contract, linear-combination sanity, mismatch handling, determinism, compute validation, output schema, direct-construction invariants, anti-leakage property test (permuting future rows must not change past scores), DoD Sharpe assertion (fusion Sharpe > best individual on 1-alpha + 2-noise synthetic, seed 42, n=2000), scope guard asserting `services/fusion_engine/` untouched via `git diff --name-only main...HEAD`. |
 | `scripts/generate_phase_4_7_report.py` | Env-var-driven demo (APEX_SEED / APEX_REPORT_NOW / APEX_REPORT_WALLCLOCK_MODE) mirroring 4.3/4.4/4.5/4.6. Builds synthetic scenario, computes per-signal IC/IC_IR (Pearson + 20-fold mean/std proxy), materialises `ICReport`, builds `ICWeightedFusionConfig.from_ic_report`, runs `compute`, writes `reports/phase_4_7/fusion_diagnostics.{md,json}` (weights vector, score percentiles P05/P25/P50/P75/P95, per-signal Pearson correlations, Sharpe comparison table). |
 
 ### Quality Gates
@@ -1900,7 +1900,7 @@ wiring tracked by issue #123).
   row loops, scales to the tick-rate hot path even though the
   current MVP is batch-only.
 - **Scope guard test**: Phase 4.7 is strictly additive; a CI-level
-  check that `services/s04_fusion_engine/` is untouched prevents
+  check that `services/fusion_engine/` is untouched prevents
   accidental premature streaming wiring.
 
 ### References (canonical)
@@ -2287,7 +2287,7 @@ reuse-only).
 - **D050**: Drop Phase 5.6 (ZMQ P2P), 5.7 (SBE/FlatBuffers), 5.9 (Rust FFI) from Phase 5 scope; move to new **Phase 7.5 Infrastructure Hardening** backlog. Rationale: Principles 1 (cash generation), 3 (acknowledged constraints), 7 (AQR senior-quant tie-breaker). Re-evaluate only if live-trading benchmarks from Phase 8 prove they are bottlenecks.
 - **D051**: Re-sequence remaining Phase 5 sub-phases as **5.1 (DONE) → 5.2 → 5.3 → 5.5 → 5.4 → 5.8 → 5.10**. 5.5 (drift monitoring) promoted ahead of 5.4 (short-side) so safety instrumentation exists before the alpha extension.
 - **D052**: Substitute proprietary `WorldMonitorConnector` in 5.8 with **GDELT 2.0 + FinBERT ONNX**. Zero USD/month operational cost; open-source; matches institutional methodology without institutional-vendor dependency.
-- **D053**: Authorize Python patcher bypass for write-protected files during post-audit work (services/s05_risk_manager/*, .github/workflows/*, docs/adr/*, docs/phases/*).
+- **D053**: Authorize Python patcher bypass for write-protected files during post-audit work (services/risk_manager/*, .github/workflows/*, docs/adr/*, docs/phases/*).
 - **D054**: #102 backtest-gate muzzle stays temporarily — Sharpe-bug fix in `full_report()` is >1h per A.3 decision rule. Muzzle visibility strengthened; #102 to be promoted to priority:high in Batch E.
 - **D055**: S05 SOLID-S decomposition (530 LOC → RiskChainOrchestrator + ContextLoader + RiskDecisionBuilder) piggybacks on Batch D, natural since 5.2 rewrites context loading anyway.
 
@@ -2300,8 +2300,8 @@ Created:
 
 Modified (Batch A):
 - `.github/workflows/ci.yml` (backtest-gate muzzle annotation)
-- `services/s10_monitor/service.py` (+ state-change handler)
-- `services/s10_monitor/dashboard.py` (+ endpoint)
+- `services/command_center/service.py` (+ state-change handler)
+- `services/command_center/dashboard.py` (+ endpoint)
 
 Modified (Batch B):
 - `docs/phases/PHASE_5_SPEC.md` (partial-supersession header)
@@ -2323,8 +2323,8 @@ Modified (Batch B):
 - All 8 S05 pre-trade context Redis keys are **orphan reads** in production code — no writers in `services/`. Tests seed them via fakeredis only. This is a hard blocker for Phase 5.2 design; three forward-paths documented.
 - S10 did not observe `risk.system.state_change` (Phase 5.1 follow-up debt) — fixed in Batch A.
 - CI `backtest-gate` still muzzled (#102) — visibility strengthened in Batch A.
-- `services/s05_risk_manager/service.py` at 530 LOC mixes 5 responsibilities (SOLID-S) — Batch D refactor.
-- `services/s02_signal_engine/pipeline.py` at 487 LOC with 290-LOC `_run()` (SOLID-S) — Batch D refactor, prerequisite for 5.3 streaming.
+- `services/risk_manager/service.py` at 530 LOC mixes 5 responsibilities (SOLID-S) — Batch D refactor.
+- `services/signal_engine/pipeline.py` at 487 LOC with 290-LOC `_run()` (SOLID-S) — Batch D refactor, prerequisite for 5.3 streaming.
 - PROJECT_ROADMAP.md had phase-numbering drift (Phase 4/5 names differ from actual execution) — reconciled in Batch B with drift notice + canonical updates.
 
 ### Next Steps

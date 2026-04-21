@@ -36,7 +36,7 @@ from core.config import get_settings
 from core.data.timescale_repository import TimescaleRepository
 from core.models.data import IngestionStatus
 from scripts._backfill_common import _parse_utc_datetime
-from services.s01_data_ingestion.connectors.fundamentals_base import (
+from services.data_ingestion.connectors.fundamentals_base import (
     FundamentalsConnector,
 )
 
@@ -55,13 +55,13 @@ def _build_connector(provider: str) -> FundamentalsConnector:
         A concrete :class:`FundamentalsConnector` instance.
     """
     if provider == "edgar":
-        from services.s01_data_ingestion.connectors.edgar_connector import (
+        from services.data_ingestion.connectors.edgar_connector import (
             EDGARConnector,
         )
 
         return EDGARConnector()
     if provider == "simfin":
-        from services.s01_data_ingestion.connectors.simfin_connector import (
+        from services.data_ingestion.connectors.simfin_connector import (
             SimFinConnector,
         )
 

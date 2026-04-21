@@ -12,10 +12,10 @@ from datetime import UTC, datetime
 import pytest
 
 from core.models.data import Bar, BarSize
-from services.s01_data_ingestion.connectors.yahoo_historical import (
+from services.data_ingestion.connectors.yahoo_historical import (
     YahooHistoricalConnector,
 )
-from services.s01_data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
+from services.data_ingestion.normalizers.yahoo_bar import YahooBarNormalizer
 
 _HAS_NETWORK = os.environ.get("APEX_NETWORK_TESTS", "0") == "1"
 

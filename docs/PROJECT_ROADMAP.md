@@ -8,7 +8,7 @@
 
 ---
 
-# APEX / CashMachine — Project Roadmap
+# APEX — Project Roadmap
 
 **⚠️ Historical reference only — see SUPERSEDED banner above. Active source of truth: [docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md](phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md).**
 

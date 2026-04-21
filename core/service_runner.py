@@ -6,8 +6,8 @@ Every ``services/sNN_xxx/service.py`` file uses
 1. Forces the Windows selector event-loop policy (pyzmq is incompatible
    with the default proactor loop on Windows).
 2. Adds the project root to ``sys.path`` so the module can be launched as
-   ``python services/s01_data_ingestion/service.py`` *or* as
-   ``python -m services.s01_data_ingestion.service``.
+   ``python services/data_ingestion/service.py`` *or* as
+   ``python -m services.data_ingestion.service``.
 3. Discovers the unique :class:`BaseService` subclass declared in the
    caller module via introspection (no manual class name registration).
 4. Runs the service inside a hardened ``try/except`` that prints a full

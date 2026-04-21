@@ -30,7 +30,7 @@ class TestFREDReleasesLive:
     @pytest.mark.asyncio
     async def test_fetch_releases_all_series(self) -> None:
         """Fetch release dates for all priority series."""
-        from services.s01_data_ingestion.connectors.fred_releases import (
+        from services.data_ingestion.connectors.fred_releases import (
             FREDReleasesConnector,
         )
 

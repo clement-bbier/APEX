@@ -7,7 +7,7 @@ to let code that expects :class:`SignalComponent` objects (e.g. S02's
 side knowing about the other.
 
 Phase 3.13 ships this adapter as **scaffolding** only: it is not yet
-wired into ``services/s02_signal_engine/``. Wiring happens in a later
+wired into ``services/signal_engine/``. Wiring happens in a later
 phase when the call-site owner is ready.
 
 Performance note (honest reporting, per CLAUDE.md rule 10):
@@ -49,7 +49,7 @@ import polars as pl
 from features.base import FeatureCalculator
 from features.integration.config import FeatureActivationConfig
 from features.integration.warmup_gate import WarmupGate
-from services.s02_signal_engine.signal_scorer import SignalComponent
+from services.signal_engine.signal_scorer import SignalComponent
 
 
 def _validate_weight(name: str, value: float) -> float:

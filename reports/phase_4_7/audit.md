@@ -24,7 +24,7 @@ ADR-0005 D7 MVP — no regime-conditional weights, no rolling
 re-calibration, no HRP, no shrinkage.
 
 Scope is **library code + unit tests + diagnostic report** only.
-`services/s04_fusion_engine/` must be untouched (wiring is Phase 5
+`services/fusion_engine/` must be untouched (wiring is Phase 5
 work, tracked separately).
 
 ## 2. Deliverables
@@ -160,7 +160,7 @@ Every bullet below is a distinct test function in
 21. `test_config_rejects_weights_not_summing_to_one`
 22. `test_config_rejects_length_mismatch`
 23. `test_fusion_services_s04_fusion_engine_untouched` (scope guard —
-    verifies no file under `services/s04_fusion_engine/` was modified
+    verifies no file under `services/fusion_engine/` was modified
     by this PR's diff; implemented via git plumbing in the test
     fixture).
 
@@ -241,7 +241,7 @@ env-var contract (`APEX_SEED`, `APEX_REPORT_NOW`,
 - Rolling re-calibration.
 - Hierarchical Risk Parity (HRP).
 - Shrinkage / robust IC_IR estimators.
-- Wiring into `services/s04_fusion_engine/_compute_fusion_score()`
+- Wiring into `services/fusion_engine/_compute_fusion_score()`
   (Phase 5, already tracked).
 - Streaming single-row `compute` API (Phase 5, issue #123).
 

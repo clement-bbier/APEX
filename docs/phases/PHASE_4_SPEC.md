@@ -91,12 +91,12 @@ extends existing code or creates new code, and why.
 | Module | Sub-phase | Reason |
 |---|---|---|
 | `features/labeling/sample_weights.py` | 4.2 | Uniqueness + return-attribution weights do not exist anywhere in the repo. |
-| `features/meta_labeler/baseline.py` | 4.3 | Existing `services/s04_fusion_engine/meta_labeler.py` is a deterministic rules scorer, not a trained classifier. Phase 4 introduces the trained-classifier path as a sibling module that will eventually replace the deterministic scorer in Phase 5 wiring. |
+| `features/meta_labeler/baseline.py` | 4.3 | Existing `services/fusion_engine/meta_labeler.py` is a deterministic rules scorer, not a trained classifier. Phase 4 introduces the trained-classifier path as a sibling module that will eventually replace the deterministic scorer in Phase 5 wiring. |
 | `features/meta_labeler/feature_builder.py` | 4.3 | Assembles the 8-feature Meta-Labeler input from Phase 3 signals + regime state + time-of-day features. No pre-existing builder. |
 | `features/meta_labeler/tuning.py` | 4.4 | Nested CPCV hyperparameter search; new. |
 | `features/meta_labeler/validation.py` | 4.5 | Thin wrapper over `features/hypothesis/` for the ML P&L path. New. |
 | `features/meta_labeler/persistence.py` | 4.6 | joblib serialization + ModelCard schema v1. New. |
-| `features/fusion/ic_weighted.py` | 4.7 | The existing `services/s04_fusion_engine/` computes a different fusion (confluence × regime × mtf); Phase 4 adds the IC-weighted library computation as a distinct module. |
+| `features/fusion/ic_weighted.py` | 4.7 | The existing `services/fusion_engine/` computes a different fusion (confluence × regime × mtf); Phase 4 adds the IC-weighted library computation as a distinct module. |
 | `tests/integration/test_phase_4_pipeline.py` | 4.8 | New E2E test mirroring `tests/integration/test_phase_3_pipeline.py`. |
 | `docs/phase_4_closure_report.md` | 4.9 | Mirrors `docs/phase_3_closure_report.md`. |
 
@@ -104,16 +104,16 @@ extends existing code or creates new code, and why.
 
 | Path | Reason |
 |---|---|
-| `services/s02_signal_engine/` | S02 is frozen; Phase 3.13 adapter is the integration seam. |
-| `services/s03_regime_detector/` | Read-only consumer; no modifications. |
-| `services/s04_fusion_engine/` | The existing deterministic `MetaLabeler` stays in place until Phase 5 wiring replaces `.score()` with trained-classifier inference. Two paths co-exist during the 4.x window, which is an explicit audit-trail note in ADR-0005 §3. |
-| `services/s05_risk_manager/` | `MetaLabelGate` interface is frozen; Phase 4 persists to the Redis key `meta_label:latest:{symbol}` that S05 reads. No code changes to S05 in Phase 4. |
+| `services/signal_engine/` | S02 is frozen; Phase 3.13 adapter is the integration seam. |
+| `services/regime_detector/` | Read-only consumer; no modifications. |
+| `services/fusion_engine/` | The existing deterministic `MetaLabeler` stays in place until Phase 5 wiring replaces `.score()` with trained-classifier inference. Two paths co-exist during the 4.x window, which is an explicit audit-trail note in ADR-0005 §3. |
+| `services/risk_manager/` | `MetaLabelGate` interface is frozen; Phase 4 persists to the Redis key `meta_label:latest:{symbol}` that S05 reads. No code changes to S05 in Phase 4. |
 
 ### 2.5 Informal terminology notes
 
 - ADR-0002 does **not** define `OBJ-0`/`OBJ-5` objectives. Existing
   docstrings in `core/math/labeling.py` and
-  `services/s05_risk_manager/circuit_breaker.py` reference those
+  `services/risk_manager/circuit_breaker.py` reference those
   strings informally; they are not a canonical ADR-0002 contract.
   Phase 4 references ADR-0005 decision numbers (`D1`, `D2`, …)
   exclusively.
@@ -1066,14 +1066,14 @@ verify purging was applied.
 Ship a library-level IC-weighted fusion computation per ADR-0005
 D7. Input: activated Phase 3 signals + their IC reports. Output:
 a scalar `fusion_score` per `(symbol, timestamp)`. Does NOT
-modify `services/s04_fusion_engine/`.
+modify `services/fusion_engine/`.
 
 ### Scope
 - **IN**: fixed IC-IR weights from Phase 3 ICReport; scalar
   fusion score; unit tests; diagnostic report.
 - **OUT (explicitly)**: regime-conditional weights; adaptive
   rolling-window re-calibration; HRP; shrinkage; wiring into
-  `services/s04_fusion_engine/`.
+  `services/fusion_engine/`.
 
 ### Module structure
 ```
@@ -1175,7 +1175,7 @@ Minimum 16 tests. Selected cases:
    signal Sharpe.
 5. `reports/phase_4_7/fusion_diagnostics.md` generated,
    reproducible with `APEX_SEED=42`.
-6. **No modifications** to `services/s04_fusion_engine/` (verified
+6. **No modifications** to `services/fusion_engine/` (verified
    by a scope test in the PR).
 
 ### Dependencies

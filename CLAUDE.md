@@ -21,7 +21,7 @@ It defines non-negotiable constraints for all development work on this project.
 >
 > **For every new file or service created by a Claude Code agent:**
 > - If the target-state location is already specified in the Charter, create the file directly in the target location (e.g., `services/strategies/crypto_momentum/service.py`, NOT `services/s11_crypto_momentum/service.py`).
-> - If adding functionality to an existing S01-S10 service, continue using the current path (e.g., `services/s05_risk_manager/` stays until the refactor) but ensure that new contracts (Pydantic models, ZMQ topics, Redis keys) include `strategy_id` where the Charter requires it, and reference the Charter section that motivates the change.
+> - If adding functionality to an existing S01-S10 service, continue using the current path (e.g., `services/risk_manager/` stays until the refactor) but ensure that new contracts (Pydantic models, ZMQ topics, Redis keys) include `strategy_id` where the Charter requires it, and reference the Charter section that motivates the change.
 >
 > Migration from current topology to target topology is scheduled in **Document 3 ([`PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md`](docs/phases/PHASE_5_v3_MULTI_STRAT_ALIGNED_ROADMAP.md), v3.0, ratified 2026-04-20 via PR #188 + #189)**.
 >

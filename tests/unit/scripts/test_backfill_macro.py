@@ -23,24 +23,24 @@ class TestBuildConnector:
         with (
             patch("scripts.backfill_macro.get_settings", return_value=fake_settings),
             patch(
-                "services.s01_data_ingestion.connectors.fred_connector.get_settings",
+                "services.data_ingestion.connectors.fred_connector.get_settings",
                 return_value=fake_settings,
             ),
-            patch("services.s01_data_ingestion.connectors.fred_connector.Fred"),
+            patch("services.data_ingestion.connectors.fred_connector.Fred"),
         ):
-            from services.s01_data_ingestion.connectors.fred_connector import FREDConnector
+            from services.data_ingestion.connectors.fred_connector import FREDConnector
 
             conn = _build_connector("fred")
             assert isinstance(conn, FREDConnector)
 
     def test_ecb_provider(self):
-        from services.s01_data_ingestion.connectors.ecb_connector import ECBConnector
+        from services.data_ingestion.connectors.ecb_connector import ECBConnector
 
         conn = _build_connector("ecb")
         assert isinstance(conn, ECBConnector)
 
     def test_boj_provider(self):
-        from services.s01_data_ingestion.connectors.boj_connector import BoJConnector
+        from services.data_ingestion.connectors.boj_connector import BoJConnector
 
         conn = _build_connector("boj")
         assert isinstance(conn, BoJConnector)

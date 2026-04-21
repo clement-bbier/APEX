@@ -89,7 +89,7 @@ class Settings(BaseSettings):
 
     # ── SEC EDGAR ─────────────────────────────────────────────────────────────
     edgar_user_agent: str = Field(
-        default="APEX/CashMachine clement.barbier@example.com",
+        default="APEX clement.barbier@example.com",
         description="User-Agent for SEC EDGAR requests (required by SEC)",
     )
 

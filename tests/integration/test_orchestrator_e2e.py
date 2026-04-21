@@ -13,7 +13,7 @@ from typing import Any
 import pytest
 import yaml
 
-from services.s01_data_ingestion.orchestrator.config import load_config_from_yaml
+from services.data_ingestion.orchestrator.config import load_config_from_yaml
 
 _SKIP_REASON = "Set APEX_NETWORK_TESTS=1 to run integration tests"
 
@@ -53,7 +53,7 @@ class TestOrchestratorE2E:
 
     @pytest.mark.asyncio
     async def test_cli_list_subcommand(self, minimal_config: Path) -> None:
-        from services.s01_data_ingestion.orchestrator.cli import ListCommand
+        from services.data_ingestion.orchestrator.cli import ListCommand
 
         cmd = ListCommand(minimal_config)
         await cmd.execute()  # should not raise

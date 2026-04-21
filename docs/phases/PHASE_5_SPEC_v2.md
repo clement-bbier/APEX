@@ -95,7 +95,7 @@ Phase 5 bridges the gap between Phase 4's offline ML pipeline and a paper-tradin
 **Status**: ✅ MERGED 2026-04-17 via PR #177 (commit `1b7c3b5`). Issue #148 CLOSED.
 
 - ADR-0006 ACCEPTED.
-- Deliverables: `SystemRiskState` / `SystemRiskStateCause` / `SystemRiskStateChange` / `SystemRiskMonitor` ([core/state.py:365-600](../../core/state.py)), `FailClosedGuard` ([services/s05_risk_manager/fail_closed.py](../../services/s05_risk_manager/fail_closed.py)), `Topics.RISK_SYSTEM_STATE_CHANGE` ([core/topics.py:48](../../core/topics.py)).
+- Deliverables: `SystemRiskState` / `SystemRiskStateCause` / `SystemRiskStateChange` / `SystemRiskMonitor` ([core/state.py:365-600](../../core/state.py)), `FailClosedGuard` ([services/risk_manager/fail_closed.py](../../services/risk_manager/fail_closed.py)), `Topics.RISK_SYSTEM_STATE_CHANGE` ([core/topics.py:48](../../core/topics.py)).
 - Follow-up observability (S10 subscribe + dashboard endpoint + alert) merged in PR #178 (Batch A of the post-audit execution).
 - Residual debt: S05 `service.py` now 530 LOC (SOLID-S). Decomposed in Batch D of the post-audit execution.
 
@@ -122,11 +122,11 @@ Eliminate the eight-key Redis batch-read from S05's hot path. Replace with an ev
    - **`correlation:matrix`** — **OUT OF 5.2 SCOPE.** For 5.2, S05 reads with a fallback to the identity matrix (explicit constant, logged as a 5.2 known gap; blocked-by-issue tracked for 5.5 or Phase 6). This is a deliberate Principle 1 trade-off: correlation is not on the short critical path to live PnL.
 
 2. **Consumer** (`InMemoryRiskState`):
-   - New module `services/s05_risk_manager/in_memory_state.py` exposing an `InMemoryRiskState` dataclass keyed by canonical field name (`capital`, `daily_pnl`, `intraday_loss_30m`, `positions`, `session`, `vix_current`, `vix_1h_ago`).
+   - New module `services/risk_manager/in_memory_state.py` exposing an `InMemoryRiskState` dataclass keyed by canonical field name (`capital`, `daily_pnl`, `intraday_loss_30m`, `positions`, `session`, `vix_current`, `vix_1h_ago`).
    - `on_message()` handler in S05 updates the state on each topic receipt.
    - Order validation reads **only** from in-memory state — zero network calls, zero `await` in the hot path.
 
-3. **Reconciliation loop** (`services/s05_risk_manager/reconciliation.py`):
+3. **Reconciliation loop** (`services/risk_manager/reconciliation.py`):
    - Every 5 s, compares in-memory state against Redis snapshot (Redis remains the durable store written by producers).
    - Discrepancies > 0.01 % emit `structlog.warning()`.
    - Discrepancies > 1 % transition `SystemRiskState` to `DEGRADED` (5.1 FailClosedGuard rejects 100 % of orders per ADR-0006 §D7).
@@ -153,7 +153,7 @@ Eliminate the eight-key Redis batch-read from S05's hot path. Replace with an ev
 #### Module structure
 
 ```
-services/s05_risk_manager/
+services/risk_manager/
 ├── in_memory_state.py           # NEW — InMemoryRiskState dataclass + update handlers
 ├── reconciliation.py            # NEW — periodic Redis ↔ in-memory comparison
 ├── chain_orchestrator.py        # NEW — extracted from service.py (Batch D)
@@ -161,33 +161,33 @@ services/s05_risk_manager/
 ├── decision_builder.py          # NEW — approved/blocked constructor
 ├── service.py                   # MODIFY — slimmed to lifecycle + dispatch
 
-services/s09_feedback_loop/
+services/feedback_loop/
 ├── pnl_tracker.py               # NEW — daily + intraday_30m PnL
 ├── position_aggregator.py       # NEW — positions:{symbol} → portfolio:positions
 
-services/s06_execution/
+services/execution/
 ├── portfolio_tracker.py         # NEW — capital on-fill updates
 
-services/s03_regime_detector/
+services/regime_detector/
 ├── session_tracker.py           # MODIFY — add Redis persistence shim
 
-services/s01_data_ingestion/
+services/data_ingestion/
 ├── macro_feed.py                # MODIFY — persist macro:vix_current; rolling-snapshot task
 
 core/topics.py                   # MODIFY — add PORTFOLIO_* topics
 
-tests/unit/services/s05_risk_manager/
+tests/unit/services/risk_manager/
 ├── test_in_memory_state.py      (~20 tests)
 ├── test_reconciliation.py       (~14 tests)
 ├── test_chain_orchestrator.py   (~16 tests)
 ├── test_context_loader.py       (~10 tests)
 ├── test_decision_builder.py     (~10 tests)
 
-tests/unit/services/s06_execution/test_portfolio_tracker.py     (~10)
-tests/unit/services/s09_feedback_loop/test_pnl_tracker.py       (~14)
-tests/unit/services/s09_feedback_loop/test_position_aggregator.py  (~10)
-tests/unit/services/s03_regime_detector/test_session_redis_shim.py  (~8)
-tests/unit/services/s01_data_ingestion/test_macro_feed_redis.py    (~10)
+tests/unit/services/execution/test_portfolio_tracker.py     (~10)
+tests/unit/services/feedback_loop/test_pnl_tracker.py       (~14)
+tests/unit/services/feedback_loop/test_position_aggregator.py  (~10)
+tests/unit/services/regime_detector/test_session_redis_shim.py  (~8)
+tests/unit/services/data_ingestion/test_macro_feed_redis.py    (~10)
 
 tests/integration/
 ├── test_event_sourcing_convergence.py  (~8 tests)
@@ -244,11 +244,11 @@ Wire Phase 4's trained Meta-Labeler and IC-weighted Fusion into the live S02 →
 
 **IN:**
 
-- `services/s02_signal_engine/streaming_adapter.py` — new per-tick wrapper around Phase 3 calculators. Each calculator that supports incremental computation exposes `compute_incremental(new_bar, evicted_bar | None) -> features`. Calculators without an incremental interface fall back to bounded-window batch `compute()`, with documented window size + P99 latency evidence.
-- `services/s02_signal_engine/pipeline.py` — SOLID-S decomposition (per-stage classes) — prerequisite from Batch D.
-- `services/s04_fusion_engine/live_meta_labeler.py` — loads persisted `.joblib` model + `.json` model card at startup. Strict card validation: if invalid or mismatched SHA, S04 **refuses to start** (fail-loud; no fallback to deterministic scorer).
-- `services/s04_fusion_engine/live_fusion.py` — IC-weighted fusion in streaming mode. Reads frozen weights from the persisted `ICWeightedFusionConfig`.
-- `services/s04_fusion_engine/service.py` — per-tick `predict_proba → 2p-1 Kelly bet-size → OrderCandidate` publishes on `order.candidate`. Redis key `meta_label:latest:{symbol}` updated live (for S05 `MetaLabelGate` consumption).
+- `services/signal_engine/streaming_adapter.py` — new per-tick wrapper around Phase 3 calculators. Each calculator that supports incremental computation exposes `compute_incremental(new_bar, evicted_bar | None) -> features`. Calculators without an incremental interface fall back to bounded-window batch `compute()`, with documented window size + P99 latency evidence.
+- `services/signal_engine/pipeline.py` — SOLID-S decomposition (per-stage classes) — prerequisite from Batch D.
+- `services/fusion_engine/live_meta_labeler.py` — loads persisted `.joblib` model + `.json` model card at startup. Strict card validation: if invalid or mismatched SHA, S04 **refuses to start** (fail-loud; no fallback to deterministic scorer).
+- `services/fusion_engine/live_fusion.py` — IC-weighted fusion in streaming mode. Reads frozen weights from the persisted `ICWeightedFusionConfig`.
+- `services/fusion_engine/service.py` — per-tick `predict_proba → 2p-1 Kelly bet-size → OrderCandidate` publishes on `order.candidate`. Redis key `meta_label:latest:{symbol}` updated live (for S05 `MetaLabelGate` consumption).
 - **G7 gate reinstated as blocking on real data.** If G7 fails during live operation, the deployment is halted; model must be retrained or feature set expanded.
 - **CVDKyle vectorization (#115)** — prerequisite. The loops at `features/calculators/cvd_kyle.py:306, 361, 408` are on the streaming hot path.
 
@@ -262,12 +262,12 @@ Wire Phase 4's trained Meta-Labeler and IC-weighted Fusion into the live S02 →
 #### Module structure
 
 ```
-services/s02_signal_engine/
+services/signal_engine/
 ├── streaming_adapter.py         # NEW — incremental calculator wrapper
 ├── pipeline.py                  # DECOMPOSED (from Batch D)
 ├── stages/                      # NEW — step classes per Batch D
 
-services/s04_fusion_engine/
+services/fusion_engine/
 ├── live_meta_labeler.py         # NEW
 ├── live_fusion.py               # NEW
 ├── service.py                   # MODIFY
@@ -275,9 +275,9 @@ services/s04_fusion_engine/
 features/calculators/
 ├── cvd_kyle.py                  # MODIFY — vectorize loops at :306, :361, :408 (issue #115)
 
-tests/unit/services/s02_signal_engine/test_streaming_adapter.py   (~18)
-tests/unit/services/s04_fusion_engine/test_live_meta_labeler.py   (~14)
-tests/unit/services/s04_fusion_engine/test_live_fusion.py         (~10)
+tests/unit/services/signal_engine/test_streaming_adapter.py   (~18)
+tests/unit/services/fusion_engine/test_live_meta_labeler.py   (~14)
+tests/unit/services/fusion_engine/test_live_fusion.py         (~10)
 tests/unit/features/calculators/test_cvd_kyle_vectorized.py       (~6)
 tests/integration/test_streaming_pipeline.py                      (~10)
 ```
@@ -334,11 +334,11 @@ Detect feature drift, calibration degradation, and signal decay in real time. Wh
 
 **IN:**
 
-- `services/s09_feedback_loop/drift_monitor.py` — new module implementing:
+- `services/feedback_loop/drift_monitor.py` — new module implementing:
   - **PSI (Population Stability Index)** on rolling 500-bar windows vs training distribution. PSI > 0.10 = warning, PSI > 0.25 = critical.
   - **Rolling AUC** on last 200 realized labels (from Triple Barrier t1 outcomes). If below G1 (0.55) for 3 consecutive windows → critical.
   - **Brier score calibration divergence** on rolling window. If > G5 (0.25) → critical.
-- `services/s09_feedback_loop/alert_engine.py` — new module publishing `feedback.drift.critical` and `feedback.recalibration.requested` topics on threshold breach.
+- `services/feedback_loop/alert_engine.py` — new module publishing `feedback.drift.critical` and `feedback.recalibration.requested` topics on threshold breach.
 - S05 `MetaLabelGate` extension: subscribes to `feedback.drift.critical` and applies Kelly × 0.5 defensive multiplier until manual reset (or automatic recalibration in Phase 6).
 - New Topics constants in `core/topics.py`: `FEEDBACK_DRIFT_CRITICAL = "feedback.drift.critical"`, `FEEDBACK_RECALIBRATION_REQUESTED = "feedback.recalibration.requested"`.
 
@@ -350,18 +350,18 @@ Detect feature drift, calibration degradation, and signal decay in real time. Wh
 #### Module structure
 
 ```
-services/s09_feedback_loop/
+services/feedback_loop/
 ├── drift_monitor.py             # NEW — PSI + rolling AUC + Brier
 ├── alert_engine.py              # NEW — threshold-based publisher
 ├── service.py                   # MODIFY — integrate drift monitor
 
-services/s05_risk_manager/
+services/risk_manager/
 ├── meta_label_gate.py           # MODIFY — Kelly × 0.5 on drift.critical
 
 core/topics.py                   # MODIFY — FEEDBACK_* constants
 
-tests/unit/services/s09_feedback_loop/test_drift_monitor.py   (~20)
-tests/unit/services/s09_feedback_loop/test_alert_engine.py    (~10)
+tests/unit/services/feedback_loop/test_drift_monitor.py   (~20)
+tests/unit/services/feedback_loop/test_alert_engine.py    (~10)
 tests/integration/test_drift_feedback_loop.py                 (~8)
 ```
 
@@ -481,12 +481,12 @@ Real-time geopolitical-risk scoring pipeline using open-source substitutes for t
 
 **IN:**
 
-- `services/s01_data_ingestion/connectors/gdelt.py` — new HTTP/CSV connector for GDELT 2.0 events feed (GKG + EVENT). Polls every 15 min. Publishes on `macro.geopolitics.raw` topic.
-- `services/s08_macro_intelligence/nlp/finbert_scorer.py` — FinBERT compiled to ONNX Runtime for CPU inference (no GPU required). Inference in isolated subprocess (no broker-key access). P99 < 50 ms per chunk.
-- `services/s08_macro_intelligence/nlp/model_card_nlp.json` — governance model card documenting bias, inference P99, model size.
+- `services/data_ingestion/connectors/gdelt.py` — new HTTP/CSV connector for GDELT 2.0 events feed (GKG + EVENT). Polls every 15 min. Publishes on `macro.geopolitics.raw` topic.
+- `services/macro_intelligence/nlp/finbert_scorer.py` — FinBERT compiled to ONNX Runtime for CPU inference (no GPU required). Inference in isolated subprocess (no broker-key access). P99 < 50 ms per chunk.
+- `services/macro_intelligence/nlp/model_card_nlp.json` — governance model card documenting bias, inference P99, model size.
 - `GeopoliticalRiskScore [-1.0, 1.0]` persisted to TimescaleDB with point-in-time semantics.
-- `services/s04_fusion_engine/service.py` — Kelly penalty on negative geo_score (asymmetric: `geo_score > 0` does NOT increase Kelly).
-- `services/s05_risk_manager/geopolitical_guard.py` — new guard in the risk chain. `geo_score == -1.0` → VETO all orders. NLP heartbeat absent > 60 s → `SystemRiskState.DEGRADED` (reuses ADR-0006 pattern).
+- `services/fusion_engine/service.py` — Kelly penalty on negative geo_score (asymmetric: `geo_score > 0` does NOT increase Kelly).
+- `services/risk_manager/geopolitical_guard.py` — new guard in the risk chain. `geo_score == -1.0` → VETO all orders. NLP heartbeat absent > 60 s → `SystemRiskState.DEGRADED` (reuses ADR-0006 pattern).
 - New Topics constants: `MACRO_GEOPOLITICS_RAW = "macro.geopolitics.raw"`, `MACRO_GEOPOLITICS_SCORE = "macro.geopolitics.score"`.
 
 **OUT:**
@@ -498,27 +498,27 @@ Real-time geopolitical-risk scoring pipeline using open-source substitutes for t
 #### Module structure
 
 ```
-services/s01_data_ingestion/
+services/data_ingestion/
 ├── connectors/
 │   └── gdelt.py                 # NEW — HTTP/CSV GDELT 2.0 feed
 
-services/s08_macro_intelligence/
+services/macro_intelligence/
 ├── nlp/
 │   ├── finbert_scorer.py        # NEW — ONNX Runtime wrapper
 │   ├── model_card_nlp.json      # NEW — governance card
 │   └── __init__.py
 
-services/s04_fusion_engine/
+services/fusion_engine/
 ├── service.py                   # MODIFY — Kelly penalty on geo_score
 
-services/s05_risk_manager/
+services/risk_manager/
 ├── geopolitical_guard.py        # NEW
 
 core/topics.py                   # MODIFY — MACRO_GEOPOLITICS_* constants
 
-tests/unit/services/s01_data_ingestion/test_gdelt_connector.py    (~12)
-tests/unit/services/s08_macro_intelligence/test_finbert_scorer.py  (~16)
-tests/unit/services/s05_risk_manager/test_geopolitical_guard.py   (~12)
+tests/unit/services/data_ingestion/test_gdelt_connector.py    (~12)
+tests/unit/services/macro_intelligence/test_finbert_scorer.py  (~16)
+tests/unit/services/risk_manager/test_geopolitical_guard.py   (~12)
 tests/integration/test_geopolitical_pipeline.py                   (~10)
 ```
 

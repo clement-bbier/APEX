@@ -111,16 +111,16 @@ services/
 
 | # | Current path | Target path | Domain |
 |---|---|---|---|
-| 1 | `services/s01_data_ingestion/` | `services/data/ingestion/` | data |
-| 2 | `services/s02_signal_engine/` | `services/signal/engine/` | signal (legacy confluence strategy wrapper post Phase B) |
-| 3 | `services/s03_regime_detector/` | `services/signal/regime_detector/` | signal |
-| 4 | `services/s04_fusion_engine/` | `services/signal/fusion/` | signal |
-| 5 | `services/s05_risk_manager/` | `services/portfolio/risk_manager/` | portfolio |
-| 6 | `services/s06_execution/` | `services/execution/engine/` | execution |
-| 7 | `services/s07_quant_analytics/` | `services/signal/quant_analytics/` | signal |
-| 8 | `services/s08_macro_intelligence/` | `services/data/macro_intelligence/` | data |
-| 9 | `services/s09_feedback_loop/` | `services/research/feedback_loop/` | research |
-| 10 | `services/s10_monitor/` | `services/ops/monitor_dashboard/` | ops |
+| 1 | `services/data_ingestion/` | `services/data/ingestion/` | data |
+| 2 | `services/signal_engine/` | `services/signal/engine/` | signal (legacy confluence strategy wrapper post Phase B) |
+| 3 | `services/regime_detector/` | `services/signal/regime_detector/` | signal |
+| 4 | `services/fusion_engine/` | `services/signal/fusion/` | signal |
+| 5 | `services/risk_manager/` | `services/portfolio/risk_manager/` | portfolio |
+| 6 | `services/execution/` | `services/execution/engine/` | execution |
+| 7 | `services/quant_analytics/` | `services/signal/quant_analytics/` | signal |
+| 8 | `services/macro_intelligence/` | `services/data/macro_intelligence/` | data |
+| 9 | `services/feedback_loop/` | `services/research/feedback_loop/` | research |
+| 10 | `services/command_center/` | `services/ops/monitor_dashboard/` | ops |
 
 **New services already in target topology** (born post-Charter, not migrated):
 
@@ -134,9 +134,9 @@ The migration is executed as **Phase D.5** of the Roadmap (weeks 26-28) in a con
 
 **PR 1 — `services/data/` domain migration**:
 
-- `git mv services/s01_data_ingestion/ services/data/ingestion/`
-- `git mv services/s08_macro_intelligence/ services/data/macro_intelligence/`
-- Add compatibility shim at `services/s01_data_ingestion/__init__.py` and `services/s08_macro_intelligence/__init__.py` preserving both package-root and submodule-path imports via explicit `sys.modules` aliasing:
+- `git mv services/data_ingestion/ services/data/ingestion/`
+- `git mv services/macro_intelligence/ services/data/macro_intelligence/`
+- Add compatibility shim at `services/data_ingestion/__init__.py` and `services/macro_intelligence/__init__.py` preserving both package-root and submodule-path imports via explicit `sys.modules` aliasing:
 
     ```python
     # DEPRECATED: import redirect during Phase D.5 migration (ADR-0010).
@@ -146,7 +146,7 @@ The migration is executed as **Phase D.5** of the Roadmap (weeks 26-28) in a con
     import warnings
 
     _NEW_PACKAGE = "services.data.ingestion"
-    _OLD_PACKAGE = "services.s01_data_ingestion"
+    _OLD_PACKAGE = "services.data_ingestion"
     _ALIASES = {
         _OLD_PACKAGE: _NEW_PACKAGE,
         f"{_OLD_PACKAGE}.connectors": f"{_NEW_PACKAGE}.connectors",
@@ -156,7 +156,7 @@ The migration is executed as **Phase D.5** of the Roadmap (weeks 26-28) in a con
         f"{_OLD_PACKAGE}.serving": f"{_NEW_PACKAGE}.serving",
     }
     warnings.warn(
-        "services.s01_data_ingestion is deprecated; use "
+        "services.data_ingestion is deprecated; use "
         "services.data.ingestion",
         DeprecationWarning,
         stacklevel=2,
@@ -171,36 +171,36 @@ The migration is executed as **Phase D.5** of the Roadmap (weeks 26-28) in a con
 
 **PR 2 — `services/signal/` domain migration**:
 
-- `git mv services/s02_signal_engine/ services/signal/engine/`
-- `git mv services/s03_regime_detector/ services/signal/regime_detector/`
-- `git mv services/s04_fusion_engine/ services/signal/fusion/`
-- `git mv services/s07_quant_analytics/ services/signal/quant_analytics/`
-- Add `sys.modules`-aliasing shims at each old path, following the PR-1 pattern with per-package `_NEW_PACKAGE` / `_OLD_PACKAGE` / `_ALIASES` values (e.g., `_NEW_PACKAGE = "services.signal.engine"`, `_OLD_PACKAGE = "services.s02_signal_engine"`, and a `_ALIASES` dict covering the submodule roots present in the source — verified by grep before authoring the shim).
+- `git mv services/signal_engine/ services/signal/engine/`
+- `git mv services/regime_detector/ services/signal/regime_detector/`
+- `git mv services/fusion_engine/ services/signal/fusion/`
+- `git mv services/quant_analytics/ services/signal/quant_analytics/`
+- Add `sys.modules`-aliasing shims at each old path, following the PR-1 pattern with per-package `_NEW_PACKAGE` / `_OLD_PACKAGE` / `_ALIASES` values (e.g., `_NEW_PACKAGE = "services.signal.engine"`, `_OLD_PACKAGE = "services.signal_engine"`, and a `_ALIASES` dict covering the submodule roots present in the source — verified by grep before authoring the shim).
 - CI green; merge.
 
 **PR 3 — `services/portfolio/` domain migration**:
 
-- `git mv services/s05_risk_manager/ services/portfolio/risk_manager/`
-- Add `sys.modules`-aliasing shim at `services/s05_risk_manager/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.portfolio.risk_manager"`, `_OLD_PACKAGE = "services.s05_risk_manager"`, and the submodule roots of s05 (e.g., `chain_orchestrator`, `context_loader`, `fail_closed`, `meta_label_gate`, `position_rules`, `exposure_monitor`, `circuit_breaker`, `cb_event_guard`, `decision_builder`, `in_memory_state`, `reconciliation`, `models`).
+- `git mv services/risk_manager/ services/portfolio/risk_manager/`
+- Add `sys.modules`-aliasing shim at `services/risk_manager/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.portfolio.risk_manager"`, `_OLD_PACKAGE = "services.risk_manager"`, and the submodule roots of s05 (e.g., `chain_orchestrator`, `context_loader`, `fail_closed`, `meta_label_gate`, `position_rules`, `exposure_monitor`, `circuit_breaker`, `cb_event_guard`, `decision_builder`, `in_memory_state`, `reconciliation`, `models`).
 - `services/portfolio/strategy_allocator/` already exists (Phase C).
 - CI green; merge.
 
 **PR 4 — `services/execution/` domain migration**:
 
-- `git mv services/s06_execution/ services/execution/engine/`
-- Add `sys.modules`-aliasing shim at `services/s06_execution/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.execution.engine"`, `_OLD_PACKAGE = "services.s06_execution"`, and the submodule roots of s06 (`broker_base`, `broker_alpaca`, `broker_binance`, `broker_factory`, `portfolio_tracker`).
+- `git mv services/execution/ services/execution/engine/`
+- Add `sys.modules`-aliasing shim at `services/execution/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.execution.engine"`, `_OLD_PACKAGE = "services.execution"`, and the submodule roots of s06 (`broker_base`, `broker_alpaca`, `broker_binance`, `broker_factory`, `portfolio_tracker`).
 - CI green; merge.
 
 **PR 5 — `services/research/` domain migration**:
 
-- `git mv services/s09_feedback_loop/ services/research/feedback_loop/`
-- Add `sys.modules`-aliasing shim at `services/s09_feedback_loop/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.research.feedback_loop"`, `_OLD_PACKAGE = "services.s09_feedback_loop"`, and the submodule roots of s09 (`drift_detector`, `trade_analyzer`, `signal_quality`, `pnl_tracker`, `position_aggregator`, `alert_engine`).
+- `git mv services/feedback_loop/ services/research/feedback_loop/`
+- Add `sys.modules`-aliasing shim at `services/feedback_loop/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.research.feedback_loop"`, `_OLD_PACKAGE = "services.feedback_loop"`, and the submodule roots of s09 (`drift_detector`, `trade_analyzer`, `signal_quality`, `pnl_tracker`, `position_aggregator`, `alert_engine`).
 - CI green; merge.
 
 **PR 6 — `services/ops/` domain migration**:
 
-- `git mv services/s10_monitor/ services/ops/monitor_dashboard/`
-- Add `sys.modules`-aliasing shim at `services/s10_monitor/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.ops.monitor_dashboard"`, `_OLD_PACKAGE = "services.s10_monitor"`, and the submodule roots of s10 (`dashboard`, `alert_engine`, `command_api`, `metrics`).
+- `git mv services/command_center/ services/ops/monitor_dashboard/`
+- Add `sys.modules`-aliasing shim at `services/command_center/__init__.py` per the PR-1 pattern with `_NEW_PACKAGE = "services.ops.monitor_dashboard"`, `_OLD_PACKAGE = "services.command_center"`, and the submodule roots of s10 (`dashboard`, `alert_engine`, `command_api`, `metrics`).
 - CI green; merge.
 
 **PR 7 — remove shims; finalize**:
@@ -235,7 +235,7 @@ The migration is executed as **Phase D.5** of the Roadmap (weeks 26-28) in a con
 
 **Catastrophic revert** (everything back to pre-D.5 state): sequence `git revert <PR 7 sha> <PR 6 sha> <PR 5 sha> ... <PR 1 sha>` in that order. All services return to their S01-S10 paths.
 
-**Git history preservation**: every move uses `git mv` exactly once. `git log --follow services/data/ingestion/` traces back through the move to the full history under `services/s01_data_ingestion/`. This is the **only** way to preserve blame and log continuity; manual `rm` + `add` would break history and is explicitly forbidden in this migration.
+**Git history preservation**: every move uses `git mv` exactly once. `git log --follow services/data/ingestion/` traces back through the move to the full history under `services/data_ingestion/`. This is the **only** way to preserve blame and log continuity; manual `rm` + `add` would break history and is explicitly forbidden in this migration.
 
 ### D6 — Why Phase D.5 is a separate mini-phase
 
@@ -347,7 +347,7 @@ PR 7 includes documentation updates reflecting the target topology:
 
 ### 4.3 Rename to domains but keep a flat structure (`services/data_ingestion/`, etc.)
 
-**Description**: rename `services/s01_data_ingestion/` → `services/data_ingestion/` (drop the s01 prefix, no nesting).
+**Description**: rename `services/data_ingestion/` → `services/data_ingestion/` (drop the s01 prefix, no nesting).
 
 **Pros**: flatter tree; simpler imports.
 
@@ -395,7 +395,7 @@ Executed in weeks 26-28, in order:
 
 - [ ] All 10 former S01-S10 services live at their target domain paths.
 - [ ] All shims removed (no `services/s0N/__init__.py` files present).
-- [ ] `git log --follow services/data/ingestion/service.py` shows the full history inherited from `services/s01_data_ingestion/service.py`.
+- [ ] `git log --follow services/data/ingestion/service.py` shows the full history inherited from `services/data_ingestion/service.py`.
 - [ ] MANIFEST.md describes target topology.
 - [ ] CLAUDE.md §2 reflects domain grouping.
 
@@ -415,16 +415,16 @@ Executed in weeks 26-28, in order:
 
 ### 7.3 Internal code references (current paths, migrating in Phase D.5)
 
-- [`services/s01_data_ingestion/`](../../services/s01_data_ingestion/) → `services/data/ingestion/`
-- [`services/s02_signal_engine/`](../../services/s02_signal_engine/) → `services/signal/engine/`
-- [`services/s03_regime_detector/`](../../services/s03_regime_detector/) → `services/signal/regime_detector/`
-- [`services/s04_fusion_engine/`](../../services/s04_fusion_engine/) → `services/signal/fusion/`
-- [`services/s05_risk_manager/`](../../services/s05_risk_manager/) → `services/portfolio/risk_manager/`
-- [`services/s06_execution/`](../../services/s06_execution/) → `services/execution/engine/`
-- [`services/s07_quant_analytics/`](../../services/s07_quant_analytics/) → `services/signal/quant_analytics/`
-- [`services/s08_macro_intelligence/`](../../services/s08_macro_intelligence/) → `services/data/macro_intelligence/`
-- [`services/s09_feedback_loop/`](../../services/s09_feedback_loop/) → `services/research/feedback_loop/`
-- [`services/s10_monitor/`](../../services/s10_monitor/) → `services/ops/monitor_dashboard/`
+- [`services/data_ingestion/`](../../services/data_ingestion/) → `services/data/ingestion/`
+- [`services/signal_engine/`](../../services/signal_engine/) → `services/signal/engine/`
+- [`services/regime_detector/`](../../services/regime_detector/) → `services/signal/regime_detector/`
+- [`services/fusion_engine/`](../../services/fusion_engine/) → `services/signal/fusion/`
+- [`services/risk_manager/`](../../services/risk_manager/) → `services/portfolio/risk_manager/`
+- [`services/execution/`](../../services/execution/) → `services/execution/engine/`
+- [`services/quant_analytics/`](../../services/quant_analytics/) → `services/signal/quant_analytics/`
+- [`services/macro_intelligence/`](../../services/macro_intelligence/) → `services/data/macro_intelligence/`
+- [`services/feedback_loop/`](../../services/feedback_loop/) → `services/research/feedback_loop/`
+- [`services/command_center/`](../../services/command_center/) → `services/ops/monitor_dashboard/`
 - [`supervisor/orchestrator.py`](../../supervisor/orchestrator.py) — startup order updated in PR 7.
 - [`docker/docker-compose.yml`](../../docker/docker-compose.yml) and [`docker/docker-compose.test.yml`](../../docker/docker-compose.test.yml) — container build contexts updated in PR 7.
 - [`MANIFEST.md`](../../MANIFEST.md) — service section rewritten in PR 7.

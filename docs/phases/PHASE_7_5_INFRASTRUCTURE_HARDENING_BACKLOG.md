@@ -265,10 +265,10 @@ rust/
 │   │   └── ffi.rs             # NEW — PyO3 bindings
 │   └── Cargo.toml
 
-services/s01_data_ingestion/
+services/data_ingestion/
 ├── rust_bridge.py             # NEW — Python FFI consumer
 
-services/s05_risk_manager/
+services/risk_manager/
 ├── rust_bridge.py             # NEW — Python FFI consumer
 
 docs/adr/

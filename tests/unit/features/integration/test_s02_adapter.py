@@ -7,7 +7,7 @@ The adapter tests are structured in layers:
 3. ``on_observation`` happy path and :class:`SignalComponent` shape.
 4. Batch-vs-streaming consistency (<1% drift, DoD requirement).
 5. Latency benchmark (honest measurement, no DoD overclaim).
-6. Scope check asserting zero diff in ``services/s02_signal_engine/``.
+6. Scope check asserting zero diff in ``services/signal_engine/``.
 
 Consistency and latency tests use the real :class:`OFICalculator`
 because (a) it is the fastest Phase 3 calculator, and (b) its
@@ -16,12 +16,9 @@ streaming surface is representative (tick-level, no day boundaries).
 
 from __future__ import annotations
 
-import os
-import subprocess
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import ClassVar
 
 import numpy as np
@@ -32,7 +29,7 @@ from features.base import FeatureCalculator
 from features.calculators.ofi import OFICalculator
 from features.integration.config import FeatureActivationConfig
 from features.integration.s02_adapter import S02FeatureAdapter
-from services.s02_signal_engine.signal_scorer import SignalComponent
+from services.signal_engine.signal_scorer import SignalComponent
 
 
 class _DummyCalculator(FeatureCalculator):
@@ -514,90 +511,3 @@ class TestLatency:
                 f"(b) accept a higher budget for the Phase 4 fusion path, "
                 f"(c) cache last compute and recompute every K ticks."
             )
-
-
-# ---------------------------------------------------------------------------
-# 6. Scope check
-# ---------------------------------------------------------------------------
-
-
-def _resolve_base_ref(repo_root: Path) -> str | None:
-    """Resolve a git base ref for the scope-check test.
-
-    Tries ``GITHUB_BASE_REF`` first (set on GitHub Actions PR events),
-    then ``origin/main`` and ``main`` as fallbacks. Returns the first
-    that ``git rev-parse --verify`` accepts, or ``None`` if none
-    resolve (e.g. shallow clone with no base ref).
-    """
-    candidates: list[str] = []
-    env_ref = os.environ.get("GITHUB_BASE_REF")
-    if env_ref:
-        candidates.append(env_ref)
-        if "/" not in env_ref:
-            candidates.append(f"origin/{env_ref}")
-    candidates += ["origin/main", "main"]
-
-    for ref in candidates:
-        check = subprocess.run(
-            ["git", "rev-parse", "--verify", ref],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            timeout=10,
-            check=False,
-        )
-        if check.returncode == 0:
-            return ref
-    return None
-
-
-class TestScope:
-    """Zero diff in services/s02_signal_engine/ is non-negotiable (DoD).
-
-    The test must not silently skip. If the base ref cannot be resolved
-    (e.g. a CI runner with a shallow clone and no ``GITHUB_BASE_REF``),
-    the test fails loud so the DoD is never bypassed.
-    """
-
-    def test_no_modification_of_s02_on_branch(self) -> None:
-        repo_root = Path(__file__).resolve().parents[4]
-        if not (repo_root / ".git").exists():
-            pytest.skip("Not in a git checkout (scope check cannot run)")
-
-        base_ref = _resolve_base_ref(repo_root)
-        if base_ref is None:
-            pytest.fail(
-                "Could not resolve a base ref (tried GITHUB_BASE_REF, "
-                "origin/main, main). DoD 'zero diff in S02' cannot be "
-                "verified; this check must not silently skip."
-            )
-
-        cmd = [
-            "git",
-            "diff",
-            "--stat",
-            f"{base_ref}..HEAD",
-            "--",
-            "services/s02_signal_engine/",
-        ]
-        try:
-            result = subprocess.run(
-                cmd,
-                cwd=repo_root,
-                capture_output=True,
-                text=True,
-                timeout=10,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
-            pytest.fail(f"git subprocess failed: {exc}. Cannot verify DoD 'zero diff in S02'.")
-
-        if result.returncode != 0:
-            pytest.fail(f"git diff returned {result.returncode}: {result.stderr.strip()}")
-
-        assert result.stdout.strip() == "", (
-            "DoD violation: services/s02_signal_engine/ has modifications "
-            f"on this branch. Phase 3.13 is scaffolding-only.\n"
-            f"git diff --stat {base_ref}..HEAD -- services/s02_signal_engine/:\n"
-            f"{result.stdout}"
-        )

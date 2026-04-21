@@ -16,7 +16,7 @@ and Majors & Fong-Jones (2022) Observability Engineering.
 
 ```bash
 # Start the serving layer
-uvicorn services.s01_data_ingestion.serving.main:app --port 8001
+uvicorn services.data_ingestion.serving.main:app --port 8001
 
 # Fetch metrics
 curl http://localhost:8001/metrics
@@ -40,7 +40,7 @@ docker compose -f docker/docker-compose.yml --profile observability up -d
 
 ## Adding New Metrics
 
-1. Define the metric in `services/s01_data_ingestion/observability/metrics.py`
+1. Define the metric in `services/data_ingestion/observability/metrics.py`
 2. Add a `record_*` helper function
 3. Call the helper from the component — never import `prometheus_client` directly
 4. Add a test in `tests/unit/s01/observability/test_metrics.py`
@@ -54,7 +54,7 @@ docker compose -f docker/docker-compose.yml --profile observability up -d
 ## Adding Tracing to a Function
 
 ```python
-from services.s01_data_ingestion.observability.tracing import trace_async
+from services.data_ingestion.observability.tracing import trace_async
 
 @trace_async("my_service.my_operation")
 async def my_operation(self, ...) -> ...:

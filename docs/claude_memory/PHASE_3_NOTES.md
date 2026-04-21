@@ -128,7 +128,7 @@
 - Audit finding D035: Phase 3.4-3.8 calculators are batch-only (compute(df) -> df); no streaming API. Adapter maintains rolling deque and re-runs compute per tick
 - Latency DoD (<1ms/tick) NOT met with batch recompute: OFI p50=4-9ms, p95=9-16ms, p99=12-19ms. Marked xfail with honest numbers per CLAUDE.md rule 10. Plan B options documented: (a) streaming compute surface, (b) cache + recompute every K ticks, (c) relax budget in Phase 4 fusion
 - Consistency test: 400-tick OFI stream through adapter matches OFICalculator.compute() batch output with < 1% max relative drift (DoD PASS)
-- Scope check test: `git diff --stat main..HEAD -- services/s02_signal_engine/` empty (DoD PASS)
+- Scope check test: `git diff --stat main..HEAD -- services/signal_engine/` empty (DoD PASS)
 - 46 tests on features/integration/, 100% coverage, 1,828 total tests (0 regressions, 1 xfailed latency)
 - **Phase 3 is now at 100%**: 3.1-3.13 complete, ready for Phase 3 closure report
 - 3.13 hotfix (PR #122 Copilot): fail-loud on duplicate feature_name in report JSON (schema violation); fail-loud on timezone-naive `generated_at` (CLAUDE.md UTC-only); D030 validation of weight [0,1] and trigger_threshold >= 0 finite; docstring aligned with on_observation behaviour (None for rejected, ValueError for unknown); scope-check test hardened with GITHUB_BASE_REF -> origin/main -> main fallback chain (never silent-skip)

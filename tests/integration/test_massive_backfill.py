@@ -40,10 +40,10 @@ async def test_massive_fetch_aapl_bars() -> None:
 
     from core.config import Settings
     from core.models.data import Bar, BarSize
-    from services.s01_data_ingestion.connectors.massive_historical import (
+    from services.data_ingestion.connectors.massive_historical import (
         MassiveHistoricalConnector,
     )
-    from services.s01_data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
+    from services.data_ingestion.normalizers.massive_bar import MassiveBarNormalizer
 
     settings = Settings()
     connector = MassiveHistoricalConnector(settings, bar_normalizer_factory=MassiveBarNormalizer)

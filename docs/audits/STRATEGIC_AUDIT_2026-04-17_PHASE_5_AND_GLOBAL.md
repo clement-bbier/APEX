@@ -24,7 +24,7 @@
 1. **S05 batched Redis read has ~7 orphan-read keys** (`portfolio:capital`, `pnl:daily`, `pnl:intraday_30m`, `portfolio:positions`, `correlation:matrix`, `session:current`, `macro:vix_current`) whose production-code writers I could not locate in a parallel grep. This is a Phase 5.1-style trap: if these writers don't exist, fail-closed guard will reject 100% of orders on first live boot. **Urgent verification required before 5.2 lands.** (See §1.)
 2. **S10 does not subscribe to `risk.system.state_change`** — the topic added by 5.1. The dashboard cannot see fail-closed transitions. Easy 1-hour fix, high safety value. (Explicit Phase 5.1 follow-up debt.)
 3. **`continue-on-error: true` remains on the CI backtest-gate** (`.github/workflows/ci.yml:124`). The Sharpe ≥ 0.8 / DD ≤ 8% gate that's supposed to enforce alpha quality is muzzled. Issue #102 is live. Principle 4 violation. Should block every Phase 5 merge until fixed.
-4. **`services/s05_risk_manager/service.py` is 530 lines** and mixes service lifecycle, chain orchestration, context loading, audit, and decision construction. SOLID-S violation, SRP candidate for `RiskChainOrchestrator` + `ContextLoader` + `RiskDecisionBuilder` extraction. This is inherited debt from the 5.1 refactor — 5.2 (event sourcing) is the natural moment to address it.
+4. **`services/risk_manager/service.py` is 530 lines** and mixes service lifecycle, chain orchestration, context loading, audit, and decision construction. SOLID-S violation, SRP candidate for `RiskChainOrchestrator` + `ContextLoader` + `RiskDecisionBuilder` extraction. This is inherited debt from the 5.1 refactor — 5.2 (event sourcing) is the natural moment to address it.
 5. **S02 `pipeline.py` is 487 lines** with an 18-field `PipelineState` dataclass and a 290-LOC `_run()` method that orchestrates 6 stages inline. Cannot be unit-tested in isolation. SOLID-S violation. Should be decomposed before Phase 5.3 wires a streaming layer on top of it.
 
 **Top 3 documentation findings:**
@@ -53,7 +53,7 @@ Classification methodology: for each sub-phase I enumerated the module paths the
 ### 1.1 Sub-phase 5.1 Fail-Closed — **DONE ✓**
 
 - `core/state.py` contains `SystemRiskState`, `SystemRiskStateCause`, `SystemRiskStateChange`, `SystemRiskMonitor` (verified at `core/state.py:365–600`).
-- `services/s05_risk_manager/fail_closed.py` exists.
+- `services/risk_manager/fail_closed.py` exists.
 - `core/topics.py:48` declares `RISK_SYSTEM_STATE_CHANGE: str = "risk.system.state_change"`.
 - `docs/adr/ADR-0006-fail-closed-risk-controls.md` ACCEPTED.
 - Issue #148 CLOSED 2026-04-17T12:35:20Z.
@@ -63,11 +63,11 @@ Classification methodology: for each sub-phase I enumerated the module paths the
 ### 1.2 Sub-phase 5.2 Event Sourcing / In-Memory State — **BLOCKED**
 
 Prerequisites declared by spec §3.2:
-- `services/s05_risk_manager/in_memory_state.py` — **MISSING** (not in tree).
-- `services/s05_risk_manager/reconciliation.py` — **MISSING**.
+- `services/risk_manager/in_memory_state.py` — **MISSING** (not in tree).
+- `services/risk_manager/reconciliation.py` — **MISSING**.
 - Upstream ZMQ topics `execution.fill.*`, `risk.m2m.*`, `portfolio.position.*` referenced by spec — **NOT IN `core/topics.py`**. Only `ORDER_FILLED: "order.filled"` (line 35) is defined; no `execution.fill.*` hierarchy, no mark-to-market topic, no `portfolio.position.*` topic.
 
-**Orphan-read trap.** S05 `_load_context_parallel` currently reads these Redis keys (Sub-agent grep, `services/s05_risk_manager/service.py:411–487`):
+**Orphan-read trap.** S05 `_load_context_parallel` currently reads these Redis keys (Sub-agent grep, `services/risk_manager/service.py:411–487`):
 
 | Key | Reader | Writer (verified in main?) | Risk |
 |---|---|---|---|
@@ -89,9 +89,9 @@ Present (offline / library-level):
 - `features/fusion/ic_weighted.py` — stateless `ICWeightedFusion.compute(DataFrame)` with frozen simplex weights.
 
 Missing (required for streaming):
-- `services/s02_signal_engine/streaming_adapter.py` — **MISSING**.
-- `services/s04_fusion_engine/live_meta_labeler.py` — **MISSING**.
-- `services/s04_fusion_engine/live_fusion.py` — **MISSING**.
+- `services/signal_engine/streaming_adapter.py` — **MISSING**.
+- `services/fusion_engine/live_meta_labeler.py` — **MISSING**.
+- `services/fusion_engine/live_fusion.py` — **MISSING**.
 - `core/topics.py` has `ANALYTICS_META_FEATURES: "analytics.meta_features"` (line 55) but no `meta_label:latest:{symbol}` Redis key channel is specified.
 - Per-tick model loading at S04 startup (card validation, fail-loud) not wired into `service.py`.
 
@@ -108,7 +108,7 @@ Missing (required for streaming):
 ### 1.5 Sub-phase 5.5 Drift Monitoring & Feedback Loop — **PARTIAL**
 
 Present:
-- `services/s09_feedback_loop/drift_detector.py` (160 LOC) — basic win-rate delta vs baseline. Minimum 50 trades. Publishes `feedback.drift_alert`.
+- `services/feedback_loop/drift_detector.py` (160 LOC) — basic win-rate delta vs baseline. Minimum 50 trades. Publishes `feedback.drift_alert`.
 
 Missing:
 - PSI (Population Stability Index) on rolling 500-bar windows — absent.
@@ -135,9 +135,9 @@ Missing:
 
 ### 1.8 Sub-phase 5.8 Alt-Data Geopolitical NLP — **BLOCKED**
 
-- `services/s01_data_ingestion/connectors/worldmonitor.py` — **MISSING**.
-- `services/s08_macro_intelligence/nlp/` directory — **MISSING**. S08 currently has 5 files (`cb_watcher.py`, `geopolitical.py` — 77-LOC stub, `sector_rotation.py`, `service.py`, `surprise_index.py`); no transformer, no FinBERT, no ONNX runtime.
-- `services/s05_risk_manager/geopolitical_guard.py` — **MISSING**.
+- `services/data_ingestion/connectors/worldmonitor.py` — **MISSING**.
+- `services/macro_intelligence/nlp/` directory — **MISSING**. S08 currently has 5 files (`cb_watcher.py`, `geopolitical.py` — 77-LOC stub, `sector_rotation.py`, `service.py`, `surprise_index.py`); no transformer, no FinBERT, no ONNX runtime.
+- `services/risk_manager/geopolitical_guard.py` — **MISSING**.
 - Topics `macro.geopolitics.*` — **NOT in `core/topics.py`** (only `MACRO_CATALYST: "macro.catalyst"` line 27).
 
 **Strategic note**: the spec calls for a `WorldMonitorConnector` via gRPC/Protobuf. This is a proprietary data source the operator cannot afford and probably cannot access at all. Substitute with GDELT 2.0 (free, public, event-coded, updated every 15 min) + FinBERT (open-source, ONNX-compilable) — this is the Principle 3 intelligent alternative.
@@ -154,8 +154,8 @@ Missing:
 - `rust/apex_mc/src/ring_buffer.rs` — **MISSING**.
 - `rust/apex_mc/src/ffi.rs` — **MISSING**.
 - `rust/apex_risk/src/validator.rs` + `ffi.rs` — **MISSING**.
-- `services/s01_data_ingestion/rust_bridge.py` — **MISSING**.
-- `services/s05_risk_manager/rust_bridge.py` — **MISSING**.
+- `services/data_ingestion/rust_bridge.py` — **MISSING**.
+- `services/risk_manager/rust_bridge.py` — **MISSING**.
 - `docs/adr/ADR-0007-rust-ffi-architecture.md` — **MISSING**.
 
 ### 1.10 Sub-phase 5.10 Closure — **NOT STARTED**, depends on all above.
@@ -185,16 +185,16 @@ Services are audited against Principle 4 (SOLID + patterns + fail-loud + Decimal
 
 ### 2.1 S01 Data Ingestion (78 files, ~5,800 LOC — the biggest service)
 
-- **Open/Closed violation (HIGH)**: `services/s01_data_ingestion/orchestrator/job_runner.py:150–200` has a large if-chain dispatching to 15+ connector types. New connectors require modifying the switch. Fix: Strategy + connector registry.
+- **Open/Closed violation (HIGH)**: `services/data_ingestion/orchestrator/job_runner.py:150–200` has a large if-chain dispatching to 15+ connector types. New connectors require modifying the switch. Fix: Strategy + connector registry.
 - **Duplication (MEDIUM)**: HTTP retry logic duplicated across `binance_historical.py` (461 LOC), `edgar_connector.py` (402 LOC), `simfin_connector.py` (387 LOC). Extract `HTTPRetryMixin`.
 - **Liskov risk (MEDIUM)**: `connectors/base.py` defines abstract `fetch()` but subclasses have inconsistent signatures (sync vs async, pagination varies). Consolidate.
-- **Continuous adaptation (AT-RISK)**: Crypto symbols hardcoded at `services/s01_data_ingestion/service.py:27–28` (`_DEFAULT_CRYPTO_SYMBOLS`). Config changes require service restart. CLAUDE.md §3 violation.
+- **Continuous adaptation (AT-RISK)**: Crypto symbols hardcoded at `services/data_ingestion/service.py:27–28` (`_DEFAULT_CRYPTO_SYMBOLS`). Config changes require service restart. CLAUDE.md §3 violation.
 - **Fail-loud**: Clean. All exception blocks log before returning.
 
 ### 2.2 S02 Signal Engine (9 files, ~1,985 LOC)
 
-- **SOLID-S (HIGH)**: `services/s02_signal_engine/pipeline.py` — 487 LOC; `_run()` method ~290 LOC orchestrating 6 steps inline on an 18-field `PipelineState` dataclass. Cannot test a single step in isolation. Decompose into step classes before 5.3 wires streaming on top.
-- **SOLID-S (HIGH)**: `services/s02_signal_engine/technical.py` — 454 LOC; `TechnicalAnalyzer` holds RSI + BB + EMA + VWAP + ATR state. Split into `BarAggregator` + `IndicatorEngine`.
+- **SOLID-S (HIGH)**: `services/signal_engine/pipeline.py` — 487 LOC; `_run()` method ~290 LOC orchestrating 6 steps inline on an 18-field `PipelineState` dataclass. Cannot test a single step in isolation. Decompose into step classes before 5.3 wires streaming on top.
+- **SOLID-S (HIGH)**: `services/signal_engine/technical.py` — 454 LOC; `TechnicalAnalyzer` holds RSI + BB + EMA + VWAP + ATR state. Split into `BarAggregator` + `IndicatorEngine`.
 - **Liskov (HIGH)**: `technical.py`, `microstructure.py`, `crowd_behavior.py` all expose `update(tick)` with inconsistent state semantics. Define a `TickAnalyzer` ABC with explicit state contract.
 
 ### 2.3 S03 Regime Detector (5 files, ~816 LOC)
@@ -485,10 +485,10 @@ Assumes §4 re-sequencing is accepted. Owner column: "Claude" = I can execute on
 | 5 | Decide re-sequencing (accept/reject §4) and rewrite `PHASE_5_SPEC.md` per §7 | Clement + Claude | docs | 1d |
 | 6 | Doc maintenance: update `PHASE_5_SPEC.md`, `CONTEXT.md`, `AUDIT_2026_04_11_WHOLE_CODEBASE.md`, `issue_fail_closed.md`, deprecation banners on 5.6/5.7/5.9 backlog MDs (if accepted) | Claude | docs | 0.5d |
 | 7 | Close or merge duplicate GitHub issues #149–#153; open thin `[phase-5.2]`, `[phase-5.3]`, `[phase-5.8]` issues | Clement | governance | 0.5d |
-| 8 | Refactor `services/s05_risk_manager/service.py` (530 LOC) into `RiskChainOrchestrator` + `ContextLoader` + `RiskDecisionBuilder` — combine with 5.2 | Claude | 5.2 | 2d |
+| 8 | Refactor `services/risk_manager/service.py` (530 LOC) into `RiskChainOrchestrator` + `ContextLoader` + `RiskDecisionBuilder` — combine with 5.2 | Claude | 5.2 | 2d |
 | 9 | Implement `InMemoryRiskState` + `reconciliation.py` (5.2 core) | Claude | 5.2 | 3d |
 | 10 | Vectorize CVDKyleCalculator loops (#115) | Claude | 5.3-prep | 1d |
-| 11 | Decompose `services/s02_signal_engine/pipeline.py` (487 LOC) into step classes ahead of 5.3 streaming | Claude | 5.3-prep | 2d |
+| 11 | Decompose `services/signal_engine/pipeline.py` (487 LOC) into step classes ahead of 5.3 streaming | Claude | 5.3-prep | 2d |
 
 Total: ~13 dev-days over 4 weeks = Phase 5.2 delivered plus full 5.3 groundwork laid.
 
@@ -510,9 +510,9 @@ Total: ~13 dev-days over 4 weeks = Phase 5.2 delivered plus full 5.3 groundwork 
 
 Every claim in §1–§5 is supported by one of:
 
-- **File presence / absence**: verified via `Glob` searches recorded in the audit tool-call log. Key absences: `services/s05_risk_manager/in_memory_state.py`, `services/s05_risk_manager/reconciliation.py`, `services/s02_signal_engine/streaming_adapter.py`, `services/s04_fusion_engine/live_meta_labeler.py`, `services/s08_macro_intelligence/nlp/*`, `services/s01_data_ingestion/connectors/worldmonitor.py`, `core/transport.py`, `core/service_registry.py`, `core/schemas/*.fbs`.
-- **File presence verified**: `core/state.py:365–600` (SystemRiskMonitor), `services/s05_risk_manager/fail_closed.py`, `features/meta_labeler/baseline.py` + `fusion/ic_weighted.py`, `rust/apex_mc/src/lib.rs`, `rust/apex_risk/src/{exposure.rs,lib.rs}`.
-- **Line citations**: `core/topics.py:48` (RISK_SYSTEM_STATE_CHANGE), `.github/workflows/ci.yml:124` (continue-on-error TODO), `services/s05_risk_manager/service.py:411–487` (Redis context load), `features/calculators/cvd_kyle.py:306, 361, 408` (`for t in range(...)`).
+- **File presence / absence**: verified via `Glob` searches recorded in the audit tool-call log. Key absences: `services/risk_manager/in_memory_state.py`, `services/risk_manager/reconciliation.py`, `services/signal_engine/streaming_adapter.py`, `services/fusion_engine/live_meta_labeler.py`, `services/macro_intelligence/nlp/*`, `services/data_ingestion/connectors/worldmonitor.py`, `core/transport.py`, `core/service_registry.py`, `core/schemas/*.fbs`.
+- **File presence verified**: `core/state.py:365–600` (SystemRiskMonitor), `services/risk_manager/fail_closed.py`, `features/meta_labeler/baseline.py` + `fusion/ic_weighted.py`, `rust/apex_mc/src/lib.rs`, `rust/apex_risk/src/{exposure.rs,lib.rs}`.
+- **Line citations**: `core/topics.py:48` (RISK_SYSTEM_STATE_CHANGE), `.github/workflows/ci.yml:124` (continue-on-error TODO), `services/risk_manager/service.py:411–487` (Redis context load), `features/calculators/cvd_kyle.py:306, 361, 408` (`for t in range(...)`).
 - **GitHub**: `gh issue view 148` returned `{"closedAt":"2026-04-17T12:35:20Z","state":"CLOSED"}`. `gh issue list` returned 32 open issues enumerated in §5.
 - **Git log**: `git log --oneline -20` — main at `1b7c3b5`, PR #177 merged 2026-04-17.
 - **Sub-agent tool outputs**: four parallel Explore / general-purpose agents covering S01-S05, S06-S10 + core + features + rust, docs coherence, and GitHub issue backlog. Each produced structured reports with file:line citations; findings are consolidated here.
@@ -531,7 +531,7 @@ Effort: S (<1h), M (1–4h), L (half-day–day), XL (>1 day).
 - **ACTION 1 (CI, M)**: Edit `.github/workflows/ci.yml:124` — remove `continue-on-error: true` on backtest-gate after fixing `full_report()` Sharpe bug in `backtesting/metrics.py` (or `scripts/backtest_regression.py`). Close issue #102. Reason: §8 item 1; Principle 4 enforcement of alpha quality gate.
 - **ACTION 2 (CODE, L)**: Grep for writers of Redis keys `portfolio:capital`, `pnl:daily`, `pnl:intraday_30m`, `portfolio:positions`, `correlation:matrix` across the codebase. Per orphan write found, either (a) add writer in the appropriate service, (b) refactor S05 to seed defaults from config, or (c) remove the read from S05's context batch if the key is not required for risk checks. Output: a short markdown addendum to this audit. Reason: §1.2 orphan-read trap; blocking for 5.2.
 - **ACTION 3 (CODE, S)**: Edit `core/topics.py` — add constants `EXECUTION_FILL = "execution.fill"`, `RISK_M2M = "risk.m2m"`, `PORTFOLIO_POSITION = "portfolio.position"`, `FEEDBACK_DRIFT_CRITICAL = "feedback.drift.critical"`, `FEEDBACK_RECALIBRATION_REQUESTED = "feedback.recalibration.requested"`, `MACRO_GEOPOLITICS = "macro.geopolitics"`. Add matching helper methods if warranted. Reason: §1.2, §1.5, §1.8; prerequisite for 5.2 / 5.5 / 5.8.
-- **ACTION 4 (CODE, S)**: Add subscription to `Topics.RISK_SYSTEM_STATE_CHANGE` in `services/s10_monitor/service.py` and a handler that updates the dashboard "System State" widget in `dashboard.py`. Reason: §1.1 residual 5.1 debt; Principle 4 safety observability.
+- **ACTION 4 (CODE, S)**: Add subscription to `Topics.RISK_SYSTEM_STATE_CHANGE` in `services/command_center/service.py` and a handler that updates the dashboard "System State" widget in `dashboard.py`. Reason: §1.1 residual 5.1 debt; Principle 4 safety observability.
 
 ### B. Doc maintenance (after re-sequencing decided)
 
@@ -561,8 +561,8 @@ Effort: S (<1h), M (1–4h), L (half-day–day), XL (>1 day).
 
 ### D. Code refactor (piggyback on 5.2)
 
-- **ACTION 25 (CODE, L)**: Decompose `services/s05_risk_manager/service.py` (530 LOC) into `service.py` (lifecycle only), `chain_orchestrator.py` (fail-fast chain), `context_loader.py` (context batch or event-sourced reader), `decision_builder.py`. Reason: §2.5 SOLID-S; natural 5.2 refactor window.
-- **ACTION 26 (CODE, L)**: Decompose `services/s02_signal_engine/pipeline.py` (487 LOC) into step classes (one class per stage of `_run()`), with explicit `execute(state) -> state` contract and unit tests per step. Reason: §2.2 blocking 5.3 streaming adapter.
+- **ACTION 25 (CODE, L)**: Decompose `services/risk_manager/service.py` (530 LOC) into `service.py` (lifecycle only), `chain_orchestrator.py` (fail-fast chain), `context_loader.py` (context batch or event-sourced reader), `decision_builder.py`. Reason: §2.5 SOLID-S; natural 5.2 refactor window.
+- **ACTION 26 (CODE, L)**: Decompose `services/signal_engine/pipeline.py` (487 LOC) into step classes (one class per stage of `_run()`), with explicit `execute(state) -> state` contract and unit tests per step. Reason: §2.2 blocking 5.3 streaming adapter.
 - **ACTION 27 (CODE, L)**: Vectorize `features/calculators/cvd_kyle.py` loops at lines 306, 361, 408 using polars / numpy. Reason: §1.3 on the 5.3 hot path; issue #115.
 
 ### E. CLAUDE.md update (deferred — no changes recommended in this audit)

@@ -15,8 +15,8 @@ from decimal import Decimal
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from services.s02_signal_engine.signal_scorer import SignalComponent, SignalScorer
-from services.s04_fusion_engine.kelly_sizer import KellySizer
+from services.fusion_engine.kelly_sizer import KellySizer
+from services.signal_engine.signal_scorer import SignalComponent, SignalScorer
 
 
 class TestKellyNeverExceedsCapital:

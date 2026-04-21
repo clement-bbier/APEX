@@ -111,9 +111,9 @@ to account for overlapping returns.
 |---|---|---|
 | None | First sub-phase | -- |
 | Phase 2 historical data | Data | TimescaleDB bars table (ADR-0003) |
-| S07 `RealizedVolEstimator` | Code (read-only) | `services/s07_quant_analytics/realized_vol.py` |
-| S07 `AdvancedMicrostructure` | Code (read-only) | `services/s07_quant_analytics/microstructure_adv.py` |
-| S07 `RoughVolAnalyzer` | Code (read-only) | `services/s07_quant_analytics/rough_vol.py` |
+| S07 `RealizedVolEstimator` | Code (read-only) | `services/quant_analytics/realized_vol.py` |
+| S07 `AdvancedMicrostructure` | Code (read-only) | `services/quant_analytics/microstructure_adv.py` |
+| S07 `RoughVolAnalyzer` | Code (read-only) | `services/quant_analytics/rough_vol.py` |
 | `core/models/data.py` | Models | `Bar`, `Asset`, `DbTick` |
 | `core/math/` | Math utils | Fractional differentiation, labeling |
 
@@ -1647,7 +1647,7 @@ adapter pattern that Phase 4 will use to inject new features.
 | Adapter produces valid `SignalComponent` objects | Verified |
 | Adapter returns None during warmup period | Verified |
 | Adapter output is consistent with offline computation (< 1% drift) | Verified |
-| No modification to S02 production code | Zero diff in services/s02_signal_engine/ |
+| No modification to S02 production code | Zero diff in services/signal_engine/ |
 
 #### A.6 Risks
 

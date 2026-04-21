@@ -158,14 +158,14 @@ foundation** for all subsequent Phase 5 work.
 core/
 ├── state.py                   # SystemRiskState enum + state machine (EXTEND)
 
-services/s05_risk_manager/
+services/risk_manager/
 ├── service.py                 # MODIFY — remove _safe(), add state check
 ├── fail_closed.py             # NEW — FailClosedGuard, state monitor
 
 docs/adr/
 ├── ADR-0006-fail-closed-risk-controls.md  (NEW)
 
-tests/unit/services/s05_risk_manager/
+tests/unit/services/risk_manager/
 ├── test_fail_closed.py        (~20 tests)
 ├── test_service_no_fallbacks.py  (~15 tests)
 
@@ -236,12 +236,12 @@ Redis asynchronously.
 
 ### Module structure
 ```
-services/s05_risk_manager/
+services/risk_manager/
 ├── in_memory_state.py         # NEW — InMemoryRiskState
 ├── reconciliation.py          # NEW — async state↔Redis reconciler
 ├── service.py                 # MODIFY — replace Redis reads with local state
 
-tests/unit/services/s05_risk_manager/
+tests/unit/services/risk_manager/
 ├── test_in_memory_state.py    (~18 tests)
 ├── test_reconciliation.py     (~12 tests)
 
@@ -311,18 +311,18 @@ inference). Reinstate G7 as a blocking gate on real market data.
 
 ### Module structure
 ```
-services/s02_signal_engine/
+services/signal_engine/
 ├── streaming_adapter.py       # NEW — per-tick Phase 3 calculator wrapper
 
-services/s04_fusion_engine/
+services/fusion_engine/
 ├── live_meta_labeler.py       # NEW — loads persisted model, predict_proba per tick
 ├── live_fusion.py             # NEW — IC-weighted fusion in streaming mode
 ├── service.py                 # MODIFY — integrate live ML inference
 
-tests/unit/services/s02_signal_engine/
+tests/unit/services/signal_engine/
 ├── test_streaming_adapter.py  (~16 tests)
 
-tests/unit/services/s04_fusion_engine/
+tests/unit/services/fusion_engine/
 ├── test_live_meta_labeler.py  (~14 tests)
 ├── test_live_fusion.py        (~10 tests)
 
@@ -486,12 +486,12 @@ automatic model recalibration or position de-risking via S05.
 
 ### Module structure
 ```
-services/s09_feedback_loop/
+services/feedback_loop/
 ├── drift_monitor.py           # NEW — PSI, rolling AUC, calibration
 ├── alert_engine.py            # NEW — threshold-based alert publisher
 ├── service.py                 # MODIFY — integrate drift monitoring
 
-tests/unit/services/s09_feedback_loop/
+tests/unit/services/feedback_loop/
 ├── test_drift_monitor.py      (~18 tests)
 ├── test_alert_engine.py       (~10 tests)
 
@@ -720,26 +720,26 @@ in S04 and can trigger S05's circuit breaker on extreme events.
 
 ### Module structure
 ```
-services/s01_data_ingestion/
+services/data_ingestion/
 ├── connectors/
 │   └── worldmonitor.py        # NEW — gRPC Protobuf consumer
 
-services/s08_macro_intelligence/
+services/macro_intelligence/
 ├── nlp/
 │   ├── risk_scorer.py         # NEW — FinBERT inference pipeline
 │   ├── model_card_nlp.json    # NEW — governance model card
 │   └── onnx_runtime.py        # NEW — ONNX/TensorRT wrapper
 
-services/s04_fusion_engine/
+services/fusion_engine/
 ├── service.py                 # MODIFY — Kelly penalty on geopolitical risk
 
-services/s05_risk_manager/
+services/risk_manager/
 ├── geopolitical_guard.py      # NEW — GeopoliticalEventGuard
 
-tests/unit/services/s08_macro_intelligence/
+tests/unit/services/macro_intelligence/
 ├── test_risk_scorer.py        (~16 tests)
 
-tests/unit/services/s05_risk_manager/
+tests/unit/services/risk_manager/
 ├── test_geopolitical_guard.py (~12 tests)
 
 tests/integration/
@@ -819,10 +819,10 @@ rust/
 │   │   └── ffi.rs             # NEW — PyO3 bindings
 │   └── Cargo.toml
 
-services/s01_data_ingestion/
+services/data_ingestion/
 ├── rust_bridge.py             # NEW — Python FFI consumer
 
-services/s05_risk_manager/
+services/risk_manager/
 ├── rust_bridge.py             # NEW — Python FFI consumer
 
 docs/adr/
