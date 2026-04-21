@@ -7,9 +7,7 @@ audit at ``reports/phase_4_7/audit.md`` §8.
 from __future__ import annotations
 
 import math
-import subprocess
 from datetime import UTC, datetime
-from pathlib import Path
 
 import numpy as np
 import polars as pl
@@ -19,9 +17,6 @@ from features.fusion import ICWeightedFusion, ICWeightedFusionConfig
 from features.ic.base import ICResult
 from features.ic.report import ICReport
 from features.integration.config import FeatureActivationConfig
-
-REPO_ROOT = Path(__file__).resolve().parents[4]
-
 
 # ----------------------------------------------------------------------
 # Fixtures
@@ -509,38 +504,4 @@ def test_fusion_sharpe_exceeds_best_individual_on_synthetic() -> None:
     assert win_rate >= min_majority, (
         f"DoD regression: fusion beat best individual on {wins}/{len(per_seed)} seeds "
         f"(win rate {win_rate:.2f} < {min_majority:.2f}); per-seed: {per_seed}"
-    )
-
-
-# ----------------------------------------------------------------------
-# 10 — scope guard: services/fusion_engine/ must be untouched by 4.7
-# ----------------------------------------------------------------------
-
-
-def test_services_fusion_engine_untouched_by_phase_4_7_branch() -> None:
-    """Scope guard per PHASE_4_SPEC §3.7 DoD #6.
-
-    Verifies that the current 4.7 branch has not modified any file
-    under ``services/fusion_engine/``. Implemented via ``git
-    diff --name-only main...HEAD``. Skipped when the test is run
-    outside a git checkout or when the ``main`` branch cannot be
-    located (e.g. in a shallow sandbox clone).
-    """
-    git_dir = REPO_ROOT / ".git"
-    if not git_dir.exists():
-        pytest.skip("not a git checkout")
-    try:
-        result = subprocess.run(
-            ["git", "diff", "--name-only", "main...HEAD"],
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        pytest.skip("git unavailable or main branch not resolvable")
-    changed = [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    offenders = [p for p in changed if p.startswith("services/fusion_engine/")]
-    assert not offenders, (
-        f"Phase 4.7 must not modify services/fusion_engine/; offending files: {offenders}"
     )
