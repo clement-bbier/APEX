@@ -169,16 +169,17 @@ Why disabled: no staging/production target exists; the `build-push` would publis
 | File | Purpose | Required check |
 |---|---|---|
 | `ci-quality.yml` | ruff + mypy strict + bandit + pip-audit (non-blocking) | `quality` |
-| `ci-rust.yml` | `cargo check`/`test`/`clippy` + maturin wheel build + artifact upload | `rust` |
-| `ci-unit-tests.yml` | pytest tests/unit + coverage (artifact + codecov) | `unit-tests` |
+| `ci-unit-tests.yml` | `rust-build` job (cargo check/test/clippy + maturin wheels + `rust-wheels` artifact upload) → `unit-tests` job (`needs: rust-build`, downloads `rust-wheels`, pytest tests/unit + coverage) | `rust`, `unit-tests` |
 | `ci-integration-tests.yml` | docker-compose test stack + pytest tests/integration | `integration-tests` |
 | `ci-backtest-gate.yml` | Backtest regression gate, **MUZZLED** (`continue-on-error: true`) | not required |
 | `cd.yml.disabled` | Production CD pipeline scaffold — intentionally disabled | N/A |
 | `backtest.yml` | Nightly backtest (cron) — existing, minimally modernized (added explicit cache step) | N/A |
 
+**Update 2026-04-22 (issue #242)**: the original split produced a separate `ci-rust.yml` that uploaded the `rust-wheels` artifact for `ci-unit-tests.yml` to download. This cross-workflow handoff is broken — `actions/download-artifact@v4` cannot fetch artifacts from a different workflow run without an explicit `run-id`. Every PR's `unit-tests` job was failing at the download step with `Artifact not found for name: rust-wheels`. The fix: merge the two files into a single `ci-unit-tests.yml` with two jobs (`rust-build` → `unit-tests`) connected via `needs:`. Same workflow run = canonical artifact pattern, zero cross-workflow magic. `ci-rust.yml` deleted; required status names `rust` and `unit-tests` preserved via explicit job `name:` fields. See §12 below for the full resolution record.
+
 Changes vs. old `ci.yml`:
 
-1. **One-concern-per-file.** Five separate workflows. Easier to see red/green per concern in the GitHub UI, and future auth changes (e.g. `integration-tests` needs broker sandbox creds) don't ripple into the other four.
+1. **One-concern-per-file.** Four separate workflow files (post-#242 merge of rust-build into ci-unit-tests). Easier to see red/green per concern in the GitHub UI, and future auth changes (e.g. `integration-tests` needs broker sandbox creds) don't ripple into the other three.
 2. **Explicit cache step** (`actions/cache@v4`) everywhere instead of `setup-python`'s implicit cache. Cache key is `pip-{os}-py{version}-{hash(pyproject.toml, requirements.txt)}` which shares hits across all CI workflows on the same commit.
 3. **`cargo clippy`** added (warnings-as-errors, `continue-on-error: true` until clippy baseline is clean).
 4. **`pip-audit`** on requirements.txt, non-blocking, writes CVE list to the GitHub Step Summary. Graduate to blocking once baseline is clean.
@@ -299,3 +300,59 @@ Focus targets (ordered by marginal yield for the 3.6pp gap):
 
 **Tracked upstream, do not touch in this PR**:
 - Backtest-gate un-muzzling — owned by issue #196 / phase-A.6, depends on phase-A.5 landing. Prerequisite: 2026-04-27 or Strategy #1 Gate 2.
+
+---
+
+## 12. Artifact flow fix — issue #242 (2026-04-22)
+
+**Status**: RESOLVED on branch `fix/issue-242-ci-artifact-flow`.
+
+### 12.1 Problem
+
+Sprint 3C (PR #221) split the monolithic `ci.yml` into five concern-scoped workflows. In that split, `ci-rust.yml` produced a `rust-wheels` artifact via `actions/upload-artifact@v4`, and `ci-unit-tests.yml` attempted to fetch it via `actions/download-artifact@v4` on the same commit.
+
+This doesn't work. `actions/download-artifact@v4` resolves artifacts within a single workflow run by default. Fetching from a *different* workflow run requires `github-token` + `run-id` (or `workflow` + `workflow_conclusion` in third-party forks), and even then both workflows must have completed before download starts — which defeats the parallelism the split was intended to provide.
+
+Observed symptom on every PR since #221 landed:
+
+```
+##[error]Unable to download artifact(s): Artifact not found for name: rust-wheels
+```
+
+Any unit test that imports `apex_mc` or `apex_risk` either skipped silently or ran against a stale locally-cached wheel. The Rust-extension test surface was effectively un-gated in CI.
+
+### 12.2 Decision: Option (a) — merge into single workflow
+
+Three options were considered (per issue #242):
+
+- (a) Merge `ci-rust` into `ci-unit-tests` as a `rust-build` job with the `unit-tests` job declaring `needs: rust-build`.
+- (b) Use `workflow_run` to chain the two workflows.
+- (c) Duplicate the Rust build inside `ci-unit-tests.yml`.
+
+**Chosen: (a).** Rationale:
+
+1. Rust wheels and Python tests are *causally* coupled — the Python tests cannot run without the wheels. Causal coupling implies topological coupling; they belong in the same workflow.
+2. `needs:` gives the same serial dependency that `workflow_run` would, without the scheduling overhead of chained workflows (typically 15–45 s per chain hop) and without the PR-status-check complexity (`workflow_run` checks don't show up on the PR the same way same-run job checks do).
+3. Option (c) wastes 3–5 minutes of Rust compilation per run. Cache hits would mitigate but not eliminate.
+4. Conceptual separation is preserved via explicit job `name:` fields (`rust`, `unit-tests`), so the GitHub UI still shows two distinct status checks with familiar names.
+
+### 12.3 What changed on disk
+
+- `.github/workflows/ci-rust.yml`: **deleted**. All content is now the `rust-build` job inside `ci-unit-tests.yml`.
+- `.github/workflows/ci-unit-tests.yml`: **rewritten** with two jobs:
+  - `rust-build` (job `name: rust`) — preserves every step from the former `ci-rust.yml` (cargo check/test/clippy, maturin wheel build for both crates, upload-artifact of `rust/target/wheels/*.whl` as `rust-wheels`).
+  - `unit-tests` (job `name: unit-tests`) — declares `needs: rust-build`, downloads `rust-wheels` via `actions/download-artifact@v4` (now same-workflow-run, which works), installs wheels via `pip install ./wheels/*.whl`, runs pytest with coverage.
+- `CICD_RESET_AUDIT_2026-04-21.md`: updated §6 (workflow table + "one-concern-per-file" count) and added this §12.
+
+No source code (`rust/`, `services/`, `core/`, `backtesting/`, `features/`, `tests/`) was modified. No `cargo` features, target triples, or build flags changed. No `pytest` invocation or coverage gate changed. No action versions changed. The rewrite is strictly structural.
+
+### 12.4 Check-name compatibility
+
+`main` has no branch protection (§2), so no required-check name was at risk. Still, to make future branch-protection wiring a no-op, the two jobs declare explicit `name:` fields matching the former workflow names (`rust` and `unit-tests`). Recommended branch protection on `main` now reads: `quality, rust, unit-tests, integration-tests` — identical to §2's original recommendation, just with `rust` and `unit-tests` now sourced from the same workflow.
+
+### 12.5 Unblocks
+
+- Dependabot PR #224 (`actions/upload-artifact` 4→7) can be re-evaluated.
+- Dependabot PR #236 (`actions/download-artifact` 4→8) can be re-evaluated.
+
+Any other PR blocked on the Rust-extension import path in unit tests is unblocked as of this fix.
