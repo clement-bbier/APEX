@@ -188,7 +188,7 @@ Changes vs. old `ci.yml`:
 
 ---
 
-## 7. Pre-existing mypy debt on main
+## 7. Pre-existing mypy debt on main — **RESOLVED 2026-04-22 (issue #240)**
 
 From Sprint 3B close-out and confirmed by reading `backtesting/data_loader.py:116`:
 
@@ -196,19 +196,15 @@ From Sprint 3B close-out and confirmed by reading `backtesting/data_loader.py:11
 pq.write_table(pa.Table.from_pandas(df), str(path))
 ```
 
-`mypy . --strict` flags this as **`[no-untyped-call]`** because `pyarrow.parquet.write_table` has no stubs in the version we install. The call is `df → pa.Table → pq.write_table(Table, str)`. The fix is either:
+`mypy . --strict` flagged this as **`[no-untyped-call]`** because pyarrow 24.0 ships `py.typed` but leaves `pyarrow.parquet.write_table` without annotations in its inline stubs.
 
-- add `pyarrow` to the `[[tool.mypy.overrides]]` `ignore_missing_imports` block (already has `pyarrow.*` — but `disallow_untyped_calls` still fires on the specific call); or
-- explicitly annotate the call site / cast the bound function; or
-- switch to `pa.parquet.write_table` via a thin typed helper.
+**Resolution** (PR resolving #240):
 
-**Decision for this PR: option (a) — leave mypy strict as-is.** Rationale:
+Targeted `# type: ignore[no-untyped-call]` on the call site with a documented rationale. `pyarrow-stubs` was evaluated and rejected — the package is pinned at 20.x (checked 2026-04-22 via `pip index versions`) against our pyarrow 24.0 requirement, and an inline `py.typed` marker takes precedence over external stubs in mypy's resolution, so the external package cannot supply the missing annotations here.
 
-- Any PR that does NOT touch `backtesting/data_loader.py` is unaffected.
-- A PR that does touch it carries the fix with it — that's the usual forcing-function for debt like this.
-- Silencing it globally (options (b), (c)) is strictly worse: it either normalizes a band-aid or downgrades the whole repo's type safety.
+A round-trip Parquet write/read smoke test was added at `tests/unit/backtesting/test_data_loader_writes.py` to catch any future pyarrow API drift that the silenced call would otherwise hide.
 
-**Track this debt** in a fresh Phase-A issue (suggested title: `[infra] Fix mypy no-untyped-call on backtesting/data_loader.py:116`). Not opened as part of this PR — mission brief says this PR does not fix the debt, only documents it.
+**Effect**: `mypy --strict backtesting/` is clean. Future PRs touching `data_loader.py` no longer require `--admin` bypass to land. Quality CI returns to fully gating.
 
 ---
 
@@ -294,7 +290,7 @@ Focus targets (ordered by marginal yield for the 3.6pp gap):
 
 **Defer to follow-up**:
 - Coverage gate raise — handed off to **issue #203 (phase-A.13)**, activation condition in §10.2, exact diff in §10.1. **Not committed on this branch.**
-- mypy debt fix on `backtesting/data_loader.py:116` (see §7)
+- ~~mypy debt fix on `backtesting/data_loader.py:116` (see §7)~~ — **RESOLVED via issue #240 (2026-04-22)**
 - Branch protection on `main` requiring `quality`, `rust`, `unit-tests`, `integration-tests`
 
 **Tracked upstream, do not touch in this PR**:

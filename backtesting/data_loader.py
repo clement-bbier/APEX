@@ -113,7 +113,11 @@ def save_parquet(ticks: list[NormalizedTick], path: str | Path) -> None:
         for t in ticks
     ]
     df = pd.DataFrame(rows)
-    pq.write_table(pa.Table.from_pandas(df), str(path))
+    # pyarrow 24.0 ships py.typed but pq.write_table lacks annotations on its
+    # inline stubs, so mypy --strict raises no-untyped-call. pyarrow-stubs is
+    # pinned at 20.x (checked 2026-04-22) and cannot override an inline py.typed
+    # marker, so a targeted ignore is the cleanest fix. See issue #240.
+    pq.write_table(pa.Table.from_pandas(df), str(path))  # type: ignore[no-untyped-call]
     logger.info("Saved parquet", path=str(path), rows=len(rows))
 
 
