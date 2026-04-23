@@ -117,11 +117,13 @@ def aggregate_records(records: dict[str, dict[str, Any]]) -> list[Position]:
             authoritative).
 
     Returns:
-        List of :class:`Position` instances. Records with non-positive
-        size, missing required fields, or unparseable Decimal values are
-        logged at DEBUG and skipped — never raise. The output is sorted
-        by symbol for deterministic test assertions and stable
-        downstream diffing.
+        List of :class:`Position` instances. Records with zero size,
+        missing required fields, or unparseable Decimal values are
+        logged at DEBUG and skipped — never raise. Signed sizes are
+        accepted; negative values are normalized via ``abs()`` so feeds
+        encoding SHORT positions with a negative size remain valid. The
+        output is sorted by symbol for deterministic test assertions
+        and stable downstream diffing.
     """
     positions: list[Position] = []
     for symbol, record in records.items():
@@ -230,19 +232,28 @@ class PositionAggregator:
             production this is :class:`core.state.StateStore`; in tests
             a ``fakeredis``-backed adapter (see
             ``tests/unit/feedback_loop/test_position_aggregator.py``).
-        ttl: Optional TTL applied to the aggregate Redis key. ``None``
-            (default) preserves the StateStore default TTL; pass an
-            explicit value to override (e.g. for tests that need
-            persistence across long-running scenarios).
+        interval_s: Snapshot cadence used by :meth:`run_loop` when no
+            per-call override is supplied, and to derive the default
+            short TTL on the aggregate key (``max(75, 5 * interval_s)``).
+            Defaults to :data:`DEFAULT_SNAPSHOT_INTERVAL_S`.
+        ttl: Optional explicit TTL applied to the aggregate Redis key.
+            ``None`` (default) enables the fail-fast short TTL derived
+            from ``interval_s`` — if the aggregator stops producing
+            snapshots, the key expires within 5 cadences so downstream
+            readers see the absence rather than a frozen value. Pass an
+            explicit positive value to override (e.g. for tests that
+            need persistence across long-running scenarios).
     """
 
     def __init__(
         self,
         state: _StateProtocol,
         *,
+        interval_s: float = DEFAULT_SNAPSHOT_INTERVAL_S,
         ttl: int | None = None,
     ) -> None:
         self._state = state
+        self._interval_s = interval_s
         self._ttl = ttl
 
     async def aggregate_from_redis(self) -> list[Position]:
@@ -306,7 +317,8 @@ class PositionAggregator:
         """
         positions = await self.aggregate_from_redis()
         payload = [p.model_dump(mode="json") for p in positions]
-        await self._state.set(AGGREGATE_KEY, payload, ttl=self._ttl)
+        effective_ttl = self._ttl if self._ttl is not None else max(75, int(self._interval_s * 5))
+        await self._state.set(AGGREGATE_KEY, payload, ttl=effective_ttl)
         logger.info(
             "position_aggregator_snapshot",
             count=len(positions),
@@ -316,22 +328,32 @@ class PositionAggregator:
 
     async def run_loop(
         self,
-        interval_s: float = DEFAULT_SNAPSHOT_INTERVAL_S,
+        interval_s: float | None = None,
         *,
         running: Any = None,  # noqa: ANN401
     ) -> None:
         """Periodically snapshot until cancelled.
 
         Args:
-            interval_s: Seconds between snapshots. Defaults to
-                :data:`DEFAULT_SNAPSHOT_INTERVAL_S`.
+            interval_s: Seconds between snapshots. Defaults to the
+                aggregator's configured ``interval_s`` (set at
+                ``__init__`` time, itself defaulting to
+                :data:`DEFAULT_SNAPSHOT_INTERVAL_S`).
             running: Optional flag-like object; the loop polls
                 ``bool(running)`` between iterations and exits cleanly on
                 ``False``. ``None`` means "run until cancelled".
         """
+        effective_interval = interval_s if interval_s is not None else self._interval_s
         while running is None or bool(running):
             try:
                 await self.snapshot_to_redis()
+            except asyncio.CancelledError:
+                # CancelledError is BaseException on Py3.8+ so the
+                # broader ``except Exception`` would not catch it, but
+                # this explicit branch documents the contract: any
+                # cancel propagates immediately, never a "quiet swallow".
+                logger.info("position_aggregator_loop_cancelled")
+                raise
             except Exception as exc:
                 # Snapshot failures must not crash the background loop;
                 # the next interval retries. Hot-path errors surface in
@@ -340,8 +362,13 @@ class PositionAggregator:
                     "position_aggregator_snapshot_failed",
                     error=str(exc),
                 )
+            # Re-check the running flag before sleeping so shutdown is
+            # responsive on the interval boundary rather than paying up
+            # to ``effective_interval`` seconds of latency.
+            if running is not None and not bool(running):
+                break
             try:
-                await asyncio.sleep(interval_s)
+                await asyncio.sleep(effective_interval)
             except asyncio.CancelledError:
                 logger.info("position_aggregator_loop_cancelled")
                 raise
