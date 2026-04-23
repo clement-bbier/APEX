@@ -7,7 +7,7 @@ resolver = "2"
 # level so that any crate's `[dev-dependencies]` can just say
 #   criterion = { workspace = true }
 # without re-pinning the version.
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 [profile.release]
 opt-level = 3
