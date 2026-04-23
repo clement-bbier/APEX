@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from datetime import UTC, datetime
 from typing import Any
 
@@ -10,6 +11,10 @@ from core.base_service import BaseService
 from core.logger import get_logger
 from core.models.order import TradeRecord
 from services.feedback_loop.drift_detector import DriftDetector
+from services.feedback_loop.position_aggregator import (
+    DEFAULT_SNAPSHOT_INTERVAL_S,
+    PositionAggregator,
+)
 from services.feedback_loop.signal_quality import SignalQuality
 from services.feedback_loop.trade_analyzer import TradeAnalyzer
 
@@ -33,6 +38,9 @@ class FeedbackLoopService(BaseService):
         self._analyzer = TradeAnalyzer()
         self._quality = SignalQuality()
         self._drift = DriftDetector()
+        # PositionAggregator is instantiated in run() once self.state is wired
+        # by BaseService.start(). Hold the task handle here for cancellation.
+        self._aggregator_task: asyncio.Task[None] | None = None
 
     async def on_message(self, topic: str, data: dict[str, Any]) -> None:
         """No-op: feedback loop reads from Redis, does not subscribe."""
@@ -40,16 +48,35 @@ class FeedbackLoopService(BaseService):
     async def run(self) -> None:
         """Run feedback analysis loop."""
         logger.info("Feedback loop service starting")
-        while self._running:
-            try:
-                await self._fast_analysis()
-                # Check if it's post-market time (21:00-22:00 UTC)
-                now = datetime.now(UTC)
-                if 21 <= now.hour < 22:
-                    await self._slow_analysis()
-            except Exception as exc:
-                logger.error("Feedback loop error", error=str(exc), exc_info=exc)
-            await asyncio.sleep(300)  # 5 minutes
+
+        # Launch the PositionAggregator background task — it snapshots
+        # positions:* → portfolio:positions every DEFAULT_SNAPSHOT_INTERVAL_S
+        # so S05's ContextLoader sees a live aggregate. Without this wire
+        # portfolio:positions would remain orphan and the S05 fail-closed
+        # guard (ADR-0006 §D1) would reject 100% of orders in production.
+        aggregator = PositionAggregator(
+            self.state,
+            interval_s=DEFAULT_SNAPSHOT_INTERVAL_S,
+        )
+        self._aggregator_task = asyncio.create_task(aggregator.run_loop())
+
+        try:
+            while self._running:
+                try:
+                    await self._fast_analysis()
+                    # Check if it's post-market time (21:00-22:00 UTC)
+                    now = datetime.now(UTC)
+                    if 21 <= now.hour < 22:
+                        await self._slow_analysis()
+                except Exception as exc:
+                    logger.error("Feedback loop error", error=str(exc), exc_info=exc)
+                await asyncio.sleep(300)  # 5 minutes
+        finally:
+            if self._aggregator_task is not None:
+                self._aggregator_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._aggregator_task
+                self._aggregator_task = None
 
     async def _fast_analysis(self) -> None:
         """Fast analysis every 5 minutes: drift detection and Kelly update."""
