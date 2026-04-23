@@ -8,7 +8,7 @@ Phase A.10 (issue #200). Verifies the producer/consumer end-to-end flow:
    both keys without raising the fail-loud :class:`RuntimeError` that
    ADR-0006 §D4 requires when a key is orphan.
 
-All seven other context keys are pre-seeded with valid fixtures so the
+All five other context keys are pre-seeded with valid fixtures so the
 test isolates the three keys under audit. fakeredis is used end-to-end —
 no Docker dependency.
 """

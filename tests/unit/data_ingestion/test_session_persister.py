@@ -309,9 +309,10 @@ async def test_dst_spring_forward_does_not_break_persistence(
 
 
 @pytest.mark.asyncio
-async def test_naive_datetime_is_treated_as_utc(state: _JsonStateAdapter) -> None:
-    """SessionTagger accepts naive datetimes as UTC. Persister forwards
-    them via the ``now`` override; verify no exception.
+async def test_tz_aware_datetime_normalized_to_utc(state: _JsonStateAdapter) -> None:
+    """SessionTagger normalizes tz-aware datetimes to UTC before classifying.
+    Persister forwards them via the ``now`` override; verify the resulting
+    session label reflects the UTC-normalized instant, not the local clock.
     """
     persister = SessionPersister(state)
     # Construct a non-UTC tz-aware datetime; SessionTagger normalizes.

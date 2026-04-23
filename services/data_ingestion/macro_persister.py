@@ -14,9 +14,11 @@ Design notes
   VIX/DXY/yield-spread from FRED + Yahoo on a 60 s cadence and caches
   them in instance attributes. The persister tails that cache and
   publishes the values to Redis.
-- ``macro:vix_1h_ago`` is the VIX value of the **oldest snapshot ≥
-  60 min old**. A bounded deque (capacity ≥ 90 entries at 60 s cadence)
-  keeps the rolling window. Until 60 min of history has accumulated,
+- ``macro:vix_1h_ago`` is the VIX value of the **most recent snapshot
+  that is at least 60 min old** (i.e., the last snapshot with
+  ``ts <= now - 60 min``). A bounded deque (capacity 120 entries at
+  60 s cadence — ≈ 2 h of buffer) keeps the rolling window. Until
+  60 min of history has accumulated,
   the persister writes the oldest available snapshot — graceful
   degradation per CLAUDE.md §3 ("degrades gracefully if upstream data
   is stale").
@@ -34,6 +36,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import deque
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from typing import Any, Protocol
 
@@ -95,7 +98,7 @@ class MacroPersister:
         feed: _MacroSnapshotSource,
         *,
         poll_interval_seconds: float = DEFAULT_POLL_INTERVAL_SECONDS,
-        clock: Any = None,  # noqa: ANN401
+        clock: Callable[[], datetime] | None = None,
     ) -> None:
         self._state = state
         self._feed = feed
@@ -199,7 +202,7 @@ class MacroPersister:
             self._vix_history.popleft()
 
     def _resolve_vix_1h_ago(self, now: datetime) -> float | None:
-        """Return the VIX value of the oldest snapshot ≥ 60 min old.
+        """Return the VIX value of the most recent snapshot ≥ 60 min old.
 
         Falls back to the oldest available snapshot when the deque
         does not yet span a full hour — graceful-degradation contract

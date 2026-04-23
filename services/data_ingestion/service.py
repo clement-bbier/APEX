@@ -106,8 +106,10 @@ class DataIngestionService(BaseService):
         # Start the macro polling loop first; it runs in its own background task.
         await self._macro_feed.start()
 
-        # Persistence shims start AFTER macro_feed so the first macro_persister
-        # tick reads a non-empty cache (avoids a 60 s blackout on first boot).
+        # Persistence shims start after macro_feed is launched so macro polling
+        # is already running before persistence begins. This ordering alone does
+        # not guarantee a populated cache or avoid an initial network fetch
+        # (see issue #248 for MacroFeed.snapshot() API to address this).
         await self._session_persister.start()
         await self._macro_persister.start()
 
