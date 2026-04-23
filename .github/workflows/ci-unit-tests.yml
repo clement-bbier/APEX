@@ -15,7 +15,7 @@
 #      service container.
 #
 # This merged structure replaces the former ci-rust.yml + ci-unit-tests.yml
-# split, which was broken: actions/download-artifact@v4 cannot fetch an
+# split, which was broken: actions/download-artifact@v8 cannot fetch an
 # artifact produced by a different workflow run. See issue #242 for the
 # failure mode and CICD_RESET_AUDIT_2026-04-21.md §6 for the decision
 # record.
@@ -136,7 +136,7 @@ jobs:
             pip-${{ runner.os }}-py${{ matrix.python-version }}-
 
       - name: Download Rust wheels (from rust-build job)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rust-wheels
           path: ./wheels
