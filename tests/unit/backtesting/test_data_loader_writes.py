@@ -51,4 +51,8 @@ def test_save_parquet_round_trip(tmp_path: Path) -> None:
         assert back.timestamp_ms == original.timestamp_ms
         assert back.price == original.price
         assert back.volume == original.volume
+        assert back.side == original.side
+        assert back.bid == original.bid
+        assert back.ask == original.ask
+        assert back.spread_bps == original.spread_bps
         assert back.session == original.session

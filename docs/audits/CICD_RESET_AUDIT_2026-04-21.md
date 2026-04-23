@@ -190,7 +190,7 @@ Changes vs. old `ci.yml`:
 
 ## 7. Pre-existing mypy debt on main — **RESOLVED 2026-04-22 (issue #240)**
 
-From Sprint 3B close-out and confirmed by reading `backtesting/data_loader.py:116`:
+From Sprint 3B close-out and confirmed by reading `backtesting/data_loader.py` at the `pq.write_table` call site:
 
 ```python
 pq.write_table(pa.Table.from_pandas(df), str(path))
@@ -290,7 +290,7 @@ Focus targets (ordered by marginal yield for the 3.6pp gap):
 
 **Defer to follow-up**:
 - Coverage gate raise — handed off to **issue #203 (phase-A.13)**, activation condition in §10.2, exact diff in §10.1. **Not committed on this branch.**
-- ~~mypy debt fix on `backtesting/data_loader.py:116` (see §7)~~ — **RESOLVED via issue #240 (2026-04-22)**
+- ~~mypy debt fix on `backtesting/data_loader.py` at the `pq.write_table` call site (see §7)~~ — **RESOLVED via issue #240 (2026-04-22)**
 - Branch protection on `main` requiring `quality`, `rust`, `unit-tests`, `integration-tests`
 
 **Tracked upstream, do not touch in this PR**:
