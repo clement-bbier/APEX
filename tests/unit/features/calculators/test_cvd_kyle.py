@@ -164,12 +164,72 @@ class TestConstructorValidation:
             CVDKyleCalculator(kyle_window=5)
 
     def test_kyle_zscore_lookback_too_small_raises(self) -> None:
-        with pytest.raises(ValueError, match="kyle_zscore_lookback must be >= 2"):
+        with pytest.raises(ValueError, match=r"must be\s+>= 2 \* kyle_window"):
             CVDKyleCalculator(kyle_window=10, kyle_zscore_lookback=15)
+
+    def test_kyle_zscore_lookback_equals_window_raises(self) -> None:
+        """lookback == kyle_window violates 2x rule -> fail with clear msg."""
+        with pytest.raises(ValueError, match=r"must be\s+>= 2 \* kyle_window"):
+            CVDKyleCalculator(kyle_window=250, kyle_zscore_lookback=250)
+
+    def test_kyle_zscore_lookback_exceeds_window_but_below_2x_raises(self) -> None:
+        """The #239 reproducer: kyle_window=250 with default lookback=252."""
+        with pytest.raises(ValueError, match=r"must be\s+>= 2 \* kyle_window"):
+            CVDKyleCalculator(kyle_window=250, kyle_zscore_lookback=252)
+
+    def test_kyle_zscore_lookback_exactly_2x_window_valid(self) -> None:
+        """Boundary: lookback == 2 * kyle_window is the minimum valid value."""
+        calc = CVDKyleCalculator(kyle_window=250, kyle_zscore_lookback=500)
+        assert calc._kyle_window == 250
+        assert calc._kyle_zscore_lookback == 500
+
+    def test_kyle_zscore_lookback_error_message_includes_offending_values(self) -> None:
+        """Error message must include both provided and required values."""
+        with pytest.raises(ValueError, match=r"kyle_zscore_lookback") as excinfo:
+            CVDKyleCalculator(kyle_window=250, kyle_zscore_lookback=252)
+        msg = str(excinfo.value)
+        assert "252" in msg
+        assert "500" in msg
+        assert "kyle_window=250" in msg
 
     def test_combined_weights_not_summing_to_one_raises(self) -> None:
         with pytest.raises(ValueError, match=r"sum to 1\.0"):
             CVDKyleCalculator(combined_weights=(0.6, 0.6))
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Constructor validation — Hypothesis property test (#239)
+# ══════════════════════════════════════════════════════════════════════
+
+
+class TestConstructorValidationProperties:
+    """Property-based tests for the (kyle_window, kyle_zscore_lookback) rule."""
+
+    @given(
+        kyle_window=st.integers(min_value=10, max_value=2000),
+        kyle_zscore_lookback=st.integers(min_value=1, max_value=5000),
+    )
+    @settings(
+        max_examples=50 if os.environ.get("CI") else 300,
+        deadline=None,
+    )
+    def test_init_accepts_iff_lookback_geq_2x_window(
+        self, kyle_window: int, kyle_zscore_lookback: int
+    ) -> None:
+        """Init must reject exactly when kyle_zscore_lookback < 2 * kyle_window."""
+        if kyle_zscore_lookback < kyle_window * 2:
+            with pytest.raises(ValueError, match=r"kyle_zscore_lookback"):
+                CVDKyleCalculator(
+                    kyle_window=kyle_window,
+                    kyle_zscore_lookback=kyle_zscore_lookback,
+                )
+        else:
+            calc = CVDKyleCalculator(
+                kyle_window=kyle_window,
+                kyle_zscore_lookback=kyle_zscore_lookback,
+            )
+            assert calc._kyle_window == kyle_window
+            assert calc._kyle_zscore_lookback == kyle_zscore_lookback
 
 
 # ══════════════════════════════════════════════════════════════════════

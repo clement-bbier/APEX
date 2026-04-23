@@ -136,8 +136,11 @@ class CVDKyleCalculator(FeatureCalculator):
             raise ValueError(f"kyle_window must be >= 10 for stable OLS, got {kyle_window}")
         if kyle_zscore_lookback < kyle_window * 2:
             raise ValueError(
-                f"kyle_zscore_lookback must be >= 2 * kyle_window, "
-                f"got {kyle_zscore_lookback} < {2 * kyle_window}"
+                f"kyle_zscore_lookback ({kyle_zscore_lookback}) must be "
+                f">= 2 * kyle_window ({2 * kyle_window}) to leave sufficient "
+                f"history for rolling z-score normalization. "
+                f"Recommended: kyle_zscore_lookback >= 2 * kyle_window "
+                f"(got kyle_window={kyle_window})."
             )
         if abs(sum(combined_weights) - 1.0) > 1e-9:
             raise ValueError(f"combined_weights must sum to 1.0, got {sum(combined_weights)}")
