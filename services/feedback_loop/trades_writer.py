@@ -292,6 +292,7 @@ class TradesWriter:
                     trade_id=trade.trade_id,
                     strategy_id=trade.strategy_id,
                     error=str(exc),
+                    exc_info=exc,
                 )
 
         # Mark seen AFTER the writes so a failing write can be retried
