@@ -17,6 +17,7 @@ from services.feedback_loop.position_aggregator import (
 )
 from services.feedback_loop.signal_quality import SignalQuality
 from services.feedback_loop.trade_analyzer import TradeAnalyzer
+from services.feedback_loop.trades_writer import TradesWriter
 
 logger = get_logger("feedback_loop")
 
@@ -38,9 +39,11 @@ class FeedbackLoopService(BaseService):
         self._analyzer = TradeAnalyzer()
         self._quality = SignalQuality()
         self._drift = DriftDetector()
-        # PositionAggregator is instantiated in run() once self.state is wired
-        # by BaseService.start(). Hold the task handle here for cancellation.
+        # PositionAggregator + TradesWriter are instantiated in run() once
+        # self.state / self.bus are wired by BaseService.start(). Hold the
+        # task handles here for cancellation in the finally block.
         self._aggregator_task: asyncio.Task[None] | None = None
+        self._trades_writer_task: asyncio.Task[None] | None = None
 
     async def on_message(self, topic: str, data: dict[str, Any]) -> None:
         """No-op: feedback loop reads from Redis, does not subscribe."""
@@ -60,6 +63,15 @@ class FeedbackLoopService(BaseService):
         )
         self._aggregator_task = asyncio.create_task(aggregator.run_loop())
 
+        # Launch the TradesWriter background task — it subscribes to the
+        # trades.executed ZMQ topic and dual-writes each closed-trade
+        # record to trades:all (legacy) + trades:{strategy_id}:all
+        # (per-strategy) so the six existing readers (audit
+        # TRADES_KEY_WRITER_AUDIT_2026-04-20) see live data. Resolves the
+        # orphan-write identified by PR #212; closes issue #237.
+        trades_writer = TradesWriter(self.state, bus=self.bus)
+        self._trades_writer_task = asyncio.create_task(trades_writer.run_loop())
+
         try:
             while self._running:
                 try:
@@ -77,6 +89,11 @@ class FeedbackLoopService(BaseService):
                 with contextlib.suppress(asyncio.CancelledError):
                     await self._aggregator_task
                 self._aggregator_task = None
+            if self._trades_writer_task is not None:
+                self._trades_writer_task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._trades_writer_task
+                self._trades_writer_task = None
 
     async def _fast_analysis(self) -> None:
         """Fast analysis every 5 minutes: drift detection and Kelly update."""
