@@ -20,7 +20,9 @@ from core.logger import get_logger
 from services.data_ingestion.alpaca_feed import AlpacaFeed
 from services.data_ingestion.binance_feed import BinanceFeed
 from services.data_ingestion.macro_feed import MacroFeed
+from services.data_ingestion.macro_persister import MacroPersister
 from services.data_ingestion.normalizer import AlpacaNormalizer, BinanceNormalizer
+from services.data_ingestion.session_persister import SessionPersister
 
 logger = get_logger("data_ingestion.service")
 
@@ -73,6 +75,12 @@ class DataIngestionService(BaseService):
         # Macro data feed.
         self._macro_feed = MacroFeed(fred_api_key=settings.fred_api_key.get_secret_value())
 
+        # Persistence shims (Phase A.10, issue #200) — write the macro and
+        # session context that S05 risk_manager reads via context_loader.
+        # See docs/audits/SESSION_MACRO_SHIMS_AUDIT_2026-04-21.md.
+        self._session_persister = SessionPersister(self.state)
+        self._macro_persister = MacroPersister(self.state, self._macro_feed)
+
     # ── BaseService interface ─────────────────────────────────────────────────
 
     async def on_message(self, topic: str, data: dict[str, Any]) -> None:
@@ -98,6 +106,13 @@ class DataIngestionService(BaseService):
         # Start the macro polling loop first; it runs in its own background task.
         await self._macro_feed.start()
 
+        # Persistence shims start after macro_feed is launched so macro polling
+        # is already running before persistence begins. This ordering alone does
+        # not guarantee a populated cache or avoid an initial network fetch
+        # (see issue #248 for MacroFeed.snapshot() API to address this).
+        await self._session_persister.start()
+        await self._macro_persister.start()
+
         # Stream feeds run concurrently.  The finally block guarantees all feeds
         # are stopped regardless of how gather exits (cancel, exception, or normal).
         try:
@@ -113,6 +128,8 @@ class DataIngestionService(BaseService):
             raise
         finally:
             await asyncio.gather(
+                self._session_persister.stop(),
+                self._macro_persister.stop(),
                 self._macro_feed.stop(),
                 self._binance_feed.stop(),
                 self._alpaca_feed.stop(),
