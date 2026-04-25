@@ -156,7 +156,7 @@ async def test_get_pnl_consumes_canonical_schema(
 
     assert result.trade_count_today == 3
     # realized_today is formatted as currency string "$150.00".
-    assert "150" in result.realized_today
+    assert result.realized_today == "$150.00"
     # All three are winners (net_pnl=50) → rolling win rate should be 1.0.
     assert result.win_rate_rolling == pytest.approx(1.0)
 
@@ -174,8 +174,7 @@ async def test_get_pnl_filters_yesterday_trades(
 
     assert result.trade_count_today == 1
     # Only the today trade ($100) contributes to realized.
-    assert "100" in result.realized_today
-    assert "999" not in result.realized_today
+    assert result.realized_today == "$100.00"
 
 
 @pytest.mark.asyncio

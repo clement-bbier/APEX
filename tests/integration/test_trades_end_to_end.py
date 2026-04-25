@@ -23,8 +23,8 @@ Scenarios:
 
 1. Golden path: 5 trades → all six readers see the canonical shape.
 2. Empty: no trades → every reader returns zero/empty without raising.
-3. Max buffer: 10 020 trades → writer ``LTRIM`` caps at ``DEFAULT_TRIM_SIZE``
-   (10 000); readers still consume the capped list.
+3. Max buffer: 150 trades with ``trim_size=100`` → writer ``LTRIM`` caps the
+   list at 100 entries; readers still consume the capped list.
 4. Concurrent publish + reader invocation: readers never observe
    partial-serialized frames (LPUSH is atomic at the Redis level).
 5. ``strategy_id`` propagation: distinct strategies land in their own
@@ -189,6 +189,7 @@ async def _drive_writer(
     bus: _AsyncQueueBus,
     writer: TradesWriter,
     trades: list[TradeRecord],
+    redis_client: fakeredis.aioredis.FakeRedis,
     *,
     expected_count: int | None = None,
 ) -> asyncio.Task[None]:
@@ -206,7 +207,7 @@ async def _drive_writer(
     # Drain the queue via cooperative scheduling.
     for _ in range(max(target * 20, 40)):
         await asyncio.sleep(0)
-        size = await writer._state._redis.llen(LEGACY_AGGREGATE_KEY)  # type: ignore[attr-defined]
+        size = await redis_client.llen(LEGACY_AGGREGATE_KEY)
         if size >= min(target, DEFAULT_TRIM_SIZE):
             break
     return task
@@ -237,7 +238,7 @@ async def test_golden_path_five_trades_reach_all_six_readers(
         _make_trade(f"T{i}", symbol="AAPL", net_pnl="50", exit_ms=_today_exit_ms(9 + i))
         for i in range(5)
     ]
-    task = await _drive_writer(bus, writer, trades)
+    task = await _drive_writer(bus, writer, trades, redis_client)
     await _stop_writer(task)
 
     # Reader 1 — FeedbackLoopService._fast_analysis (5 trades = Kelly threshold).

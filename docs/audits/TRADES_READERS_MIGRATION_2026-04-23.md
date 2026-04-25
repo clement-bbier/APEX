@@ -81,7 +81,7 @@ trades = [TradeRecord(**t) for t in raw_trades if isinstance(t, dict)]
 - **Current behaviour**: identical deserialization pattern to reader 1; reads the full list instead of a bounded window.
 - **Gap vs. canonical**: none. Same round-trip guarantee as reader 1.
 - **Classification**: **M1**. No code change.
-- **Regression test added**: `tests/unit/feedback_loop/test_service_canonical_trades.py::test_slow_analysis_consumes_canonical_schema` — seeds via writer, invokes `_slow_analysis`, asserts `feedback:signal_quality` and `feedback:attribution` keys are populated.
+- **Regression test added**: `tests/unit/feedback_loop/test_service_canonical_trades.py::test_slow_analysis_consumes_canonical_schema` — seeds via writer, invokes `_slow_analysis`, and asserts `feedback:signal_quality` is populated; `feedback:attribution` is not asserted there because `TradeAnalyzer.batch_analyze` hits a pre-existing Decimal/float TypeError (see follow-up issue for the fix).
 
 ### 4.3 Reader 3 — `get_pnl` (`services/command_center/command_api.py:244`)
 
@@ -157,7 +157,7 @@ Scenarios:
 
 1. `test_golden_path_five_trades_reach_all_six_readers` — publish five trades, confirm each reader sees the full set.
 2. `test_empty_trades_all_readers_gracefully_return_zero` — no trades published; all readers return zero/empty without exception.
-3. `test_max_buffer_trades_preserves_writer_ltrim` — publish 10 020 trades, confirm `trades:all` is capped at `DEFAULT_TRIM_SIZE` (10 000) and readers still work.
+3. `test_max_buffer_trades_preserves_writer_ltrim` — publish 150 trades with the test writer configured to `trim_size=100`, confirming `trades:all` is capped at 100 entries; readers still consume the capped list.
 4. `test_concurrent_publish_and_read_atomicity` — readers invoked concurrently with writer; no partial-read exceptions (writer `LPUSH` is atomic at the Redis level; readers never see half-serialized frames).
 5. `test_strategy_id_propagates_to_per_strategy_partition` — trades with distinct `strategy_id` land in both `trades:all` and `trades:{strategy_id}:all`; legacy readers (which don't discriminate) see the union.
 
