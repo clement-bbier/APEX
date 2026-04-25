@@ -231,16 +231,19 @@ class TestTickBasedBuildWindowsFast:
         assert len(windows) == 3
         assert len(windows[-1].test_ticks) == 11
 
-    def test_build_windows_empty_window_is_skipped(self) -> None:
-        """A window with no ticks is skipped (line 288-289)."""
+    def test_build_windows_minimum_valid_ticks_produces_non_empty_windows(self) -> None:
+        """Minimum valid tick count still produces one non-empty window per split.
+
+        The ``if not test_ticks_window: continue`` branch in
+        ``build_windows_fast`` is dead code under the ``n >= n_splits * 2``
+        guard; documented for future cleanup.
+        """
         v = TickBasedWalkForwardValidator(n_splits=3, embargo_bars=0)
-        # Just enough ticks to pass the minimum (n_splits * 2 = 6),
-        # but window_size = 2 and at least one window will be empty after slicing.
-        # This path asserts `continue` doesn't crash even if rare.
         ticks = [_make_tick(i * 1000) for i in range(6)]
         windows = v.build_windows_fast(ticks)
-        # 3 windows of size 2 each; last absorbs remainder → all non-empty
+
         assert len(windows) == 3
+        assert [len(w.test_ticks) for w in windows] == [2, 2, 2]
 
 
 class TestCombinatorialPurgedCVInit:
