@@ -314,28 +314,37 @@ class TechnicalAnalyzer:
 
         True Range = max(H − L, |H − prev_C|, |L − prev_C|).
 
+        The seed value is the arithmetic mean of the first ``period`` TR
+        values; subsequent values are produced by the Wilder recurrence
+        ``ATR_t = (ATR_{t-1} * (period - 1) + TR_t) / period`` over the
+        remaining TRs.
+
         Args:
             period: ATR smoothing period (default 14).
             timeframe: Bar timeframe to use (default ``'5m'``).
 
         Returns:
-            ATR as a :class:`~decimal.Decimal`, or ``None`` if insufficient
-            bars exist.
+            ATR as a :class:`~decimal.Decimal`, or ``None`` if fewer than
+            ``period + 1`` bars are available.
+
+        Reference:
+            Wilder J.W. (1978). "New Concepts in Technical Trading Systems".
+            Trend Research, ISBN 978-0-89459-027-6.
         """
+        # Compute TR over ALL available bars (Wilder 1978 canonical formulation).
+        # Previous implementation sliced bars[-(period + 1):] before computing
+        # TRs, yielding exactly `period` TR values, leaving trs[period:] always
+        # empty so the smoothing loop body never executed (#254).
         bars = self._all_bars(timeframe)
         if len(bars) < period + 1:
             return None
 
-        recent = bars[-(period + 1) :]
         trs: list[float] = []
-        for i in range(1, len(recent)):
-            h = recent[i]["high"]
-            lo = recent[i]["low"]
-            prev_c = recent[i - 1]["close"]
+        for i in range(1, len(bars)):
+            h = bars[i]["high"]
+            lo = bars[i]["low"]
+            prev_c = bars[i - 1]["close"]
             trs.append(max(h - lo, abs(h - prev_c), abs(lo - prev_c)))
-
-        if not trs:
-            return None
 
         atr_val = sum(trs[:period]) / period
         for tr in trs[period:]:
