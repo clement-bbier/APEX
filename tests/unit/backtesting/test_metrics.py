@@ -13,6 +13,8 @@ from typing import Any
 
 import numpy as np
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from backtesting.metrics import (
     almgren_chriss_impact,
@@ -959,3 +961,99 @@ def test_ac_impact_rejects_invalid_calibration() -> None:
         almgren_chriss_impact(50_000, 1_000_000, 0.02, gamma=float("nan"))
     with pytest.raises(ValueError, match="finite non-negative"):
         almgren_chriss_impact(float("inf"), 1_000_000, 0.02)
+
+
+# ---------------------------------------------------------------------------
+# PBO property tests (issue #266) — Bailey-Borwein-Lopez de Prado-Zhu (2014)
+# ---------------------------------------------------------------------------
+
+
+class TestPBOProperties:
+    """Hypothesis property tests for PBO invariants (#266).
+
+    Reference:
+        Bailey D., Borwein J., Lopez de Prado M., Zhu Q. (2014).
+        "The Probability of Backtest Overfitting".
+        Journal of Computational Finance, 17(4).
+    """
+
+    @given(
+        n_strategies=st.integers(min_value=2, max_value=12),
+        n_obs=st.integers(min_value=60, max_value=200),
+        seed=st.integers(min_value=1, max_value=10_000),
+    )
+    @settings(max_examples=20, deadline=None)
+    def test_pbo_in_unit_interval(self, n_strategies: int, n_obs: int, seed: int) -> None:
+        """PBO must lie in [0, 1] for any well-formed returns matrix."""
+        rng = np.random.default_rng(seed)
+        returns = rng.normal(0.0, 0.01, size=(n_obs, n_strategies))
+        cv = CombinatorialPurgedCV(n_splits=6, n_test_splits=2, embargo_pct=0.0)
+        pbo = probability_of_backtest_overfitting_cpcv(returns, cv)
+        assert math.isfinite(pbo)
+        assert 0.0 <= pbo <= 1.0
+
+    def test_pbo_perfect_overfit_property(self) -> None:
+        """Self-contained regression of the line-247 perfect-overfit fixture.
+
+        Two designed CV splits over 20 observations and 3 strategies. The
+        IS-best strategy is constructed to be the OOS-worst on every split,
+        so PBO must equal 1.0.
+        """
+        n_obs = 20
+        half = n_obs // 2
+        returns = np.zeros((n_obs, 3), dtype=float)
+        returns[:half, 0] = 0.02
+        returns[half:, 0] = -0.02
+        returns[:half, 1] = -0.02
+        returns[half:, 1] = 0.02
+        returns[:, 2] = 0.0001
+        splits = [
+            (list(range(0, half)), list(range(half, n_obs))),
+            (list(range(half, n_obs)), list(range(0, half))),
+        ]
+        cv = _MockCV(splits)
+        pbo = probability_of_backtest_overfitting_cpcv(returns, cv)  # type: ignore[arg-type]
+        assert pbo == 1.0
+
+    def test_pbo_perfect_anti_overfit_returns_zero(self) -> None:
+        """When the IS-best is also the OOS-best on every split, PBO = 0.0.
+
+        Strategy 0 dominates uniformly so it is selected IS and OOS-best
+        on every CPCV path; logits are strictly positive → PBO = 0.0.
+        """
+        rng = np.random.default_rng(11)
+        n_obs, n_strats = 80, 5
+        returns = rng.normal(0.0, 0.001, size=(n_obs, n_strats))
+        returns[:, 0] = 0.02
+        cv = CombinatorialPurgedCV(n_splits=6, n_test_splits=2, embargo_pct=0.0)
+        pbo = probability_of_backtest_overfitting_cpcv(returns, cv)
+        assert pbo == 0.0
+
+    def test_pbo_robust_to_zero_variance_strategies(self) -> None:
+        """Regression for #266: zero-variance series produce ±inf Sharpes.
+
+        The IS/OOS rank step must remain well-defined even when several
+        candidate strategies have constant returns over a fold (e.g. cash,
+        flat-position, or degenerate signal). Pre-fix, scipy ``rankdata``
+        on a vector containing both ``+inf`` and ``-inf`` returned an
+        all-NaN array, which silently zeroed PBO regardless of true
+        overfitting.
+        """
+        n_obs = 40
+        half = n_obs // 2
+        returns = np.zeros((n_obs, 4), dtype=float)
+        returns[:half, 0] = 0.01
+        returns[half:, 0] = -0.01
+        returns[:half, 1] = -0.01
+        returns[half:, 1] = 0.01
+        returns[:, 2] = 0.0001
+        # strategy 3: flat zero — pure noise floor candidate
+        splits = [
+            (list(range(0, half)), list(range(half, n_obs))),
+            (list(range(half, n_obs)), list(range(0, half))),
+        ]
+        cv = _MockCV(splits)
+        pbo = probability_of_backtest_overfitting_cpcv(returns, cv)  # type: ignore[arg-type]
+        assert math.isfinite(pbo)
+        assert 0.0 <= pbo <= 1.0
+        assert pbo == 1.0
