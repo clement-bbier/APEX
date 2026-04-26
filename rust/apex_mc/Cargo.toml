@@ -12,4 +12,4 @@ numpy = "0.28"
 ndarray = "0.17"
 rayon = "1.12"
 rand = { version = "0.8", features = ["small_rng"] }
-rand_distr = "0.4"
+rand_distr = "0.6"
