@@ -13,7 +13,7 @@ ever reintroduced.
 from __future__ import annotations
 
 from decimal import Decimal
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from hypothesis import given, settings
@@ -234,3 +234,37 @@ class TestTradeAnalyzerWithRealTradeRecord:
         assert isinstance(result, dict)
         assert "r_multiple" in result
         assert isinstance(result["r_multiple"], float)
+
+
+class TestUpdateKellyStatsWritePath:
+    """Regression: ``_update_kelly_stats`` writes to Redis when state is
+    present and trade count >= 5.
+
+    Note: this test uses a minimal duck-typed object rather than real
+    ``TradeRecord`` because ``TradeRecord`` lacks the ``pnl_pct`` field
+    that ``_update_kelly_stats`` reads (see #274 for the underlying
+    schema mismatch). When #274 is fixed, this test should be updated to
+    use real ``TradeRecord``.
+    """
+
+    @pytest.mark.asyncio
+    async def test_writes_kelly_stats_when_threshold_met(self) -> None:
+        state = AsyncMock()
+        analyzer = TradeAnalyzer(state=state)
+        # Minimal duck-typed objects with the fields _update_kelly_stats
+        # reads (currently net_pnl + pnl_pct; see #274 for the schema
+        # mismatch).
+        winning_trades = [
+            MagicMock(net_pnl=Decimal("100"), pnl_pct=Decimal("0.05")) for _ in range(10)
+        ]
+        losing_trades = [
+            MagicMock(net_pnl=Decimal("-50"), pnl_pct=Decimal("-0.025")) for _ in range(5)
+        ]
+        await analyzer._update_kelly_stats(winning_trades + losing_trades)
+        state.set.assert_called_once()
+        call_args = state.set.call_args
+        assert call_args[0][0] == "feedback:kelly_stats:default"
+        payload = call_args[0][1]
+        assert "win_rate" in payload
+        assert "avg_rr" in payload
+        assert "n_trades" in payload

@@ -45,6 +45,17 @@ class TradeAnalyzer:
         :pyattr:`TradeRecord.r_multiple`), falling back to
         ``Decimal("1")`` when entry == exit to avoid division-by-zero.
 
+        Note (post-#258 semantic deviation): r_multiple is computed here
+        as ``net_pnl / |entry - exit|`` without the size factor. This
+        differs from :pyattr:`TradeRecord.r_multiple`
+        (``core/models/order.py:415``) which uses
+        ``|entry - exit| * size`` as denominator. The TradeRecord
+        property is the canonical position-aware risk multiple. The
+        value computed here is a per-unit-price r-multiple used
+        internally by feedback_loop attribution. Both are mathematically
+        valid but report different magnitudes; unifying them would be a
+        follow-up.
+
         Args:
             trade: TradeRecord instance to analyze.
 

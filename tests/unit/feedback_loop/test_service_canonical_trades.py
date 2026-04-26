@@ -278,7 +278,11 @@ async def test_slow_analysis_consumes_canonical_schema(
     # objects, so feedback:attribution is reachable.
     assert "feedback:attribution" in set_keys
     attribution_payload = next(val for key, val in state.set_calls if key == "feedback:attribution")
-    assert isinstance(attribution_payload, (dict, list))
+    assert isinstance(attribution_payload, list)
+    assert len(attribution_payload) > 0  # 5 trades seeded by fixture
+    for entry in attribution_payload:
+        assert isinstance(entry, dict)
+        assert "r_multiple" in entry  # the field analyze() returns
 
 
 @pytest.mark.asyncio
