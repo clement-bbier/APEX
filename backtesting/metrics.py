@@ -669,6 +669,31 @@ def minimum_track_record_length(
     return max(1, math.ceil(1.0 + var_f * (z / (sr_raw - sr_star)) ** 2))
 
 
+def _rankdata_average_safe(
+    values: np.ndarray[Any, np.dtype[np.float64]],
+) -> np.ndarray[Any, np.dtype[np.float64]]:
+    """Average-rank wrapper around :func:`scipy.stats.rankdata` robust to ±inf.
+
+    SciPy ``rankdata`` (≤ 1.12) returns an all-NaN vector when the input
+    contains both ``+inf`` and ``-inf`` because its internal tie-detection
+    computes ``inf - inf`` → NaN, which then poisons every rank. We pre-map
+    infinities to finite sentinels that strictly preserve the input order
+    before delegating.
+    """
+    arr = np.asarray(values, dtype=np.float64)
+    finite_mask = np.isfinite(arr)
+    if finite_mask.all():
+        return np.asarray(scipy_stats.rankdata(arr, method="average"), dtype=np.float64)
+    finite_vals = arr[finite_mask]
+    bound = float(np.max(np.abs(finite_vals))) + 1.0 if finite_vals.size else 1.0
+    safe = np.where(
+        np.isposinf(arr),
+        bound,
+        np.where(np.isneginf(arr), -bound, arr),
+    )
+    return np.asarray(scipy_stats.rankdata(safe, method="average"), dtype=np.float64)
+
+
 def probability_of_backtest_overfitting_cpcv(
     strategy_returns: np.ndarray[Any, np.dtype[np.float64]],
     cv: CombinatorialPurgedCV,
@@ -712,19 +737,21 @@ def probability_of_backtest_overfitting_cpcv(
         annual_factor: Annualisation factor (``sqrt(252)`` for daily).
 
     Returns:
-        PBO in ``[0, 1]``. Values ``< 0.1`` suggest a genuine edge,
-        values near ``0.5`` suggest the backtest is statistically
-        indistinguishable from noise selection.
+        Float in ``[0, 1]``. Higher PBO indicates higher overfitting
+        probability. Conventionally, ``PBO < 0.5`` is required for
+        strategy promotion (ADR-0002 §6). Values ``< 0.1`` suggest a
+        genuine edge; values near ``0.5`` suggest the backtest is
+        statistically indistinguishable from noise selection.
 
     Raises:
         ValueError: if ``strategy_returns`` is not 2D, if
             ``n_strategies < 2``, or if the CPCV produces no splits.
 
     Reference:
-        Bailey, D. H., Borwein, J. M., Lopez de Prado, M., & Zhu, Q. J.
-        (2014). The Probability of Backtest Overfitting. Journal of
-        Computational Finance. Equation 11 (logit) and Equation 12
-        (PBO definition).
+        Bailey D., Borwein J., Lopez de Prado M., Zhu Q. (2014).
+        "The Probability of Backtest Overfitting". Journal of
+        Computational Finance, 17(4). Equation 11 (logit) and
+        Equation 12 (PBO definition).
     """
     arr = np.asarray(strategy_returns, dtype=float)
     if arr.ndim != 2:
@@ -758,7 +785,7 @@ def probability_of_backtest_overfitting_cpcv(
             dtype=float,
         )
         best_is = int(np.argmax(is_sharpes))
-        ranks = scipy_stats.rankdata(oos_sharpes, method="average")
+        ranks = _rankdata_average_safe(oos_sharpes)
         rank_best = float(ranks[best_is])
         omega = (rank_best + 0.5) / (n_strats + 1)
         lambda_c = math.log(omega / (1.0 - omega))
