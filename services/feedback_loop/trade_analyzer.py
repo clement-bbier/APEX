@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 import structlog
@@ -29,6 +30,32 @@ class TradeAnalyzer:
     def analyze(self, trade: TradeRecord) -> dict[str, Any]:
         """Return a full attribution dict for a single trade.
 
+        All input arithmetic is Decimal per CLAUDE.md §2; r_multiple and
+        actual_outcome are cast to float at the JSON-serialization
+        boundary only.
+
+        Note (post-#258): this method previously used a defensive
+        ``getattr(trade, "...", 0.0) or 0.0`` pattern that mixed Decimal
+        TradeRecord fields with float defaults, raising TypeError on
+        ``Decimal / float``. TradeRecord is a frozen Pydantic v2 model
+        (``core/models/order.py:339``), so direct attribute access is
+        correct and Decimal-throughout is enforced. TradeRecord does not
+        carry a ``stop_loss`` field, so the risk denominator uses
+        ``|entry_price - exit_price|`` (consistent with
+        :pyattr:`TradeRecord.r_multiple`), falling back to
+        ``Decimal("1")`` when entry == exit to avoid division-by-zero.
+
+        Note (post-#258 semantic deviation): r_multiple is computed here
+        as ``net_pnl / |entry - exit|`` without the size factor. This
+        differs from :pyattr:`TradeRecord.r_multiple`
+        (``core/models/order.py:415``) which uses
+        ``|entry - exit| * size`` as denominator. The TradeRecord
+        property is the canonical position-aware risk multiple. The
+        value computed here is a per-unit-price r-multiple used
+        internally by feedback_loop attribution. Both are mathematically
+        valid but report different magnitudes; unifying them would be a
+        follow-up.
+
         Args:
             trade: TradeRecord instance to analyze.
 
@@ -36,19 +63,23 @@ class TradeAnalyzer:
             Dict with keys: signal_type, regime_at_entry, session,
             mtf_score, expected_slippage_bps, actual_outcome, r_multiple.
         """
-        entry = getattr(trade, "entry_price", 0.0) or 0.0
-        getattr(trade, "exit_price", 0.0) or 0.0
-        stop = getattr(trade, "stop_loss", 0.0) or 0.0
-        risk = abs(entry - stop) if entry and stop else 1.0
-        pnl = getattr(trade, "net_pnl", 0.0) or 0.0
-        r_multiple = float(pnl / risk) if risk != 0.0 else 0.0
+        entry = trade.entry_price
+        exit_price = trade.exit_price
+        pnl = trade.net_pnl
+
+        risk = abs(entry - exit_price)
+        if risk == Decimal("0"):
+            risk = Decimal("1")
+        r_multiple = float(pnl / risk)
 
         return {
-            "signal_type": getattr(trade, "signal_type", "unknown"),
-            "regime_at_entry": getattr(trade, "regime_at_entry", "unknown"),
-            "session": getattr(trade, "session_at_entry", "unknown"),
-            "mtf_score": getattr(trade, "mtf_score", 0.0),
-            "expected_slippage_bps": getattr(trade, "expected_slippage_bps", 0.0),
+            "signal_type": trade.signal_type if trade.signal_type else "unknown",
+            "regime_at_entry": (trade.regime_at_entry if trade.regime_at_entry else "unknown"),
+            "session": trade.session_at_entry if trade.session_at_entry else "unknown",
+            "mtf_score": trade.mtf_alignment_score,
+            # expected_slippage_bps is not modeled on TradeRecord; the dict
+            # key is preserved for downstream consumers (vestigial).
+            "expected_slippage_bps": 0.0,
             "actual_outcome": float(pnl),
             "r_multiple": r_multiple,
         }
