@@ -45,17 +45,28 @@ class HealthChecker:
     def is_alive(self, service_id: str, timeout_ms: int = 10000) -> bool:
         """Check if a service is alive within the timeout window.
 
+        Boundary semantic: ``elapsed_ms < timeout_ms`` (strict less-than).
+        A heartbeat exactly at the timeout boundary is treated as "just
+        expired" → DEAD. Matches Kubernetes liveness probe, gRPC keepalive,
+        and AWS health check conventions.
+
+        Elapsed time is rounded to integer milliseconds before comparison so
+        the boundary is well-defined under floating-point arithmetic
+        (``time.time()`` returns float seconds; the float→ms round-trip is
+        imprecise for non-integer second values like 512.035).
+
         Args:
             service_id: Service to check.
             timeout_ms: Maximum acceptable silence in milliseconds.
 
         Returns:
-            True if last heartbeat was within timeout.
+            True if last heartbeat was strictly within ``timeout_ms``.
         """
         last = self._last_seen.get(service_id)
         if last is None:
             return False
-        return (time.time() - last) * 1000 < timeout_ms
+        elapsed_ms = round((time.time() - last) * 1000)
+        return elapsed_ms < timeout_ms
 
     def get_dead_services(self) -> list[str]:
         """Return list of service IDs that have not sent a heartbeat within 10s.

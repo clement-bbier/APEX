@@ -363,6 +363,56 @@ class TestLatencyStats:
 
 
 # ---------------------------------------------------------------------------
+# TestBoundary — explicit liveness-window edge cases
+# ---------------------------------------------------------------------------
+
+
+class TestBoundary:
+    """Explicit boundary tests for ``is_alive`` semantics.
+
+    Reinforces the property test by pinning down each side of the
+    ``age < timeout`` boundary with a named case. Originally added after a
+    Hypothesis flake at ``age_ms == timeout_ms`` caused by float-to-ms
+    round-trip imprecision (e.g. ``512035 / 1000 * 1000 == 512034.99...``).
+    """
+
+    def test_age_zero_is_alive(self) -> None:
+        hc = HealthChecker()
+        with patch("services.command_center.health_checker.time.time", return_value=1000.0):
+            hc.record_heartbeat("signal_engine", 0)
+            assert hc.is_alive("signal_engine", timeout_ms=10_000) is True
+
+    def test_age_one_below_timeout_is_alive(self) -> None:
+        hc = HealthChecker()
+        with patch("services.command_center.health_checker.time.time", return_value=1000.0):
+            hc.record_heartbeat("signal_engine", 0)
+        # 9.999s elapsed = 9999ms = timeout − 1
+        with patch("services.command_center.health_checker.time.time", return_value=1009.999):
+            assert hc.is_alive("signal_engine", timeout_ms=10_000) is True
+
+    def test_age_equals_timeout_is_dead(self) -> None:
+        """Boundary case that originally triggered the Hypothesis flake."""
+        hc = HealthChecker()
+        with patch("services.command_center.health_checker.time.time", return_value=0.0):
+            hc.record_heartbeat("signal_engine", 0)
+        # age_ms == timeout_ms, including the FP-pathological 512035 case
+        for boundary_ms in (10_000, 512_035, 1_000_000):
+            with patch(
+                "services.command_center.health_checker.time.time",
+                return_value=boundary_ms / 1000.0,
+            ):
+                assert hc.is_alive("signal_engine", timeout_ms=boundary_ms) is False
+
+    def test_age_above_timeout_is_dead(self) -> None:
+        hc = HealthChecker()
+        with patch("services.command_center.health_checker.time.time", return_value=1000.0):
+            hc.record_heartbeat("signal_engine", 0)
+        # 10.001s elapsed = 10001ms = timeout + 1
+        with patch("services.command_center.health_checker.time.time", return_value=1010.001):
+            assert hc.is_alive("signal_engine", timeout_ms=10_000) is False
+
+
+# ---------------------------------------------------------------------------
 # TestPropertyInvariants — Hypothesis
 # ---------------------------------------------------------------------------
 
