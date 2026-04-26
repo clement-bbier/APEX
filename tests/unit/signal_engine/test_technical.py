@@ -276,10 +276,14 @@ class TestAtrWilderSmoothing:
     def test_wilder_smoothing_differs_from_naive_mean_on_ascending_tr(self) -> None:
         """ATR over an ascending-TR series must differ from the naive mean."""
         ta = TechnicalAnalyzer("BTCUSDT")
-        # Increments 0.1, 0.2, ..., 4.4 -> TRs ascend from 0.1 to 4.4.
-        prices = [100.0]
+        # Build TR sequence with exact Decimal arithmetic to eliminate FP drift.
+        # Each increment is Decimal(i) / Decimal(10), so TRs target exactly
+        # [0.1, 0.2, ..., 4.4] regardless of platform FP rounding.
+        prices: list[float] = [100.0]
+        running = Decimal("100.0")
         for i in range(1, 45):
-            prices.append(prices[-1] + i * 0.1)
+            running += Decimal(i) / Decimal(10)
+            prices.append(float(running))
         _feed_prices(ta, prices)
 
         wilder_atr = ta.atr(period=14, timeframe="5m")
