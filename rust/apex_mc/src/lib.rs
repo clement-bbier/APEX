@@ -9,7 +9,6 @@ use numpy::{IntoPyArray, PyArray2, PyReadonlyArray1};
 use pyo3::prelude::*;
 use rand::prelude::*;
 use rand::rngs::SmallRng;
-use rand_distr::Uniform;
 use rayon::prelude::*;
 
 // ── Internal simulation ───────────────────────────────────────────────────────
@@ -23,11 +22,10 @@ fn simulate_paths(returns: &[f64], n_simulations: usize, seed: u64) -> Vec<Vec<f
         .into_par_iter()
         .map(|i| {
             let mut rng = SmallRng::seed_from_u64(seed.wrapping_add(i as u64));
-            let dist = Uniform::new(0, n);
             let mut path = Vec::with_capacity(n);
             let mut cum = 1.0_f64;
             for _ in 0..n {
-                let idx = rng.sample(dist);
+                let idx = rng.random_range(0..n);
                 cum *= 1.0 + returns[idx];
                 path.push(cum - 1.0);
             }
