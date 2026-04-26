@@ -254,6 +254,109 @@ class TestATRExtended:
         assert float(atr) == 0.0
 
 
+# ── ATR Wilder 1978 smoothing — regression for #254 ──────────────────────────
+
+
+class TestAtrWilderSmoothing:
+    """Regression tests for the Wilder 1978 ATR smoothing fix (#254).
+
+    Previous implementation sliced ``bars[-(period + 1):]`` which yielded
+    exactly ``period`` TR values, leaving ``trs[period:]`` always empty so
+    the smoothing loop body never executed. The fix consumes all available
+    bars and applies the canonical Wilder recurrence.
+
+    Reference: Wilder J.W. (1978) "New Concepts in Technical Trading Systems".
+
+    With single-tick-per-bar feeds (as built by ``_feed_prices``), each bar
+    has ``high == low == close == price``, so the True Range collapses to
+    ``TR_i = |price_i - price_{i-1}|``. This lets the tests pin down the
+    exact TR sequence the analyzer will see.
+    """
+
+    def test_wilder_smoothing_differs_from_naive_mean_on_ascending_tr(self) -> None:
+        """ATR over an ascending-TR series must differ from the naive mean."""
+        ta = TechnicalAnalyzer("BTCUSDT")
+        # Increments 0.1, 0.2, ..., 4.4 -> TRs ascend from 0.1 to 4.4.
+        prices = [100.0]
+        for i in range(1, 45):
+            prices.append(prices[-1] + i * 0.1)
+        _feed_prices(ta, prices)
+
+        wilder_atr = ta.atr(period=14, timeframe="5m")
+        assert wilder_atr is not None
+
+        # Naive arithmetic mean of the last 14 TRs (the buggy behavior):
+        # (3.1 + 4.4) / 2 = 3.75.
+        naive_buggy_atr = 3.75
+        assert abs(float(wilder_atr) - naive_buggy_atr) > 0.1, (
+            f"Wilder ATR ({wilder_atr}) should differ from the naive mean "
+            f"({naive_buggy_atr}) on this ascending-volatility series. If they "
+            f"match, the smoothing loop body did not execute (#254)."
+        )
+        # Sanity: canonical Wilder over all 44 TRs computes to 3.17036762.
+        assert abs(float(wilder_atr) - 3.17036762) < 1e-6
+
+    def test_wilder_recurrence_against_hand_computed_value(self) -> None:
+        """Hand-computed Wilder value over TR=[1, 2, 3, 4, 5], period=3.
+
+        Seed = (1 + 2 + 3) / 3 = 2.0
+        Step 1: (2.0 * 2 + 4) / 3 = 8 / 3 ≈ 2.66667
+        Step 2: (8/3 * 2 + 5) / 3 = 31 / 9 ≈ 3.44444
+        """
+        ta = TechnicalAnalyzer("BTCUSDT")
+        prices = [100.0, 101.0, 103.0, 106.0, 110.0, 115.0]  # diffs: 1, 2, 3, 4, 5
+        _feed_prices(ta, prices)
+
+        result = ta.atr(period=3, timeframe="5m")
+        assert result is not None
+        expected = Decimal("3.44444444")
+        assert abs(result - expected) < Decimal("0.0001"), (
+            f"Wilder hand-computed expected {expected}, got {result}"
+        )
+
+    def test_wilder_constant_tr_yields_constant_atr(self) -> None:
+        """Constant TR series: Wilder smoothing yields that constant value."""
+        ta = TechnicalAnalyzer("BTCUSDT")
+        # Constant +10 increment -> TR_i = 10.0 for every bar.
+        prices = [100.0 + 10.0 * i for i in range(20)]
+        _feed_prices(ta, prices)
+        result = ta.atr(period=14, timeframe="5m")
+        assert result is not None
+        assert abs(result - Decimal("10.0")) < Decimal("0.001")
+
+    def test_returns_none_for_insufficient_bars(self) -> None:
+        """Fewer than ``period + 1`` bars must return None."""
+        ta = TechnicalAnalyzer("BTCUSDT")
+        _feed_prices(ta, [100.0] * 10)  # 10 bars; period=14 needs >= 15.
+        assert ta.atr(period=14, timeframe="5m") is None
+
+    @given(
+        n_bars=st.integers(min_value=20, max_value=120),
+        seed=st.integers(min_value=1, max_value=10_000),
+    )
+    @settings(max_examples=40, deadline=None, suppress_health_check=[HealthCheck.too_slow])
+    def test_wilder_atr_within_tr_range(self, n_bars: int, seed: int) -> None:
+        """Property: Wilder ATR is bounded by ``[min(TR), max(TR)]``."""
+        rng = np.random.default_rng(seed)
+        prices = [100.0]
+        for _ in range(n_bars - 1):
+            prices.append(prices[-1] + float(rng.uniform(-2.0, 2.0)))
+
+        ta = TechnicalAnalyzer("BTCUSDT")
+        _feed_prices(ta, prices)
+        result = ta.atr(period=14, timeframe="5m")
+        if result is None:
+            return  # insufficient data; allowed by contract
+
+        diffs = [abs(prices[i] - prices[i - 1]) for i in range(1, len(prices))]
+        tr_min = min(diffs)
+        tr_max = max(diffs)
+        # Tolerance accounts for the 8-decimal rounding applied to the result.
+        assert tr_min - 1e-6 <= float(result) <= tr_max + 1e-6, (
+            f"ATR={result} outside TR range [{tr_min}, {tr_max}]"
+        )
+
+
 # ── compute_bollinger_score ──────────────────────────────────────────────────
 
 
