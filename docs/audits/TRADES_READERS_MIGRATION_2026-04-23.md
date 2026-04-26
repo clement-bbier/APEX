@@ -81,7 +81,7 @@ trades = [TradeRecord(**t) for t in raw_trades if isinstance(t, dict)]
 - **Current behaviour**: identical deserialization pattern to reader 1; reads the full list instead of a bounded window.
 - **Gap vs. canonical**: none. Same round-trip guarantee as reader 1.
 - **Classification**: **M1**. No code change.
-- **Regression test added**: `tests/unit/feedback_loop/test_service_canonical_trades.py::test_slow_analysis_consumes_canonical_schema` — seeds via writer, invokes `_slow_analysis`, and asserts `feedback:signal_quality` is populated; `feedback:attribution` is not asserted there because `TradeAnalyzer.batch_analyze` hits a pre-existing Decimal/float TypeError (see follow-up issue for the fix).
+- **Regression test added**: `tests/unit/feedback_loop/test_service_canonical_trades.py::test_slow_analysis_consumes_canonical_schema` — seeds via writer, invokes `_slow_analysis`, and asserts both `feedback:signal_quality` and `feedback:attribution` are populated. `feedback:attribution` is now asserted following the #258 fix (Sprint 5 Wave A); previously deferred because `TradeAnalyzer.batch_analyze` hit a pre-existing Decimal/float TypeError.
 
 ### 4.3 Reader 3 — `get_pnl` (`services/command_center/command_api.py:244`)
 

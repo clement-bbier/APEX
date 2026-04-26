@@ -249,15 +249,17 @@ async def test_slow_analysis_consumes_canonical_schema(
     service: FeedbackLoopService,
     state: _FakeState,
 ) -> None:
-    """Trades written via TradesWriter deserialize successfully and feed SignalQuality.
+    """Trades written via TradesWriter deserialize successfully and feed both
+    SignalQuality and TradeAnalyzer.
 
     Asserts ``feedback:signal_quality`` is written — this key is persisted
-    before any downstream TradeAnalyzer call, so its presence is exactly the
-    proof that the canonical-schema deserialization path succeeded (readers 2
-    survives the ``[TradeRecord(**t) for t in raw_trades]`` step). The
-    ``feedback:attribution`` key is written further down the same function
-    and depends on ``TradeAnalyzer.batch_analyze``, which carries a pre-
-    existing Decimal/float arithmetic bug that is out of scope for #238.
+    before any downstream TradeAnalyzer call, so its presence proves the
+    canonical-schema deserialization path succeeded (reader 2 survives the
+    ``[TradeRecord(**t) for t in raw_trades]`` step). Also asserts
+    ``feedback:attribution`` — written further down the same function via
+    ``TradeAnalyzer.batch_analyze``. This second assertion was deferred in
+    PR #256 because of the Decimal/float TypeError tracked as issue #258;
+    that bug is now fixed (Sprint 5 Wave A) and the assertion is live.
     """
     trades = [_make_trade(trade_id=f"T{i:03d}") for i in range(10)]
     await _seed_via_writer(state, trades)
@@ -271,6 +273,12 @@ async def test_slow_analysis_consumes_canonical_schema(
     # received real TradeRecord objects (not empty/malformed input).
     quality_payload = next(val for key, val in state.set_calls if key == "feedback:signal_quality")
     assert set(quality_payload.keys()) == {"by_type", "by_regime", "by_session", "best_configs"}
+
+    # #258 fix: TradeAnalyzer.batch_analyze now succeeds on real TradeRecord
+    # objects, so feedback:attribution is reachable.
+    assert "feedback:attribution" in set_keys
+    attribution_payload = next(val for key, val in state.set_calls if key == "feedback:attribution")
+    assert isinstance(attribution_payload, (dict, list))
 
 
 @pytest.mark.asyncio
