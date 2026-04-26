@@ -20,10 +20,10 @@
 # failure mode and CICD_RESET_AUDIT_2026-04-21.md §6 for the decision
 # record.
 #
-# Coverage gate: currently --cov-fail-under=75 (mirrors pyproject.toml
-# [tool.pytest.ini_options] default). Target is 85% per CLAUDE.md §6 —
-# see CICD_RESET_AUDIT_2026-04-21.md §3 for the ramp plan and
-# [phase-A.13] tracker (issue #203).
+# Coverage gate: --cov-fail-under=85 (CLAUDE.md §6 target). Raised from
+# 75% to 85% on 2026-04-27 closing [phase-A.13] (issue #203) after the
+# Sprint 5 Wave A coverage push (cb_watcher 57% → 100%, PR #269) brought
+# main to 85.35% (CI run 24965362087, 2026-04-26).
 #
 # Required statuses: `rust`, `unit-tests`.
 
@@ -155,7 +155,7 @@ jobs:
           pytest tests/unit/ -v \
             --cov=services --cov=core --cov=backtesting \
             --cov-report=xml --cov-report=term-missing \
-            --cov-fail-under=75 --timeout=30
+            --cov-fail-under=85 --timeout=30
 
       - name: Upload coverage artifact
         if: always()

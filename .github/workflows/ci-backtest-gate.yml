@@ -1,25 +1,17 @@
-# APEX CI — Backtest regression gate (MUZZLED)
+# APEX CI — Backtest regression gate
 #
 # Runs the scripts/backtest_regression.py gate against the 30-day
-# BTCUSDT fixture. Intentionally non-blocking (`continue-on-error: true`)
-# until un-muzzling per issue #196 (phase-A.6) — which requires phase-A.5
-# to land and the Sharpe calculation in `full_report()` to be fixed.
+# BTCUSDT fixture. Un-muzzled per issue #196 (phase-A.6) following the
+# PBO fix in PR #272 (Sprint 5 Wave A) and the Sharpe calculation
+# correction under phase-A.5. The job now reports its real pass/fail
+# status.
 #
-# HARD CONSTRAINT (per mission brief 2026-04-21 / issue #196):
-#   Do NOT remove `continue-on-error: true`. Do NOT restore the
-#   CLAUDE.md §6 target thresholds (MIN_SHARPE=0.8, MAX_DD=0.08) on this
-#   workflow. Un-muzzling is scheduled after 2026-04-27 or Strategy #1
-#   Gate 2, whichever first.
-#
-# When un-muzzling (separate PR, tracked by #196):
-#   1. Remove `continue-on-error: true` below.
-#   2. Restore BACKTEST_MIN_SHARPE=0.8, BACKTEST_MAX_DD=0.08.
-#   3. Delete the "Announce muzzled-gate status" step.
-#   4. Add `backtest-gate` to required status checks on branch protection.
-#
-# Not required on branch protection today. Intentionally.
+# Thresholds (BACKTEST_MIN_SHARPE / BACKTEST_MAX_DD) reflect the current
+# 30-day BTCUSDT fixture quality. Tightening to CLAUDE.md §6 targets
+# (MIN_SHARPE=0.8, MAX_DD=0.08) is tracked separately as an alpha-policy
+# decision tied to Strategy #1 Gate 2.
 
-name: backtest-gate (MUZZLED — see #196)
+name: backtest-gate
 
 on:
   push:
@@ -37,11 +29,8 @@ concurrency:
 
 jobs:
   backtest-gate:
-    name: "backtest-gate (MUZZLED — see #196)"
+    name: backtest-gate
     runs-on: ubuntu-latest
-    # Non-blocking pending phase-A.6 (#196). Do NOT remove without the
-    # prerequisites listed in the header.
-    continue-on-error: true
 
     steps:
       - uses: actions/checkout@v6
@@ -67,18 +56,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Announce muzzled-gate status
-        run: |
-          echo "::warning title=Backtest gate muzzled::backtest-gate runs with continue-on-error=true pending #196 / phase-A.6. Failures here do NOT block merges."
-
       - name: Generate fixture
         run: python scripts/generate_test_fixtures.py
 
       - name: Backtest regression gate
         env:
-          # MUZZLED thresholds — reflect fixture quality, NOT CLAUDE.md §6
-          # targets. Restore MIN_SHARPE=0.8, MAX_DD=0.08 when un-muzzling
-          # per #196.
+          # Thresholds reflect current 30-day BTCUSDT fixture quality.
+          # Tightening to CLAUDE.md §6 targets (MIN_SHARPE=0.8, MAX_DD=0.08)
+          # is a separate alpha-policy decision tied to Strategy #1 Gate 2.
           BACKTEST_MIN_SHARPE: "0.5"
           BACKTEST_MAX_DD: "0.12"
         run: |
